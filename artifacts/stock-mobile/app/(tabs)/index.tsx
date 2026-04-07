@@ -5,7 +5,6 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,12 +15,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { StockRow } from "@/components/StockRow";
 import { useColors } from "@/hooks/useColors";
 import {
-  MasterStock,
-  SortKey,
-  StockFilter,
+  type MasterStock,
+  type SortKey,
+  type StockFilter,
   calcBreadth,
   fetchMasterStock,
   filterStocks,
@@ -29,106 +27,786 @@ import {
   getIndexBadges,
   getTopGainersList,
   getTopLosersList,
-  masterToStock,
   sortStocks,
 } from "@/services/masterStockService";
+import {
+  type RadarMarket,
+  fetchRadarMarket,
+} from "@/services/radarMarketService";
 
-// ─── MoverCard ────────────────────────────────────────────────
+// ─── Greeting ──────────────────────────────────────────────────
 
-function MoverCard({ ms, colors }: {
-  ms: MasterStock;
-  colors: ReturnType<typeof useColors>;
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 11) return "Good Morning 👋";
+  if (h < 15) return "Good Afternoon 👋";
+  return "Good Evening 👋";
+}
+
+// ─── Phase derivation from radar ──────────────────────────────
+
+function derivePhaseLabel(item: RadarMarket): string {
+  const fs = (item.flowState ?? "").toUpperCase();
+  if (fs.includes("STRONG ACCUMULATION") && item.bandarScore >= 65) return "IGNITION";
+  if (fs.includes("STRONG ACCUMULATION")) return "EARLY_ACC";
+  if (fs.includes("ACCUMULATION") && item.trendScore >= 60) return "STRONG_TREND";
+  if (fs.includes("ACCUMULATION")) return "EARLY_ACC";
+  if (fs.includes("STRONG DISTRIBUTION")) return "DISTRIBUTION";
+  if (fs.includes("DISTRIBUTION")) return "EXHAUSTION";
+  return "CHURNING";
+}
+
+const PHASE_BADGE: Record<string, { label: string; color: string }> = {
+  IGNITION:     { label: "ACC",  color: "#16a34a" },
+  EARLY_ACC:    { label: "ACC",  color: "#16a34a" },
+  STRONG_TREND: { label: "TREND", color: "#0ea5e9" },
+  EXHAUSTION:   { label: "LATE", color: "#f97316" },
+  DISTRIBUTION: { label: "DIST", color: "#dc2626" },
+  CHURNING:     { label: "NEU",  color: "#475569" },
+};
+
+const PHASE_DISPLAY: Record<string, string> = {
+  IGNITION:     "Akumulasi Kuat",
+  EARLY_ACC:    "Akumulasi",
+  CHURNING:     "Netral",
+  STRONG_TREND: "Akumulasi Kuat",
+  EXHAUSTION:   "Distribusi",
+  DISTRIBUTION: "Distribusi Kuat",
+};
+
+const PHASE_COLORS: Record<string, string> = {
+  "Akumulasi Kuat": "#10b981",
+  "Akumulasi":      "#34d399",
+  "Netral":         "#fbbf24",
+  "Distribusi":     "#f87171",
+  "Distribusi Kuat":"#dc2626",
+};
+
+// ─── [1] Home Header ──────────────────────────────────────────
+
+const INDICES = [
+  { key: "COMPOSITE", label: "IDX COMPOSITE" },
+  { key: "IDXLQ45",   label: "IDX LQ45" },
+  { key: "IDXJII",    label: "JSX ISLAMIC INDEX" },
+  { key: "IDX30",     label: "IDX30" },
+] as const;
+
+function HomeHeader({ stocks, radar }: {
+  stocks: MasterStock[]; radar: RadarMarket[];
 }) {
+  const breadth = useMemo(() => calcBreadth(stocks), [stocks]);
+  const stockMap = useMemo(() => new Map(stocks.map(s => [s.symbol, s])), [stocks]);
+  const radarMap = useMemo(() => new Map(radar.map(r => [r.ticker, r])), [radar]);
+
+  const ihsgMs = stockMap.get("COMPOSITE");
+  const ihsgRd = radarMap.get("COMPOSITE");
+  const ihsgClose = ihsgMs?.close || ihsgRd?.close || 0;
+  const ihsgChg  = ihsgMs?.changePercent || ihsgRd?.chgPct || 0;
+  const isUp = ihsgChg >= 0;
+  const chgColor = isUp ? "#34d399" : "#f87171";
+
+  return (
+    <View style={{ backgroundColor: "#0f1629", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 }}>
+      {/* Greeting row */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 13 }}>{getGreeting()}</Text>
+        <View style={[styles.liveTag, { backgroundColor: "#34d39922" }]}>
+          <View style={[styles.liveDot, { backgroundColor: "#34d399" }]} />
+          <Text style={[styles.liveText, { color: "#34d399" }]}>LIVE</Text>
+        </View>
+      </View>
+
+      {/* IHSG Big */}
+      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+        <Text style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>IHSG</Text>
+        {ihsgClose > 0 ? (
+          <>
+            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 30 }}>
+              {ihsgClose.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+            </Text>
+            <Text style={{ color: chgColor, fontWeight: "700", fontSize: 15 }}>
+              {isUp ? "+" : ""}{ihsgChg.toFixed(2)}%
+            </Text>
+          </>
+        ) : (
+          <Text style={{ color: "#475569", fontSize: 16 }}>Memuat…</Text>
+        )}
+      </View>
+
+      {/* Breadth mini bar */}
+      {breadth.total > 0 && (
+        <View style={{ marginBottom: 12 }}>
+          <View style={{ height: 4, borderRadius: 2, overflow: "hidden", flexDirection: "row" }}>
+            <View style={{ flex: breadth.advancers, backgroundColor: "#34d399" }} />
+            <View style={{ flex: breadth.unchanged, backgroundColor: "#94a3b820" }} />
+            <View style={{ flex: breadth.decliners, backgroundColor: "#f87171" }} />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 3 }}>
+            <Text style={{ color: "#34d399", fontSize: 9 }}>{breadth.advancers} naik</Text>
+            <Text style={{ color: "#64748b", fontSize: 9 }}>{breadth.total} saham</Text>
+            <Text style={{ color: "#f87171", fontSize: 9 }}>{breadth.decliners} turun</Text>
+          </View>
+        </View>
+      )}
+
+      {/* 4 Index Cards — 2 per row */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        {INDICES.map(idx => {
+          const ms = stockMap.get(idx.key);
+          const rd = radarMap.get(idx.key);
+          const val = ms?.close || rd?.close || 0;
+          const chg = ms?.changePercent || rd?.chgPct || 0;
+          if (val === 0) return null;
+          const up = chg >= 0;
+          const col = up ? "#34d399" : "#f87171";
+          return (
+            <View key={idx.key} style={{
+              flex: 1, minWidth: "45%",
+              backgroundColor: "#1e2433", borderRadius: 10, padding: 10,
+            }}>
+              <Text style={{ color: "#64748b", fontSize: 9, marginBottom: 2 }}>{idx.label}</Text>
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
+                {val > 0 ? val.toLocaleString("id-ID", { maximumFractionDigits: 1 }) : "–"}
+              </Text>
+              <Text style={{ color: col, fontSize: 11, fontWeight: "600" }}>
+                {up ? "+" : ""}{chg.toFixed(2)}%
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ─── [2] Signal Snapshot ──────────────────────────────────────
+
+const SNAPSHOT_TABS = [
+  { key: "acc",   icon: "⭐", label: "Top Akumulasi", badgeColor: "#16a34a" },
+  { key: "entry", icon: "🚀", label: "Entry Peluang",  badgeColor: "#0ea5e9" },
+  { key: "warn",  icon: "⚠️", label: "Peringatan",     badgeColor: "#f97316" },
+  { key: "trend", icon: "✅", label: "Strong Trend",   badgeColor: "#a78bfa" },
+] as const;
+
+type SnapTab = "acc" | "entry" | "warn" | "trend";
+
+function filterByTab(radar: RadarMarket[], tab: SnapTab): RadarMarket[] {
+  const withPhase = radar
+    .filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE")
+    .map(r => ({ ...r, _phase: derivePhaseLabel(r) }));
+
+  switch (tab) {
+    case "acc":
+      return withPhase
+        .filter(r => ["IGNITION", "EARLY_ACC", "STRONG_TREND"].includes(r._phase))
+        .sort((a, b) => b.bandarScore - a.bandarScore)
+        .slice(0, 8);
+    case "entry":
+      return withPhase
+        .filter(r => r._phase === "IGNITION")
+        .sort((a, b) => b.nbs1d - a.nbs1d)
+        .slice(0, 8);
+    case "warn":
+      return withPhase
+        .filter(r => ["EXHAUSTION", "DISTRIBUTION"].includes(r._phase))
+        .sort((a, b) => a.bandarScore - b.bandarScore)
+        .slice(0, 8);
+    case "trend":
+      return withPhase
+        .filter(r => r._phase === "STRONG_TREND")
+        .sort((a, b) => b.nbs1d - a.nbs1d)
+        .slice(0, 8);
+    default:
+      return [];
+  }
+}
+
+function SignalSnapshotSection({ radar }: { radar: RadarMarket[] }) {
+  const [activeTab, setActiveTab] = useState<SnapTab>("acc");
+
+  const stocksOnly = useMemo(
+    () => radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE"),
+    [radar]
+  );
+
+  const counts = useMemo(() => {
+    const withPhase = stocksOnly.map(r => ({ ...r, _phase: derivePhaseLabel(r) }));
+    return {
+      acc:   withPhase.filter(r => ["IGNITION","EARLY_ACC","STRONG_TREND"].includes(r._phase)).length,
+      entry: withPhase.filter(r => r._phase === "IGNITION").length,
+      warn:  withPhase.filter(r => ["EXHAUSTION","DISTRIBUTION"].includes(r._phase)).length,
+      trend: withPhase.filter(r => r._phase === "STRONG_TREND").length,
+    };
+  }, [stocksOnly]);
+
+  const list = useMemo(() => filterByTab(radar, activeTab), [radar, activeTab]);
+
+  const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+
+  return (
+    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12 }]}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 16 }}>🎯</Text>
+          <Text style={styles.cardTitle}>Signal Snapshot</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#34d399" }} />
+            <Text style={{ color: "#64748b", fontSize: 10 }}>{today}</Text>
+          </View>
+        </View>
+        <TouchableOpacity onPress={() => router.push("/(tabs)/bandar" as any)}>
+          <Text style={{ color: "#f59e0b", fontSize: 12 }}>Lihat Semua →</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tabs */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+        {SNAPSHOT_TABS.map(tab => {
+          const active = activeTab === tab.key;
+          return (
+            <TouchableOpacity key={tab.key}
+              onPress={() => setActiveTab(tab.key)}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 4,
+                paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+                backgroundColor: active ? tab.badgeColor + "25" : "transparent",
+                borderWidth: active ? 1 : 0, borderColor: tab.badgeColor,
+                marginRight: 8,
+              }}>
+              <Text style={{ fontSize: 12 }}>{tab.icon}</Text>
+              <Text style={{
+                color: active ? tab.badgeColor : "#64748b",
+                fontSize: 11, fontWeight: active ? "700" : "400",
+              }}>
+                {tab.label} {counts[tab.key]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* List */}
+      {list.length === 0 ? (
+        <Text style={{ color: "#475569", fontSize: 12, textAlign: "center", paddingVertical: 12 }}>
+          Tidak ada saham dalam kategori ini
+        </Text>
+      ) : (
+        list.map((stock, idx) => {
+          const phase = derivePhaseLabel(stock);
+          const badge = PHASE_BADGE[phase] ?? PHASE_BADGE["CHURNING"];
+          const nbsColor = stock.nbs1d >= 0 ? "#34d399" : "#f87171";
+          return (
+            <TouchableOpacity key={stock.ticker}
+              onPress={() => router.push(`/stock/${stock.ticker}` as any)}
+              style={{
+                flexDirection: "row", alignItems: "center", paddingVertical: 10,
+                borderBottomWidth: idx < list.length - 1 ? 1 : 0,
+                borderBottomColor: "#1e293b",
+              }}>
+              <Text style={{ color: "#475569", fontSize: 11, width: 20 }}>{idx + 1}</Text>
+              <View style={{ width: 8, height: 8, borderRadius: 4,
+                backgroundColor: badge.color, marginRight: 8 }} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>{stock.ticker}</Text>
+                  <View style={{ backgroundColor: badge.color + "25", borderRadius: 4,
+                    paddingHorizontal: 6, paddingVertical: 1 }}>
+                    <Text style={{ color: badge.color, fontSize: 9, fontWeight: "700" }}>{badge.label}</Text>
+                  </View>
+                </View>
+                <Text style={{ color: "#475569", fontSize: 10 }} numberOfLines={1}>
+                  {stock.company || phase}
+                </Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ color: nbsColor, fontWeight: "700", fontSize: 13 }}>
+                  {stock.nbs1d >= 0 ? "+" : ""}{stock.nbs1d.toFixed(1)}B
+                </Text>
+                <Text style={{ color: "#64748b", fontSize: 9 }}>NBS 1D</Text>
+              </View>
+              <View style={{ alignItems: "flex-end", marginLeft: 12, minWidth: 34 }}>
+                <Text style={{ color: "#a78bfa", fontWeight: "900", fontSize: 15 }}>
+                  {stock.bandarScore.toFixed(0)}
+                </Text>
+                <Text style={{ color: "#475569", fontSize: 9 }}>score</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })
+      )}
+    </View>
+  );
+}
+
+// ─── [3] Phase Distribution ────────────────────────────────────
+
+function buildPhaseStats(radar: RadarMarket[]) {
+  const stocks = radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE");
+  const ORDER = ["Akumulasi Kuat", "Akumulasi", "Netral", "Distribusi", "Distribusi Kuat"] as const;
+  const counts: Record<string, number> = Object.fromEntries(ORDER.map(k => [k, 0]));
+  let totalFlow = 0;
+  for (const s of stocks) {
+    const phase = derivePhaseLabel(s);
+    const label = PHASE_DISPLAY[phase] ?? "Netral";
+    counts[label] = (counts[label] ?? 0) + 1;
+    totalFlow += s.bandarScore ?? 0;
+  }
+  const total = stocks.length || 1;
+  const avgFlow = Math.round(totalFlow / total);
+  const accPct  = Math.round(((counts["Akumulasi Kuat"] + counts["Akumulasi"]) / total) * 100);
+  const distPct = Math.round(((counts["Distribusi"] + counts["Distribusi Kuat"]) / total) * 100);
+  return {
+    phases: ORDER.map(label => ({
+      label, count: counts[label],
+      pct: Math.round((counts[label] / total) * 100),
+      color: PHASE_COLORS[label],
+    })),
+    total, avgFlow, accPct, distPct,
+  };
+}
+
+function PhaseDistributionSection({ radar }: { radar: RadarMarket[] }) {
+  const stats = useMemo(() => buildPhaseStats(radar), [radar]);
+  return (
+    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12 }]}>
+      <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
+        letterSpacing: 1, marginBottom: 10 }}>
+        PHASE DISTRIBUTION · {stats.total} SAHAM
+      </Text>
+
+      {/* Stacked bar */}
+      <View style={{ flexDirection: "row", height: 10, borderRadius: 5,
+        overflow: "hidden", marginBottom: 10 }}>
+        {stats.phases.filter(p => p.count > 0).map(p => (
+          <View key={p.label} style={{ flex: p.count, backgroundColor: p.color }} />
+        ))}
+      </View>
+
+      {/* Legend */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        {stats.phases.filter(p => p.count > 0).map(p => (
+          <View key={p.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color }} />
+            <Text style={{ color: p.color, fontSize: 10 }}>{p.label} {p.count}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Stats 3 col */}
+      <View style={{ flexDirection: "row", borderTopWidth: 1,
+        borderTopColor: "#1e293b", paddingTop: 12, marginBottom: 12 }}>
+        {[
+          { label: "Avg Smart Money", value: `${stats.avgFlow}/100`, color: "#f59e0b" },
+          { label: "Akumulasi",       value: `${stats.accPct}%`,     color: "#34d399" },
+          { label: "Distribusi",      value: `${stats.distPct}%`,    color: "#f87171" },
+        ].map(s => (
+          <View key={s.label} style={{ flex: 1, alignItems: "center" }}>
+            <Text style={{ color: "#64748b", fontSize: 9, marginBottom: 4 }}>{s.label}</Text>
+            <Text style={{ color: s.color, fontWeight: "700", fontSize: 18 }}>{s.value}</Text>
+          </View>
+        ))}
+      </View>
+
+      <TouchableOpacity onPress={() => router.push("/market-intel" as any)}
+        style={{ alignSelf: "flex-end" }}>
+        <Text style={{ color: "#0ea5e9", fontSize: 12 }}>Lihat Market Radar →</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── [4] Analisis Konteks IDX ─────────────────────────────────
+
+function AnalisisKonteksSection({ radar, breadth }: {
+  radar: RadarMarket[];
+  breadth: ReturnType<typeof calcBreadth>;
+}) {
+  const stocks = useMemo(
+    () => radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE"),
+    [radar]
+  );
+
+  const composite = useMemo(() => radar.find(r => r.ticker === "COMPOSITE"), [radar]);
+
+  const accCount  = useMemo(() => stocks.filter(r => r.signal1d === "Accumulation").length, [stocks]);
+  const distCount = useMemo(() => stocks.filter(r => r.signal1d === "Distribution").length, [stocks]);
+  const total     = stocks.length || 1;
+  const accPct    = Math.round((accCount / total) * 100);
+  const distPct   = Math.round((distCount / total) * 100);
+
+  const advPct = breadth.advancerPct;
+  const decPct = breadth.declinerPct;
+
+  const globalBias = accPct >= 50 && advPct >= 45 ? "RISK ON"
+    : distPct >= 60 || decPct >= 60 ? "RISK OFF" : "MIXED";
+
+  const biasBadge = globalBias === "RISK ON"
+    ? { text: "RISK ON",  color: "#34d399", bg: "#052e16" }
+    : globalBias === "RISK OFF"
+    ? { text: "RISK OFF", color: "#f87171", bg: "#2d0a0a" }
+    : { text: "MIXED",    color: "#fbbf24", bg: "#1c1500" };
+
+  const indicators = [
+    {
+      label: "IHSG",
+      value: composite ? `${(composite.chgPct >= 0 ? "▲" : "▼")}${Math.abs(composite.chgPct).toFixed(2)}%` : "–",
+      sub: null,
+      color: composite ? (composite.chgPct >= 0 ? "#34d399" : "#f87171") : "#64748b",
+    },
+    {
+      label: "Naik",
+      value: `${breadth.advancers}`,
+      sub: `${advPct}%`,
+      color: "#34d399",
+    },
+    {
+      label: "Turun",
+      value: `${breadth.decliners}`,
+      sub: `${decPct}%`,
+      color: "#f87171",
+    },
+    {
+      label: "SM Acc",
+      value: `${accPct}%`,
+      sub: `${accCount} saham`,
+      color: "#60a5fa",
+    },
+  ];
+
+  const bullets = [
+    breadth.declinerPct > 50
+      ? `${breadth.decliners} saham turun (${decPct}%) — tekanan jual mendominasi`
+      : `${breadth.advancers} saham naik (${advPct}%) — momentum positif`,
+    distPct > 50
+      ? `Smart Money: ${distPct}% distribusi — bandar net jual`
+      : accPct > 40
+      ? `Smart Money: ${accPct}% akumulasi — bandar net beli`
+      : `Smart Money campuran — ${accPct}% ACC · ${distPct}% DIST`,
+    composite
+      ? `IHSG ${composite.close.toLocaleString("id-ID")} · ${composite.chgPct >= 0 ? "+" : ""}${composite.chgPct.toFixed(2)}% hari ini`
+      : `Nilai transaksi: Rp ${breadth.totalValueT}T`,
+  ];
+
+  return (
+    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12 }]}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 16 }}>🌐</Text>
+          <Text style={styles.cardTitle}>Analisis Konteks IDX</Text>
+          <View style={{ backgroundColor: biasBadge.bg, borderRadius: 6,
+            paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: biasBadge.color + "60" }}>
+            <Text style={{ color: biasBadge.color, fontSize: 10, fontWeight: "700" }}>
+              {biasBadge.text}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 4 Quick Indicators */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between",
+        backgroundColor: "#0f1629", borderRadius: 10, padding: 10, marginBottom: 12 }}>
+        {indicators.map(ind => (
+          <View key={ind.label} style={{ alignItems: "center" }}>
+            <Text style={{ color: "#475569", fontSize: 9 }}>{ind.label}</Text>
+            <Text style={{ color: ind.color, fontWeight: "700", fontSize: 13 }}>{ind.value}</Text>
+            {ind.sub ? <Text style={{ color: ind.color + "99", fontSize: 8 }}>{ind.sub}</Text> : null}
+          </View>
+        ))}
+      </View>
+
+      {/* Bullet insights */}
+      <View style={{ gap: 6 }}>
+        <Text style={{ color: "#475569", fontSize: 10, fontWeight: "700", letterSpacing: 1, marginBottom: 2 }}>
+          📝 RINGKASAN PASAR
+        </Text>
+        {bullets.map((b, i) => (
+          <View key={i} style={{ flexDirection: "row", gap: 6 }}>
+            <Text style={{ color: "#475569", fontSize: 11 }}>●</Text>
+            <Text style={{ color: "#94a3b8", fontSize: 11, flex: 1 }}>{b}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── [5] Market Risk Score ────────────────────────────────────
+
+function calcRiskScore(radar: RadarMarket[], breadth: ReturnType<typeof calcBreadth>) {
+  const stocks = radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE");
+  const total  = stocks.length || 1;
+  const distCount = stocks.filter(r => r.signal1d === "Distribution").length;
+  const distPct   = (distCount / total) * 100;
+
+  let score = 0;
+  const components: Array<{ icon: string; label: string; poin: string; desc: string; color: string }> = [];
+
+  // Breadth risk
+  const decPct = breadth.declinerPct;
+  let breadthPoin = 0;
+  if (decPct >= 65) breadthPoin = 3;
+  else if (decPct >= 50) breadthPoin = 2;
+  else if (decPct >= 40) breadthPoin = 1;
+  score += breadthPoin;
+  components.push({
+    icon: "📊", label: "Market Breadth",
+    poin: breadthPoin > 0 ? `+${breadthPoin} poin` : "aman",
+    desc: `${breadth.decliners} saham turun (${decPct}%) · ${breadth.advancers} naik`,
+    color: breadthPoin >= 2 ? "#f87171" : breadthPoin >= 1 ? "#fbbf24" : "#34d399",
+  });
+
+  // SM Distribution risk
+  let distPoin = 0;
+  if (distPct >= 65) distPoin = 4;
+  else if (distPct >= 50) distPoin = 3;
+  else if (distPct >= 40) distPoin = 2;
+  else if (distPct >= 30) distPoin = 1;
+  score += distPoin;
+  components.push({
+    icon: "🏦", label: "Smart Money Flow",
+    poin: distPoin > 0 ? `+${distPoin} poin` : "aman",
+    desc: `${distPct.toFixed(0)}% saham dalam distribusi (${distCount}/${total})`,
+    color: distPoin >= 3 ? "#f87171" : distPoin >= 2 ? "#fbbf24" : "#34d399",
+  });
+
+  // IHSG direction
+  const composite = radar.find(r => r.ticker === "COMPOSITE");
+  let ihsgPoin = 0;
+  if (composite && composite.chgPct < -1.5) ihsgPoin = 2;
+  else if (composite && composite.chgPct < 0) ihsgPoin = 1;
+  score += ihsgPoin;
+  components.push({
+    icon: "📉", label: "Arah IHSG",
+    poin: ihsgPoin > 0 ? `+${ihsgPoin} poin` : "aman",
+    desc: composite
+      ? `IHSG ${composite.close.toLocaleString("id-ID")} · ${composite.chgPct >= 0 ? "+" : ""}${composite.chgPct.toFixed(2)}% hari ini`
+      : "Data IHSG tidak tersedia",
+    color: ihsgPoin >= 2 ? "#f87171" : ihsgPoin >= 1 ? "#fbbf24" : "#34d399",
+  });
+
+  // Avg bandar score (inverse — lower score = more risk)
+  const avgScore = stocks.reduce((s, r) => s + r.bandarScore, 0) / total;
+  let scorePoin = 0;
+  if (avgScore < 30) scorePoin = 1;
+  score += scorePoin;
+  components.push({
+    icon: "🧠", label: "Avg Bandar Score",
+    poin: scorePoin > 0 ? `+${scorePoin} poin` : "aman",
+    desc: `Rata-rata bandar score: ${avgScore.toFixed(0)}/100`,
+    color: scorePoin >= 1 ? "#fbbf24" : "#34d399",
+  });
+
+  const finalScore = Math.min(10, score);
+  let label: string, color: string, bg: string;
+  let strategy: { title: string; bullets: string[] };
+
+  if (finalScore >= 8) {
+    label = "HIGH RISK"; color = "#f87171"; bg = "#2d0a0a";
+    strategy = {
+      title: "Kurangi Posisi — Pindah ke Safe Haven",
+      bullets: ["Cash 40–50% dari portofolio", "Hindari saham growth & spekulatif", "Tunggu breadth membaik sebelum re-entry"],
+    };
+  } else if (finalScore >= 6) {
+    label = "MEDIUM-HIGH"; color = "#f97316"; bg = "#1c0a00";
+    strategy = {
+      title: "Selektif — Fokus Defensive & Dividen",
+      bullets: ["Kurangi exposure growth stock", "Fokus saham dengan NBS positif", "Pertahankan cash 20–30%"],
+    };
+  } else if (finalScore >= 4) {
+    label = "MEDIUM RISK"; color = "#fbbf24"; bg = "#1c1500";
+    strategy = {
+      title: "Normal — Selektif per Sektor",
+      bullets: ["Ikuti sinyal BOW/BOS dengan konfirmasi", "Diversifikasi sektor", "Risk per trade max 2%"],
+    };
+  } else {
+    label = "LOW RISK"; color = "#34d399"; bg = "#052e16";
+    strategy = {
+      title: "Bullish — Entry dengan Konfirmasi",
+      bullets: ["Cari setup breakout dengan volume", "Saham dengan SM Accumulation", "Tambah posisi yang sudah profit"],
+    };
+  }
+  return { score: finalScore, components, label, color, bg, strategy };
+}
+
+function MarketRiskCard({ radar, breadth }: {
+  radar: RadarMarket[]; breadth: ReturnType<typeof calcBreadth>;
+}) {
+  const risk = useMemo(() => calcRiskScore(radar, breadth), [radar, breadth]);
+  return (
+    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12 }]}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+        <View>
+          <Text style={{ color: "#64748b", fontSize: 10, fontWeight: "700", letterSpacing: 1 }}>
+            MARKET RISK SCORE
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+            <Text style={{ fontSize: 16 }}>🚨</Text>
+            <Text style={{ color: risk.color, fontWeight: "700", fontSize: 15 }}>{risk.label}</Text>
+          </View>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ color: risk.color, fontWeight: "900", fontSize: 36 }}>{risk.score}</Text>
+          <Text style={{ color: "#475569", fontSize: 14, marginTop: -4 }}>/10</Text>
+        </View>
+      </View>
+
+      {/* Gradient bar */}
+      <View style={{ marginBottom: 10 }}>
+        <View style={{ height: 10, backgroundColor: "#0f1629", borderRadius: 5, overflow: "hidden" }}>
+          <View style={{ position: "absolute", flexDirection: "row", width: "100%", height: "100%" }}>
+            <View style={{ flex: 4, backgroundColor: "#34d399" }} />
+            <View style={{ flex: 3, backgroundColor: "#f97316" }} />
+            <View style={{ flex: 3, backgroundColor: "#dc2626" }} />
+          </View>
+          <View style={{ position: "absolute", right: 0, top: 0, bottom: 0,
+            width: `${100 - (risk.score / 10 * 100)}%` as any, backgroundColor: "#0f1629" }} />
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+          <Text style={{ color: "#475569", fontSize: 9 }}>0 LOW</Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>4 MEDIUM</Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>7 HIGH</Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>10</Text>
+        </View>
+      </View>
+
+      {/* Components */}
+      <View style={{ gap: 10, marginBottom: 12 }}>
+        {risk.components.map(c => (
+          <View key={c.label} style={{ flexDirection: "row", gap: 8 }}>
+            <Text style={{ fontSize: 14 }}>{c.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                <Text style={{ color: c.color, fontWeight: "600", fontSize: 12 }}>{c.label}</Text>
+                <Text style={{ color: c.poin === "aman" ? "#34d399" : c.color, fontSize: 10 }}>
+                  {c.poin}
+                </Text>
+              </View>
+              <Text style={{ color: "#64748b", fontSize: 10 }}>{c.desc}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Strategy */}
+      <View style={{ backgroundColor: risk.bg, borderRadius: 10, padding: 12,
+        borderWidth: 1, borderColor: risk.color + "40" }}>
+        <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700",
+          letterSpacing: 1, marginBottom: 6 }}>STRATEGI YANG DISARANKAN</Text>
+        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13, marginBottom: 8 }}>
+          {risk.strategy.title}
+        </Text>
+        {risk.strategy.bullets.map((b, i) => (
+          <View key={i} style={{ flexDirection: "row", gap: 6, marginBottom: 4 }}>
+            <Text style={{ color: "#475569", fontSize: 12 }}>→</Text>
+            <Text style={{ color: "#94a3b8", fontSize: 12, flex: 1 }}>{b}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Mover card ───────────────────────────────────────────────
+
+function MoverCard({ ms }: { ms: MasterStock }) {
   const isUp = ms.changePercent >= 0;
   const chgColor = isUp ? "#34d399" : "#f87171";
   const badges = getIndexBadges(ms.indexCategory);
-
   return (
     <TouchableOpacity
-      style={[styles.moverCard, { backgroundColor: colors.card }]}
+      style={[styles.moverCard, { backgroundColor: "#1e2433" }]}
       onPress={() => router.push(`/stock/${ms.symbol}` as never)}
-      activeOpacity={0.7}
-    >
+      activeOpacity={0.7}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
-        <View style={[styles.moverCodeBadge, { backgroundColor: chgColor + "22" }]}>
-          <Text style={[styles.moverCode, { color: chgColor }]}>{ms.symbol}</Text>
+        <View style={{ alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 3,
+          borderRadius: 5, backgroundColor: chgColor + "22" }}>
+          <Text style={{ color: chgColor, fontSize: 11, fontWeight: "700" }}>{ms.symbol}</Text>
         </View>
-        {badges.slice(0, 1).map((b) => (
+        {badges.slice(0, 1).map(b => (
           <View key={b.label} style={{ paddingHorizontal: 4, paddingVertical: 1,
             borderRadius: 3, backgroundColor: b.color + "25" }}>
             <Text style={{ color: b.color, fontSize: 7, fontWeight: "700" }}>{b.label}</Text>
           </View>
         ))}
       </View>
-      <Text style={[styles.moverName, { color: colors.mutedForeground }]} numberOfLines={1}>
+      <Text style={{ color: "#64748b", fontSize: 10 }} numberOfLines={1}>
         {(ms.name || ms.symbol).split(" ").slice(0, 2).join(" ")}
       </Text>
-      <Text style={[styles.moverPrice, { color: colors.foreground }]}>
+      <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
         {ms.close.toLocaleString("id-ID")}
       </Text>
-      <Text style={[styles.moverChange, { color: chgColor }]}>
+      <Text style={{ color: chgColor, fontSize: 11, fontWeight: "600", marginTop: 2 }}>
         {isUp ? "▲" : "▼"} {Math.abs(ms.changePercent).toFixed(2)}%
       </Text>
     </TouchableOpacity>
   );
 }
 
-// ─── Market breadth bar ───────────────────────────────────────
+// ─── Stock list card ──────────────────────────────────────────
 
-function BreadthBar({ adv, unch, dec, totalValueT, colors }: {
-  adv: number; unch: number; dec: number;
-  totalValueT: string;
-  colors: ReturnType<typeof useColors>;
-}) {
-  const total = adv + unch + dec || 1;
-  const advPct = Math.round((adv / total) * 100);
-  const decPct = Math.round((dec / total) * 100);
-
+function StockCard({ ms, colors }: { ms: MasterStock; colors: ReturnType<typeof useColors> }) {
+  const isUp = ms.changePercent >= 0;
+  const chgColor = isUp ? "#34d399" : "#f87171";
+  const badges = getIndexBadges(ms.indexCategory);
+  const volRatio = ms.vol50dPct;
   return (
-    <View style={[styles.breadthCard, { backgroundColor: colors.card }]}>
-      {/* Counts */}
-      <View style={styles.breadthRow}>
-        <View style={styles.breadthItem}>
-          <Text style={[styles.breadthNum, { color: "#34d399" }]}>{adv}</Text>
-          <Text style={[styles.breadthLabel, { color: colors.mutedForeground }]}>Naik</Text>
+    <TouchableOpacity
+      style={[styles.stockRow, { borderBottomColor: colors.border }]}
+      onPress={() => router.push(`/stock/${ms.symbol}` as never)}
+      activeOpacity={0.7}>
+      <View style={styles.stockLeft}>
+        <View style={[styles.codeBadge, { backgroundColor: colors.secondary }]}>
+          <Text style={[styles.codeText, { color: colors.primary }]}>{ms.symbol}</Text>
         </View>
-        <View style={[styles.breadthDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.breadthItem}>
-          <Text style={[styles.breadthNum, { color: "#94a3b8" }]}>{unch}</Text>
-          <Text style={[styles.breadthLabel, { color: colors.mutedForeground }]}>Stagnan</Text>
-        </View>
-        <View style={[styles.breadthDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.breadthItem}>
-          <Text style={[styles.breadthNum, { color: "#f87171" }]}>{dec}</Text>
-          <Text style={[styles.breadthLabel, { color: colors.mutedForeground }]}>Turun</Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "500" }} numberOfLines={1}>
+              {ms.name || ms.symbol}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+            <Text style={{ color: "#64748b", fontSize: 10 }}>{ms.sector}</Text>
+            {badges.map(b => (
+              <View key={b.label} style={{ paddingHorizontal: 4, paddingVertical: 1,
+                borderRadius: 3, backgroundColor: b.color + "22" }}>
+                <Text style={{ color: b.color, fontSize: 8, fontWeight: "700" }}>{b.label}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ color: "#60a5fa", fontSize: 10, marginTop: 1 }}>
+            Vol: {ms.volume >= 1_000_000 ? `${(ms.volume / 1_000_000).toFixed(1)}M`
+              : ms.volume >= 1_000 ? `${(ms.volume / 1_000).toFixed(0)}K` : String(ms.volume)}
+            {volRatio >= 150 && <Text style={{ color: "#fbbf24" }}> ★{Math.round(volRatio)}%</Text>}
+            {"  "}Nilai: {fmtValueBn(ms.value)}
+          </Text>
         </View>
       </View>
-
-      {/* Visual bar */}
-      <View style={{ height: 8, borderRadius: 4, overflow: "hidden",
-        flexDirection: "row", marginTop: 10 }}>
-        <View style={{ flex: adv, backgroundColor: "#34d399" }} />
-        <View style={{ flex: unch, backgroundColor: "#94a3b820" }} />
-        <View style={{ flex: dec, backgroundColor: "#f87171" }} />
+      <View style={{ alignItems: "flex-end", gap: 3 }}>
+        <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "700" }}>
+          {ms.close.toLocaleString("id-ID")}
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 3,
+          paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+          backgroundColor: chgColor + "22" }}>
+          <Feather name={isUp ? "trending-up" : "trending-down"} size={10} color={chgColor} />
+          <Text style={{ color: chgColor, fontSize: 12, fontWeight: "700" }}>
+            {isUp ? "▲" : "▼"} {Math.abs(ms.changePercent).toFixed(2)}%
+          </Text>
+        </View>
+        {ms.return10d !== 0 && (
+          <Text style={{ color: ms.return10d > 0 ? "#34d39980" : "#f8717180", fontSize: 9 }}>
+            10D: {ms.return10d > 0 ? "+" : ""}{ms.return10d.toFixed(1)}%
+          </Text>
+        )}
       </View>
-
-      {/* % + value */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
-        <Text style={{ color: "#34d399", fontSize: 10, fontWeight: "700" }}>
-          {advPct}% Naik
-        </Text>
-        <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
-          Nilai: Rp {totalValueT}T
-        </Text>
-        <Text style={{ color: "#f87171", fontSize: 10, fontWeight: "700" }}>
-          {decPct}% Turun
-        </Text>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
-// ─── Sort + Filter toolbar ────────────────────────────────────
+// ─── Filter/sort config ───────────────────────────────────────
 
 const INDEX_OPTS: { label: string; val: StockFilter["index"] }[] = [
   { label: "Semua", val: "" },
@@ -147,99 +825,34 @@ const SORT_OPTS: { label: string; val: SortKey }[] = [
   { label: "A–Z", val: "alpha" },
 ];
 
-// ─── Stock card for list (with master data) ───────────────────
-
-function MasterStockCard({ ms, colors }: {
-  ms: MasterStock;
-  colors: ReturnType<typeof useColors>;
-}) {
-  const isUp = ms.changePercent >= 0;
-  const chgColor = isUp ? "#34d399" : "#f87171";
-  const badges = getIndexBadges(ms.indexCategory);
-  const volRatio = ms.vol50dPct;
-
-  return (
-    <TouchableOpacity
-      style={[styles.stockCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
-      onPress={() => router.push(`/stock/${ms.symbol}` as never)}
-      activeOpacity={0.7}
-    >
-      {/* Left */}
-      <View style={styles.stockCardLeft}>
-        <View style={[styles.codeBadge, { backgroundColor: colors.secondary }]}>
-          <Text style={[styles.stockCode, { color: colors.primary }]}>{ms.symbol}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Text style={[styles.stockName, { color: colors.foreground }]} numberOfLines={1}>
-              {ms.name || ms.symbol}
-            </Text>
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-            <Text style={{ color: "#64748b", fontSize: 10 }}>{ms.sector}</Text>
-            {badges.map(b => (
-              <View key={b.label} style={{ paddingHorizontal: 4, paddingVertical: 1,
-                borderRadius: 3, backgroundColor: b.color + "22" }}>
-                <Text style={{ color: b.color, fontSize: 8, fontWeight: "700" }}>{b.label}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={{ color: "#60a5fa", fontSize: 10, marginTop: 1 }}>
-            Vol: {ms.volume >= 1_000_000
-              ? `${(ms.volume / 1_000_000).toFixed(1)}M`
-              : ms.volume >= 1_000
-              ? `${(ms.volume / 1_000).toFixed(0)}K`
-              : String(ms.volume)}
-            {volRatio >= 150 && (
-              <Text style={{ color: "#fbbf24" }}> ★{Math.round(volRatio)}%</Text>
-            )}
-            {"  "}Nilai: {fmtValueBn(ms.value)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Right */}
-      <View style={{ alignItems: "flex-end", gap: 3 }}>
-        <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "700" }}>
-          {ms.close.toLocaleString("id-ID")}
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 3,
-          paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
-          backgroundColor: chgColor + "22" }}>
-          <Feather name={isUp ? "trending-up" : "trending-down"} size={10} color={chgColor} />
-          <Text style={{ color: chgColor, fontSize: 12, fontWeight: "700" }}>
-            {isUp ? "▲" : "▼"} {Math.abs(ms.changePercent).toFixed(2)}%
-          </Text>
-        </View>
-        {ms.return10d !== 0 && (
-          <Text style={{ color: ms.return10d > 0 ? "#34d39980" : "#f8717180",
-            fontSize: 9 }}>
-            10D: {ms.return10d > 0 ? "+" : ""}{ms.return10d.toFixed(1)}%
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 // ─── Main screen ──────────────────────────────────────────────
 
 export default function MarketScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState("");
-  const [indexFilter, setIndexFilter] = useState<StockFilter["index"]>("");
-  const [sortBy, setSortBy] = useState<SortKey>("change_desc");
-  const [showSortPicker, setShowSortPicker] = useState(false);
+  const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
-  const { data: stocks = [], isLoading, isError, refetch } = useQuery({
+  const [query, setQuery]         = useState("");
+  const [indexFilter, setIndexFilter] = useState<StockFilter["index"]>("");
+  const [sortBy, setSortBy]       = useState<SortKey>("change_desc");
+  const [showSort, setShowSort]   = useState(false);
+
+  const { data: stocks = [], isLoading: loadingStocks, isError, refetch } = useQuery({
     queryKey: ["master-stock"],
-    queryFn: fetchMasterStock,
+    queryFn:  fetchMasterStock,
     staleTime: 60 * 60 * 1000,
-    gcTime: 4 * 60 * 60 * 1000,
+    gcTime:    4 * 60 * 60 * 1000,
     retry: 2,
   });
 
+  const { data: radar = [], isLoading: loadingRadar } = useQuery({
+    queryKey: ["radar-market"],
+    queryFn:  fetchRadarMarket,
+    staleTime: 60 * 60 * 1000,
+    gcTime:    2 * 60 * 60 * 1000,
+  });
+
+  const isLoading = loadingStocks;
   const breadth = useMemo(() => calcBreadth(stocks), [stocks]);
   const gainers = useMemo(() => getTopGainersList(stocks, 8), [stocks]);
   const losers  = useMemo(() => getTopLosersList(stocks, 8), [stocks]);
@@ -249,193 +862,190 @@ export default function MarketScreen() {
     return sortStocks(f, sortBy);
   }, [stocks, query, indexFilter, sortBy]);
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
   const sortLabel = SORT_OPTS.find(o => o.val === sortBy)?.label ?? "Sort";
+  const radarReady = radar.length > 0;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPadding, backgroundColor: colors.background }]}>
-        <View style={styles.headerRow}>
-          <View>
-            <Image
-              source={require("@/assets/images/logo-stockbot.png")}
-              resizeMode="contain"
-              style={{ width: 130, height: 28 }}
-            />
-            <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-              {new Date().toLocaleDateString("id-ID", {
-                weekday: "long", day: "numeric", month: "long",
-              })}
-              {stocks.length > 0 && ` · ${stocks.length.toLocaleString("id-ID")} saham`}
-            </Text>
-          </View>
-          <View style={[styles.liveTag, { backgroundColor: isLoading ? "#fbbf2422" : "#34d39922" }]}>
-            <View style={[styles.liveDot, { backgroundColor: isLoading ? "#fbbf24" : "#34d399" }]} />
-            <Text style={[styles.liveText, { color: isLoading ? "#fbbf24" : "#34d399" }]}>
-              {isLoading ? "LOADING" : "LIVE"}
-            </Text>
-          </View>
-        </View>
+      {/* Fixed top padding area */}
+      <View style={{ height: topPadding, backgroundColor: colors.background }} />
 
-        {/* Market Breadth */}
-        {isError ? (
-          <View style={{ borderRadius: 12, borderWidth: 1, borderColor: "#f8717140",
-            padding: 14, backgroundColor: "#f8717110", gap: 8 }}>
-            <Text style={{ color: "#f87171", fontWeight: "700" }}>⚠️ Gagal memuat data Master</Text>
-            <TouchableOpacity onPress={() => refetch()}
-              style={{ backgroundColor: "#f87171", borderRadius: 8, padding: 8, alignItems: "center" }}>
-              <Text style={{ color: "#fff", fontWeight: "700" }}>Coba Lagi</Text>
-            </TouchableOpacity>
-          </View>
-        ) : isLoading ? (
-          <View style={{ borderRadius: 12, padding: 24,
-            backgroundColor: colors.card, alignItems: "center" }}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={{ color: colors.mutedForeground, marginTop: 8, fontSize: 12 }}>
-              Memuat data {breadth.total > 0 ? breadth.total.toLocaleString("id-ID") : ""} saham IDX…
-            </Text>
-          </View>
-        ) : (
-          <BreadthBar
-            adv={breadth.advancers}
-            unch={breadth.unchanged}
-            dec={breadth.decliners}
-            totalValueT={breadth.totalValueT}
-            colors={colors}
-          />
-        )}
-      </View>
-
-      {/* ── List ── */}
       <FlatList
         data={filtered}
         keyExtractor={item => item.symbol}
-        renderItem={({ item }) => <MasterStockCard ms={item} colors={colors} />}
+        renderItem={({ item }) => <StockCard ms={item} colors={colors} />}
+        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 100 : 90 }}
+
         ListHeaderComponent={
           <>
-            {/* Gainers / Losers */}
+            {/* [1] Home Header */}
+            <HomeHeader stocks={stocks} radar={radar} />
+
+            {/* Smart sections — only when radar loaded */}
+            {radarReady && !loadingRadar && (
+              <View style={{ backgroundColor: "#0f1629", paddingTop: 12 }}>
+                {/* [2] Signal Snapshot */}
+                <SignalSnapshotSection radar={radar} />
+
+                {/* [3] Phase Distribution */}
+                <PhaseDistributionSection radar={radar} />
+
+                {/* [4] Analisis Konteks IDX */}
+                <AnalisisKonteksSection radar={radar} breadth={breadth} />
+
+                {/* [5] Market Risk Score */}
+                <MarketRiskCard radar={radar} breadth={breadth} />
+              </View>
+            )}
+
+            {/* Loading state for radar */}
+            {loadingRadar && (
+              <View style={{ marginHorizontal: 16, marginBottom: 12, padding: 16,
+                backgroundColor: "#1e2433", borderRadius: 16, alignItems: "center" }}>
+                <ActivityIndicator size="small" color="#60a5fa" />
+                <Text style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
+                  Memuat Market Intelligence…
+                </Text>
+              </View>
+            )}
+
+            {/* Gainers */}
             {gainers.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-                  🚀 Top Gainers
-                </Text>
+              <View style={[styles.section, { backgroundColor: colors.background }]}>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>🚀 Top Gainers</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.moversRow}>
-                  {gainers.map(s => <MoverCard key={s.symbol} ms={s} colors={colors} />)}
+                  contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+                  {gainers.map(s => <MoverCard key={s.symbol} ms={s} />)}
                 </ScrollView>
               </View>
             )}
 
+            {/* Losers */}
             {losers.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-                  📉 Top Losers
-                </Text>
+              <View style={[styles.section, { backgroundColor: colors.background }]}>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>📉 Top Losers</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.moversRow}>
-                  {losers.map(s => <MoverCard key={s.symbol} ms={s} colors={colors} />)}
+                  contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+                  {losers.map(s => <MoverCard key={s.symbol} ms={s} />)}
                 </ScrollView>
               </View>
             )}
 
-            {/* Search + Filters */}
+            {/* Stocks header + filter */}
             <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8,
-              borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+              borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+              backgroundColor: colors.background }}>
               <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 10 }]}>
                 Semua Saham
               </Text>
 
-              {/* Search bar */}
-              <View style={[styles.searchBar, { backgroundColor: colors.card,
-                borderColor: colors.border }]}>
-                <Feather name="search" size={14} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.searchInput, { color: colors.foreground }]}
-                  placeholder="Cari kode atau nama saham…"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={query}
-                  onChangeText={setQuery}
-                  autoCapitalize="characters"
-                />
-                {query.length > 0 && (
-                  <TouchableOpacity onPress={() => setQuery("")}>
-                    <Feather name="x" size={14} color={colors.mutedForeground} />
+              {isError && (
+                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: "#f8717140",
+                  padding: 14, backgroundColor: "#f8717110", gap: 8, marginBottom: 8 }}>
+                  <Text style={{ color: "#f87171", fontWeight: "700" }}>⚠️ Gagal memuat data</Text>
+                  <TouchableOpacity onPress={() => refetch()}
+                    style={{ backgroundColor: "#f87171", borderRadius: 8, padding: 8, alignItems: "center" }}>
+                    <Text style={{ color: "#fff", fontWeight: "700" }}>Coba Lagi</Text>
                   </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Index filter chips */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 6, paddingTop: 8 }}>
-                {INDEX_OPTS.map(o => {
-                  const active = indexFilter === o.val;
-                  return (
-                    <TouchableOpacity key={o.val ?? "all"}
-                      style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
-                        backgroundColor: active ? colors.primary : colors.card,
-                        borderWidth: 1, borderColor: active ? colors.primary : colors.border }}
-                      onPress={() => setIndexFilter(o.val)}>
-                      <Text style={{ color: active ? "#fff" : colors.mutedForeground,
-                        fontSize: 11, fontWeight: active ? "700" : "400" }}>
-                        {o.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {/* Sort button */}
-                <TouchableOpacity
-                  style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
-                    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.primary,
-                    flexDirection: "row", alignItems: "center", gap: 4 }}
-                  onPress={() => setShowSortPicker(!showSortPicker)}>
-                  <Feather name="sliders" size={11} color={colors.primary} />
-                  <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>
-                    {sortLabel}
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-
-              {/* Sort picker */}
-              {showSortPicker && (
-                <View style={{ marginTop: 8, borderRadius: 10, borderWidth: 1,
-                  borderColor: colors.border, backgroundColor: colors.card,
-                  overflow: "hidden" }}>
-                  {SORT_OPTS.map(o => (
-                    <TouchableOpacity key={o.val}
-                      style={{ padding: 10, borderBottomWidth: StyleSheet.hairlineWidth,
-                        borderBottomColor: colors.border,
-                        backgroundColor: sortBy === o.val ? colors.primary + "15" : "transparent" }}
-                      onPress={() => { setSortBy(o.val); setShowSortPicker(false); }}>
-                      <Text style={{ color: sortBy === o.val ? colors.primary : colors.foreground,
-                        fontWeight: sortBy === o.val ? "700" : "400", fontSize: 13 }}>
-                        {o.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
                 </View>
               )}
 
-              {/* Result count */}
-              <Text style={{ color: colors.mutedForeground, fontSize: 10,
-                marginTop: 8, textAlign: "right" }}>
-                {filtered.length.toLocaleString("id-ID")} saham ditampilkan
-              </Text>
+              {isLoading ? (
+                <View style={{ padding: 24, alignItems: "center", backgroundColor: colors.card,
+                  borderRadius: 12 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={{ color: colors.mutedForeground, marginTop: 8, fontSize: 12 }}>
+                    Memuat {breadth.total > 0 ? breadth.total.toLocaleString("id-ID") : ""} saham IDX…
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {/* Search */}
+                  <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Feather name="search" size={14} color={colors.mutedForeground} />
+                    <TextInput
+                      style={[{ flex: 1, fontSize: 14, color: colors.foreground }]}
+                      placeholder="Cari kode atau nama saham…"
+                      placeholderTextColor={colors.mutedForeground}
+                      value={query}
+                      onChangeText={setQuery}
+                      autoCapitalize="characters"
+                    />
+                    {query.length > 0 && (
+                      <TouchableOpacity onPress={() => setQuery("")}>
+                        <Feather name="x" size={14} color={colors.mutedForeground} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Index + sort chips */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 6, paddingTop: 8 }}>
+                    {INDEX_OPTS.map(o => {
+                      const active = indexFilter === o.val;
+                      return (
+                        <TouchableOpacity key={o.val ?? "all"}
+                          style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
+                            backgroundColor: active ? colors.primary : colors.card,
+                            borderWidth: 1, borderColor: active ? colors.primary : colors.border }}
+                          onPress={() => setIndexFilter(o.val)}>
+                          <Text style={{ color: active ? "#fff" : colors.mutedForeground,
+                            fontSize: 11, fontWeight: active ? "700" : "400" }}>
+                            {o.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
+                        backgroundColor: colors.card, borderWidth: 1, borderColor: colors.primary,
+                        flexDirection: "row", alignItems: "center", gap: 4 }}
+                      onPress={() => setShowSort(!showSort)}>
+                      <Feather name="sliders" size={11} color={colors.primary} />
+                      <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>
+                        {sortLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+
+                  {showSort && (
+                    <View style={{ marginTop: 8, borderRadius: 10, borderWidth: 1,
+                      borderColor: colors.border, backgroundColor: colors.card, overflow: "hidden" }}>
+                      {SORT_OPTS.map(o => (
+                        <TouchableOpacity key={o.val}
+                          style={{ padding: 10,
+                            borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+                            backgroundColor: sortBy === o.val ? colors.primary + "15" : "transparent" }}
+                          onPress={() => { setSortBy(o.val); setShowSort(false); }}>
+                          <Text style={{ color: sortBy === o.val ? colors.primary : colors.foreground,
+                            fontWeight: sortBy === o.val ? "700" : "400", fontSize: 13 }}>
+                            {o.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  <Text style={{ color: colors.mutedForeground, fontSize: 10,
+                    marginTop: 8, textAlign: "right" }}>
+                    {filtered.length.toLocaleString("id-ID")} saham ditampilkan
+                  </Text>
+                </>
+              )}
             </View>
           </>
         }
+
         ListEmptyComponent={
           isLoading ? null : (
-            <View style={styles.emptyState}>
+            <View style={{ alignItems: "center", paddingTop: 60, gap: 12 }}>
               <Feather name="search" size={32} color={colors.mutedForeground} />
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 14, textAlign: "center" }}>
                 Tidak ditemukan: "{query}"
               </Text>
             </View>
           )
         }
-        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 100 : 90 }}
       />
     </View>
   );
@@ -445,169 +1055,43 @@ export default function MarketScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#1e2433",
+  card: {
+    backgroundColor: "#1e2433",
+    borderRadius: 16,
+    padding: 16,
   },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 26,
-    fontFamily: "Inter_700Bold",
+  cardTitle: {
+    color: "#fff",
     fontWeight: "700",
-  },
-  headerSub: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
+    fontSize: 14,
   },
   liveTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    marginTop: 4,
+    flexDirection: "row", alignItems: "center",
+    gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
   },
   liveDot: { width: 6, height: 6, borderRadius: 3 },
-  liveText: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
-  },
-  breadthCard: {
-    borderRadius: 14,
-    padding: 14,
-  },
-  breadthRow: {
-    flexDirection: "row",
-  },
-  breadthItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  breadthNum: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    fontWeight: "700",
-  },
-  breadthLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-  },
-  breadthDivider: {
-    width: StyleSheet.hairlineWidth,
-    marginVertical: 4,
-  },
-  section: {
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  moversRow: {
-    gap: 8,
-    paddingBottom: 4,
-  },
-  moverCard: {
-    width: 110,
-    padding: 10,
-    borderRadius: 12,
-  },
-  moverCodeBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 5,
-  },
-  moverCode: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    fontWeight: "700",
-  },
-  moverName: {
-    fontSize: 10,
-    fontFamily: "Inter_400Regular",
-    marginBottom: 6,
-  },
-  moverPrice: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    fontWeight: "600",
-  },
-  moverChange: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    fontWeight: "600",
-    marginTop: 2,
-  },
+  liveText: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+
+  section: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 10 },
+  moverCard: { width: 110, padding: 10, borderRadius: 12 },
+
   searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
+
+  stockRow: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth, gap: 8,
   },
-  emptyState: {
-    alignItems: "center",
-    paddingTop: 60,
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    textAlign: "center",
-  },
-  stockCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-  },
-  stockCardLeft: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginRight: 4,
+  stockLeft: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 10, marginRight: 4,
   },
   codeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 52,
-    alignItems: "center",
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+    minWidth: 52, alignItems: "center",
   },
-  stockCode: {
-    fontSize: 13,
-    fontWeight: "700",
-    fontFamily: "Inter_700Bold",
-  },
-  stockName: {
-    fontSize: 12,
-    fontWeight: "500",
-    fontFamily: "Inter_500Medium",
-  },
+  codeText: { fontSize: 13, fontWeight: "700" },
 });
