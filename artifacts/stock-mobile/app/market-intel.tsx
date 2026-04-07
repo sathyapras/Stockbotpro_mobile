@@ -1,0 +1,351 @@
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import React, { useMemo } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useColors } from "@/hooks/useColors";
+import { type RadarMarket, fetchRadarMarket } from "@/services/radarMarketService";
+
+// ─── Phase map (AFL phase codes → display) ────────────────────
+
+const PHASE_MAP: Record<string, { label: string; color: string }> = {
+  IGNITION:     { label: "Markup",        color: "#60a5fa" },
+  EARLY_ACC:    { label: "Accumulation",  color: "#34d399" },
+  STRONG_TREND: { label: "Markup",        color: "#60a5fa" },
+  EXHAUSTION:   { label: "Late Stage",    color: "#fbbf24" },
+  DISTRIBUTION: { label: "Distribution",  color: "#f87171" },
+  CHURNING:     { label: "Consolidation", color: "#94a3b8" },
+};
+
+function phaseDisplay(phase: string): { label: string; color: string } {
+  const key = (phase ?? "").toUpperCase().trim();
+  return PHASE_MAP[key] ?? { label: "Consolidation", color: "#94a3b8" };
+}
+
+// ─── Compute helpers ──────────────────────────────────────────
+
+function computeMarketPulse(stocks: RadarMarket[]) {
+  const total = stocks.length || 1;
+  const acc1d = stocks.filter(r => r.signal1d === "Accumulation").length;
+  const smAccPct = Math.round((acc1d / total) * 100);
+  const avgFlowScore = Math.round(stocks.reduce((s, r) => s + r.bandarScore, 0) / total);
+  const smBrokPulse = Math.round(smAccPct * 0.6 + avgFlowScore * 0.4);
+  const hybridPulse = Math.round(smBrokPulse * 0.7 + smAccPct * 0.3);
+
+  let label: string, color: string, bg: string, desc: string;
+  if (hybridPulse >= 70) {
+    label = "BULLISH";  color = "#34d399"; bg = "#052e16";
+    desc  = "Kondisi pasar kuat — momentum mendukung";
+  } else if (hybridPulse >= 50) {
+    label = "NETRAL";   color = "#fbbf24"; bg = "#1c1500";
+    desc  = "Pasar campuran — selektif dan hati-hati";
+  } else if (hybridPulse >= 35) {
+    label = "WASPADA";  color = "#f97316"; bg = "#1c0a00";
+    desc  = "Momentum lemah — lebih banyak cash";
+  } else {
+    label = "BEARISH";  color = "#f87171"; bg = "#2d0a0a";
+    desc  = "Kondisi buruk — hindari posisi baru";
+  }
+  return { hybridPulse, label, color, bg, desc, smAccPct, avgFlowScore, smBrokPulse, total };
+}
+
+function buildPhaseDistribution(stocks: RadarMarket[]) {
+  const counts: Record<string, number> = {};
+  const total = stocks.length;
+  for (const s of stocks) {
+    const disp = phaseDisplay(s.phase).label;
+    counts[disp] = (counts[disp] ?? 0) + 1;
+  }
+  const maxPct = Math.max(...Object.values(counts).map(c => Math.round((c / total) * 100)), 1);
+  return Object.entries(counts)
+    .map(([label, count]) => ({
+      label,
+      count,
+      pct: Math.round((count / total) * 100),
+      color: Object.values(PHASE_MAP).find(p => p.label === label)?.color ?? "#94a3b8",
+    }))
+    .sort((a, b) => b.count - a.count)
+    .map(p => ({ ...p, maxPct }));
+}
+
+function buildFlowState(stocks: RadarMarket[]) {
+  const counts = { "STRONG ACC": 0, "ACC": 0, "NEUTRAL": 0, "DIST": 0, "STRONG DIST": 0 };
+  for (const item of stocks) {
+    const fs = (item.flowState ?? "").toUpperCase();
+    if      (fs.includes("STRONG ACCUMULATION"))  counts["STRONG ACC"]++;
+    else if (fs.includes("ACCUMULATION"))          counts["ACC"]++;
+    else if (fs.includes("STRONG DISTRIBUTION"))   counts["STRONG DIST"]++;
+    else if (fs.includes("DISTRIBUTION"))          counts["DIST"]++;
+    else                                            counts["NEUTRAL"]++;
+  }
+  const total = stocks.length || 1;
+  const maxCount = Math.max(...Object.values(counts), 1);
+  return [
+    { key: "STRONG ACC",  label: "★ Akumulasi",  color: "#10b981" },
+    { key: "ACC",         label: "Akumulasi",    color: "#34d399" },
+    { key: "NEUTRAL",     label: "Netral",       color: "#64748b" },
+    { key: "DIST",        label: "Distribusi",   color: "#f87171" },
+    { key: "STRONG DIST", label: "★ Distribusi", color: "#dc2626" },
+  ].map(f => ({
+    ...f,
+    count: counts[f.key as keyof typeof counts],
+    pct: Math.round((counts[f.key as keyof typeof counts] / total) * 100),
+    maxCount,
+  }));
+}
+
+function buildSmartMoneyFlow(stocks: RadarMarket[]) {
+  let total5d = 0, total10d = 0;
+  for (const r of stocks) {
+    total5d  += r.nbs5d  ?? 0;
+    total10d += r.nbs10d ?? 0;
+  }
+  const formatT = (bn: number) => {
+    const abs = Math.abs(bn);
+    const sign = bn >= 0 ? "+" : "-";
+    if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(1)}T`;
+    return `${sign}${abs.toFixed(0)}B`;
+  };
+  return {
+    nbs5d: total5d,   nbs5dStr:  formatT(total5d),
+    nbs10d: total10d, nbs10dStr: formatT(total10d),
+    label5d:  total5d  >= 0 ? "Net beli (akumulasi)" : "Net jual (distribusi)",
+    label10d: total10d >= 0 ? "Net beli (akumulasi)" : "Net jual (distribusi)",
+    color5d:  total5d  >= 0 ? "#34d399" : "#f87171",
+    color10d: total10d >= 0 ? "#34d399" : "#f87171",
+  };
+}
+
+// ─── Sub-components ───────────────────────────────────────────
+
+function MarketPulseCard({ stocks }: { stocks: RadarMarket[] }) {
+  const pulse = computeMarketPulse(stocks);
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>⚡ Market Pulse</Text>
+        <Text style={styles.cardSub}>{stocks.length} saham tercover</Text>
+      </View>
+
+      <View style={styles.progressBg}>
+        <View style={[styles.progressFill, { width: `${pulse.hybridPulse}%` as any, backgroundColor: pulse.color }]} />
+      </View>
+
+      <View style={styles.row}>
+        <Text style={styles.bigScore}>
+          {pulse.hybridPulse}<Text style={styles.bigScoreSub}>/100</Text>
+        </Text>
+        <View style={[styles.labelBadge, { backgroundColor: pulse.bg, borderColor: pulse.color }]}>
+          <Text style={[styles.labelBadgeText, { color: pulse.color }]}>{pulse.label}</Text>
+        </View>
+      </View>
+      <Text style={styles.descText}>{pulse.desc}</Text>
+
+      <View style={styles.statsRow}>
+        {[
+          { label: "SM Acc%",        value: `${pulse.smAccPct}%`,        sub: `${pulse.total} saham` },
+          { label: "Avg Flow Score", value: `${pulse.avgFlowScore}/100`, sub: "Rata-rata bandar score" },
+          { label: "SM Pulse",       value: `${pulse.smBrokPulse}/100`,  sub: "60% Acc + 40% Score" },
+        ].map(s => (
+          <View key={s.label} style={{ alignItems: "center", flex: 1 }}>
+            <Text style={styles.statValue}>{s.value}</Text>
+            <Text style={styles.statLabel}>{s.label}</Text>
+            <Text style={styles.statSub}>{s.sub}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function PhaseDistributionCard({ stocks }: { stocks: RadarMarket[] }) {
+  const phases = buildPhaseDistribution(stocks);
+  const maxPct = phases[0]?.pct ?? 1;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>📊 Phase Distribution</Text>
+      {phases.map(p => (
+        <View key={p.label} style={{ marginBottom: 10 }}>
+          <View style={styles.rowBetween}>
+            <Text style={[styles.phaseLabel, { color: p.color }]}>{p.label.toUpperCase()}</Text>
+            <Text style={styles.phaseStat}>{p.pct}%  ·  {p.count} saham</Text>
+          </View>
+          <View style={styles.barBg}>
+            <View style={[styles.barFill, {
+              width: `${(p.pct / maxPct) * 100}%` as any,
+              backgroundColor: p.color + "cc",
+            }]} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function FlowStateCard({ stocks }: { stocks: RadarMarket[] }) {
+  const flows = buildFlowState(stocks);
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>👥 Flow State</Text>
+      </View>
+      <Text style={styles.cardSubtitle}>Primary Truth — Smart Money ngapain?</Text>
+      {flows.map(f => (
+        <View key={f.key} style={[styles.row, { gap: 8, marginBottom: 8 }]}>
+          <Text style={[styles.flowLabel, { color: f.color }]}>{f.label}</Text>
+          <View style={styles.barBg2}>
+            <View style={[styles.barFill, {
+              width: `${(f.count / f.maxCount) * 100}%` as any,
+              backgroundColor: f.color,
+            }]} />
+          </View>
+          <Text style={styles.flowStat}>{f.count} ({f.pct}%)</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function SmartMoneyFlowCard({ stocks }: { stocks: RadarMarket[] }) {
+  const flow = buildSmartMoneyFlow(stocks);
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>↘ Smart Money Flow</Text>
+        <Text style={styles.cardSub}>Net Buy/Sell 5D & 10D</Text>
+      </View>
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        {[
+          { label: "Net Buy/Sell 5D",  value: flow.nbs5dStr,  sub: flow.label5d,  color: flow.color5d  },
+          { label: "Net Buy/Sell 10D", value: flow.nbs10dStr, sub: flow.label10d, color: flow.color10d },
+        ].map(item => (
+          <View key={item.label} style={[styles.flowBox]}>
+            <Text style={styles.flowBoxLabel}>{item.label}</Text>
+            <Text style={[styles.flowBoxValue, { color: item.color }]}>{item.value}</Text>
+            <Text style={[styles.flowBoxSub, { color: item.color + "99" }]}>{item.sub}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────
+
+export default function MarketIntelScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  const { data: radarAll = [], isLoading } = useQuery({
+    queryKey: ["radar-market"],
+    queryFn: fetchRadarMarket,
+    staleTime: 60 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
+  });
+
+  const stocks = useMemo(
+    () => radarAll.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE"),
+    [radarAll]
+  );
+
+  const today = new Date().toLocaleDateString("id-ID", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric",
+  });
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={{ color: "#60a5fa", fontSize: 16 }}>←</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.pageTitle}>Market Intelligence</Text>
+          <Text style={styles.pageDate}>{today}</Text>
+        </View>
+      </View>
+
+      {isLoading ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
+          <ActivityIndicator size="large" color="#60a5fa" />
+          <Text style={{ color: "#64748b", fontSize: 13 }}>Memuat data pasar...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
+          showsVerticalScrollIndicator={false}>
+          <MarketPulseCard stocks={stocks} />
+          <PhaseDistributionCard stocks={stocks} />
+          <FlowStateCard stocks={stocks} />
+          <SmartMoneyFlowCard stocks={stocks} />
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 16, paddingBottom: 12,
+    backgroundColor: "#0f1629",
+    borderBottomWidth: 1, borderBottomColor: "#1e2433",
+  },
+  backBtn: { padding: 4, marginRight: 4 },
+  pageTitle: { color: "#fff", fontWeight: "900", fontSize: 20 },
+  pageDate: { color: "#475569", fontSize: 11, marginTop: 1 },
+
+  card: {
+    backgroundColor: "#1e2433", borderRadius: 16,
+    padding: 16, marginBottom: 12,
+  },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  cardTitle: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  cardSub: { color: "#475569", fontSize: 11 },
+  cardSubtitle: { color: "#475569", fontSize: 10, marginBottom: 14, marginTop: -8 },
+
+  progressBg: { height: 10, backgroundColor: "#0f1629", borderRadius: 5, marginBottom: 8 },
+  progressFill: { height: 10, borderRadius: 5 },
+
+  row: { flexDirection: "row", alignItems: "center" },
+  rowBetween: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+
+  bigScore: { color: "#fff", fontWeight: "900", fontSize: 28, flex: 1 },
+  bigScoreSub: { color: "#475569", fontSize: 14, fontWeight: "400" },
+  labelBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
+  labelBadgeText: { fontWeight: "700", fontSize: 13 },
+  descText: { color: "#94a3b8", fontSize: 11, marginBottom: 12, marginTop: 4 },
+
+  statsRow: {
+    flexDirection: "row", justifyContent: "space-between",
+    backgroundColor: "#0f1629", borderRadius: 8, padding: 10,
+  },
+  statValue: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  statLabel: { color: "#475569", fontSize: 9, textAlign: "center", marginTop: 2 },
+  statSub:   { color: "#334155", fontSize: 8, textAlign: "center" },
+
+  phaseLabel: { fontSize: 11, fontWeight: "700", width: 110 },
+  phaseStat:  { color: "#64748b", fontSize: 11 },
+  barBg:  { height: 6, backgroundColor: "#0f1629", borderRadius: 3 },
+  barBg2: { flex: 1, height: 6, backgroundColor: "#0f1629", borderRadius: 3 },
+  barFill: { height: 6, borderRadius: 3 },
+
+  flowLabel: { fontSize: 10, width: 88, textAlign: "right" },
+  flowStat:  { color: "#64748b", fontSize: 10, width: 56, textAlign: "right" },
+
+  flowBox: { flex: 1, backgroundColor: "#0f1629", borderRadius: 10, padding: 12 },
+  flowBoxLabel: { color: "#64748b", fontSize: 10, marginBottom: 4 },
+  flowBoxValue: { fontWeight: "900", fontSize: 22 },
+  flowBoxSub:   { fontSize: 10, marginTop: 2 },
+});

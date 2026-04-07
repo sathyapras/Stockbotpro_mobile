@@ -112,6 +112,15 @@ export function flowToSignal(flowState: string): "Accumulation" | "Distribution"
   return "Neutral";
 }
 
+export function deriveSignal(rawCtx: string, nbsValue: number): "Accumulation" | "Distribution" | "Neutral" {
+  const s = (rawCtx ?? "").toUpperCase().trim();
+  if (s.includes("ACCUMULATION")) return "Accumulation";
+  if (s.includes("DISTRIBUTION")) return "Distribution";
+  if (nbsValue > 0) return "Accumulation";
+  if (nbsValue < 0) return "Distribution";
+  return "Neutral";
+}
+
 export function getFlowLabel(flowState: string): { label: string; color: string; short: string } {
   const s = (flowState ?? "").toUpperCase();
   if (s.includes("STRONG ACCUMULATION")) return { label: "Akumulasi Kuat", color: "#10b981", short: "ACC ✦" };
@@ -141,13 +150,21 @@ export function formatNBS(value: number | null): { text: string; color: string }
   return { text: `${sign}${value.toFixed(1)}B`, color };
 }
 
-export function vwapInterpretation(currentPrice: number, vwap: number): { text: string; color: string } | null {
+export function vwapInterpretation(
+  currentPrice: number,
+  vwap: number
+): { text: string; color: string; icon: string } | null {
   if (!vwap || !currentPrice) return null;
-  const diffPct = ((currentPrice - vwap) / vwap) * 100;
-  if (diffPct >  2) return { text: "Harga jauh di atas VWAP bandar — bandar untung besar",    color: "#10b981" };
-  if (diffPct >  0) return { text: "Harga di atas VWAP bandar — bandar untung",               color: "#34d399" };
-  if (diffPct > -2) return { text: "Harga di bawah VWAP bandar — bandar sedikit rugi",        color: "#fca5a5" };
-  return             { text: "Harga jauh di bawah VWAP bandar — bandar rugi, potensi cut loss", color: "#f87171" };
+  const diff = currentPrice - vwap;
+  const pct  = ((diff / vwap) * 100).toFixed(1);
+  if (diff > 0) return {
+    text:  `Harga ${Math.round(diff).toLocaleString("id-ID")} di ATAS VWAP bandar (+${pct}%)`,
+    color: "#34d399", icon: "📈",
+  };
+  return {
+    text:  `Harga ${Math.round(Math.abs(diff)).toLocaleString("id-ID")} di BAWAH VWAP bandar (${pct}%)`,
+    color: "#f87171", icon: "📉",
+  };
 }
 
 // ─── Parser ───────────────────────────────────────────────────
@@ -200,10 +217,10 @@ export function parseRadarItem(raw: RadarRaw): RadarMarket {
     beta:           pn(raw.Beta),
     alpha:          pn(raw.Alpha),
     rSquared:       pn(raw.R_Squared),
-    // derived signals
-    signal1d:       flowToSignal(flowState),
-    signal5d:       flowToSignal(vwapContext),
-    signal10d:      flowToSignal(trendContext),
+    // derived signals — fallback to NBS value if context is ambiguous
+    signal1d:       deriveSignal(flowState,    pn(raw.NBS1D)),
+    signal5d:       deriveSignal(vwapContext,  pn(raw.NBS5D)),
+    signal10d:      deriveSignal(trendContext, pn(raw.NBS10D)),
   };
 }
 

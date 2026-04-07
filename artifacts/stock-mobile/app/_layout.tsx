@@ -37,6 +37,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="stock/[code]" options={{ headerBackTitle: "Back" }} />
       <Stack.Screen name="tool/[toolId]" options={{ headerShown: false }} />
+      <Stack.Screen name="market-intel" options={{ headerShown: false }} />
     </Stack>
   );
 }

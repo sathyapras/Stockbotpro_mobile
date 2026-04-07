@@ -6,6 +6,7 @@ import {
   FlatList,
   Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,25 +31,48 @@ import {
 
 type FilterTab = "ALL" | "ACC" | "DIST" | "SMI";
 
-const FILTER_TABS: { key: FilterTab; label: string; emoji: string }[] = [
-  { key: "ALL",  label: "Semua",          emoji: "📊" },
-  { key: "ACC",  label: "Akumulasi",      emoji: "🟢" },
-  { key: "DIST", label: "Distribusi",     emoji: "🔴" },
-  { key: "SMI",  label: "Smart Money In", emoji: "💎" },
+const FILTER_TABS: { key: FilterTab; icon: string; label: string; color: string }[] = [
+  { key: "ALL",  icon: "📊", label: "Semua",       color: "#60a5fa" },
+  { key: "ACC",  icon: "🟢", label: "Akumulasi",   color: "#34d399" },
+  { key: "DIST", icon: "🔴", label: "Distribusi",  color: "#f87171" },
+  { key: "SMI",  icon: "💎", label: "Smart Money", color: "#a78bfa" },
 ];
 
-// ─── Signal color / icon ──────────────────────────────────────
+// ─── Signal helpers ───────────────────────────────────────────
 
 function signalColor(sig: string) {
   if (sig === "Accumulation")  return "#34d399";
   if (sig === "Distribution")  return "#f87171";
-  return "#94a3b8";
+  return "#475569";
 }
 
-function signalIcon(sig: string) {
-  if (sig === "Accumulation")  return "🟢";
-  if (sig === "Distribution")  return "🔴";
-  return "⚪";
+// ─── Fix 5: Colored TF indicator boxes ───────────────────────
+
+function TimeframeDots({ signal1d, signal5d, signal10d }: {
+  signal1d: string; signal5d: string; signal10d: string;
+}) {
+  const strength = getBandarStrength(signal1d, signal5d, signal10d);
+  const tfs = [
+    { label: "1D", signal: signal1d },
+    { label: "5D", signal: signal5d },
+    { label: "10D", signal: signal10d },
+  ];
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      {tfs.map(tf => (
+        <View key={tf.label} style={{ alignItems: "center", gap: 2 }}>
+          <View style={{
+            width: 14, height: 14, borderRadius: 3,
+            backgroundColor: signalColor(tf.signal),
+          }} />
+          <Text style={{ color: "#475569", fontSize: 8 }}>{tf.label}</Text>
+        </View>
+      ))}
+      <Text style={{ color: strength.color, fontSize: 10, fontWeight: "700", marginLeft: 4 }}>
+        {strength.label}
+      </Text>
+    </View>
+  );
 }
 
 // ─── Score bar ────────────────────────────────────────────────
@@ -83,6 +107,7 @@ function NBSGrid({ item, colors }: { item: RadarMarket; colors: ReturnType<typeo
     <View style={{ flexDirection: "row", gap: 6, marginTop: 8 }}>
       {periods.map(tf => {
         const fmt = formatNBS(tf.value);
+        const sigColor = signalColor(tf.signal);
         return (
           <View key={tf.label} style={{ flex: 1, backgroundColor: colors.background,
             borderRadius: 8, padding: 7, alignItems: "center",
@@ -91,8 +116,7 @@ function NBSGrid({ item, colors }: { item: RadarMarket; colors: ReturnType<typeo
             <Text style={{ color: fmt.color, fontWeight: "800", fontSize: 12, marginTop: 2 }}>
               {fmt.text}
             </Text>
-            <Text style={{ color: signalColor(tf.signal), fontSize: 9, marginTop: 2 }}>
-              {signalIcon(tf.signal)}{" "}
+            <Text style={{ color: sigColor, fontSize: 9, marginTop: 2 }}>
               {tf.signal === "Accumulation" ? "ACC" : tf.signal === "Distribution" ? "DIST" : "NEU"}
             </Text>
           </View>
@@ -109,8 +133,7 @@ function BandarCard({ item }: { item: RadarMarket }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
 
-  const flow  = getFlowLabel(item.flowState);
-  const strength = getBandarStrength(item.signal1d, item.signal5d, item.signal10d);
+  const flow     = getFlowLabel(item.flowState);
   const vwapInfo = vwapInterpretation(item.close, item.vwapD1);
 
   return (
@@ -127,14 +150,6 @@ function BandarCard({ item }: { item: RadarMarket }) {
             <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 16 }}>
               {item.ticker}
             </Text>
-            {/* Multi-TF strength badge */}
-            <View style={{ backgroundColor: strength.color + "22", borderRadius: 6,
-              paddingHorizontal: 6, paddingVertical: 2 }}>
-              <Text style={{ color: strength.color, fontSize: 9, fontWeight: "700" }}>
-                {strength.label}
-              </Text>
-            </View>
-            {/* Change % */}
             {item.chgPct !== 0 && (
               <Text style={{ color: item.chgPct > 0 ? "#34d399" : "#f87171",
                 fontSize: 11, fontWeight: "700" }}>
@@ -169,22 +184,21 @@ function BandarCard({ item }: { item: RadarMarket }) {
         )}
       </View>
 
-      {/* VWAP interpretation */}
+      {/* Fix 3: VWAP interpretation — bold + icon + diff amount */}
       {vwapInfo && (
-        <Text style={{ color: vwapInfo.color, fontSize: 10, marginTop: 2 }}>{vwapInfo.text}</Text>
+        <Text style={{ color: vwapInfo.color, fontSize: 11, fontWeight: "600", marginTop: 4 }}>
+          {vwapInfo.icon} {vwapInfo.text}
+        </Text>
       )}
 
       {/* NBS 3-timeframe grid */}
       <NBSGrid item={item} colors={colors} />
 
-      {/* Multi-TF strength icons */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
-        <Text style={{ fontSize: 12 }}>{strength.icon}</Text>
-        <Text style={{ color: strength.color, fontSize: 10, fontWeight: "700" }}>
-          {strength.label}
-        </Text>
+      {/* Fix 5: Colored TF dots + strength label */}
+      <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <TimeframeDots signal1d={item.signal1d} signal5d={item.signal5d} signal10d={item.signal10d} />
         {item.rsMom !== 0 && (
-          <Text style={{ color: "#64748b", fontSize: 10, marginLeft: "auto" }}>
+          <Text style={{ color: "#64748b", fontSize: 10 }}>
             RS Mom: <Text style={{ color: item.rsMom > 0 ? "#34d399" : "#f87171",
               fontWeight: "600" }}>
               {item.rsMom > 0 ? "+" : ""}{item.rsMom.toFixed(1)}
@@ -241,29 +255,36 @@ function BandarCard({ item }: { item: RadarMarket }) {
   );
 }
 
-// ─── Summary stats bar ────────────────────────────────────────
+// ─── Fix 2: Summary bar with better colors ────────────────────
 
-function SummaryBar({ data, colors }: { data: RadarMarket[]; colors: ReturnType<typeof useColors> }) {
+const SUMMARY_CARDS = [
+  { key: "acc",  label: "Akumulasi", bgColor: "#052e16", borderColor: "#16a34a", textColor: "#4ade80" },
+  { key: "dist", label: "Distribusi", bgColor: "#2d0a0a", borderColor: "#dc2626", textColor: "#f87171" },
+  { key: "neu",  label: "Netral", bgColor: "#0f1629", borderColor: "#475569", textColor: "#94a3b8" },
+] as const;
+
+function SummaryBar({ data }: { data: RadarMarket[] }) {
   const acc  = data.filter(r => r.signal1d === "Accumulation").length;
   const dist = data.filter(r => r.signal1d === "Distribution").length;
   const neu  = data.length - acc - dist;
+  const counts = { acc, dist, neu };
   return (
     <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-      <View style={{ flex: 1, backgroundColor: "#34d39918", borderRadius: 8,
-        borderWidth: 1, borderColor: "#34d39930", padding: 8, alignItems: "center" }}>
-        <Text style={{ color: "#34d399", fontWeight: "800", fontSize: 16 }}>{acc}</Text>
-        <Text style={{ color: "#64748b", fontSize: 9 }}>Akumulasi</Text>
-      </View>
-      <View style={{ flex: 1, backgroundColor: "#f8717118", borderRadius: 8,
-        borderWidth: 1, borderColor: "#f8717130", padding: 8, alignItems: "center" }}>
-        <Text style={{ color: "#f87171", fontWeight: "800", fontSize: 16 }}>{dist}</Text>
-        <Text style={{ color: "#64748b", fontSize: 9 }}>Distribusi</Text>
-      </View>
-      <View style={{ flex: 1, backgroundColor: colors.card, borderRadius: 8,
-        borderWidth: 1, borderColor: colors.border, padding: 8, alignItems: "center" }}>
-        <Text style={{ color: colors.mutedForeground, fontWeight: "800", fontSize: 16 }}>{neu}</Text>
-        <Text style={{ color: "#64748b", fontSize: 9 }}>Netral</Text>
-      </View>
+      {SUMMARY_CARDS.map(card => (
+        <View key={card.key} style={{
+          flex: 1, padding: 10, borderRadius: 10,
+          backgroundColor: card.bgColor,
+          borderWidth: 1, borderColor: card.borderColor,
+          alignItems: "center",
+        }}>
+          <Text style={{ color: card.textColor, fontSize: 22, fontWeight: "900" }}>
+            {counts[card.key]}
+          </Text>
+          <Text style={{ color: card.textColor + "cc", fontSize: 9, marginTop: 2 }}>
+            {card.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -273,6 +294,7 @@ function SummaryBar({ data, colors }: { data: RadarMarket[]; colors: ReturnType<
 export default function BandarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
   const [filterTab, setFilterTab] = useState<FilterTab>("ALL");
@@ -285,10 +307,7 @@ export default function BandarScreen() {
     gcTime:    2 * 60 * 60 * 1000,
   });
 
-  // Top 40 by |nbs1d|
-  const top40 = useMemo(() => bandarDetector(radarAll, 40), [radarAll]);
-
-  // Smart Money In list (all 3 TF positive, unlimited)
+  const top40   = useMemo(() => bandarDetector(radarAll, 40), [radarAll]);
   const smiList = useMemo(() => smartMoneyIn(radarAll), [radarAll]);
 
   const filtered = useMemo(() => {
@@ -316,14 +335,24 @@ export default function BandarScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: topPadding, backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Bandar Detector</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Net Buy/Sell · VWAP Bandar · Smart Money Flow
-        </Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 2 }}>
+          <View>
+            <Text style={[styles.title, { color: colors.foreground }]}>Bandar Detector</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+              Net Buy/Sell · VWAP Bandar · Smart Money Flow
+            </Text>
+          </View>
+          {/* Market Intel button */}
+          <TouchableOpacity
+            onPress={() => router.push("/market-intel" as any)}
+            style={styles.intelBtn}>
+            <Text style={styles.intelBtnText}>🔭 Intel</Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* Summary bar (only when data loaded) */}
+        {/* Fix 2: Summary bar */}
         {radarAll.length > 0 && !isLoading && (
-          <SummaryBar data={radarAll} colors={colors} />
+          <SummaryBar data={radarAll} />
         )}
 
         {/* Search */}
@@ -344,35 +373,37 @@ export default function BandarScreen() {
           )}
         </View>
 
-        {/* Filter tabs */}
-        <View style={styles.tabRow}>
+        {/* Fix 1: Filter tabs with icon + label text + count */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: 10 }} contentContainerStyle={{ gap: 6 }}>
           {FILTER_TABS.map(t => {
             const active = filterTab === t.key;
-            const tabColor = t.key === "ACC" ? "#34d399" : t.key === "DIST" ? "#f87171"
-              : t.key === "SMI" ? "#a78bfa" : colors.primary;
             return (
               <TouchableOpacity
                 key={t.key}
-                style={[styles.tabChip, {
-                  backgroundColor: active ? tabColor + "22" : colors.card,
-                  borderColor: active ? tabColor : colors.border,
-                }]}
-                onPress={() => setFilterTab(t.key)}>
-                <Text style={[styles.tabChipText, { color: active ? tabColor : colors.mutedForeground }]}>
-                  {t.emoji}
-                </Text>
-                <Text style={[styles.tabChipCount, { color: active ? tabColor : colors.mutedForeground }]}>
-                  {counts[t.key]}
+                onPress={() => setFilterTab(t.key)}
+                style={{
+                  paddingHorizontal: 12, paddingVertical: 7,
+                  borderRadius: 20,
+                  backgroundColor: active ? t.color + "25" : colors.card,
+                  borderWidth: 1,
+                  borderColor: active ? t.color : colors.border,
+                  flexDirection: "row", alignItems: "center", gap: 4,
+                }}>
+                <Text style={{ fontSize: 12 }}>{t.icon}</Text>
+                <Text style={{ color: active ? t.color : colors.mutedForeground,
+                  fontSize: 11, fontWeight: "600" }}>
+                  {t.label} {counts[t.key]}
                 </Text>
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
 
         {/* Section title */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            {FILTER_TABS.find(t => t.key === filterTab)?.emoji}{" "}
+            {FILTER_TABS.find(t => t.key === filterTab)?.icon}{" "}
             {FILTER_TABS.find(t => t.key === filterTab)?.label}
             {"  "}<Text style={{ color: colors.mutedForeground, fontSize: 12, fontWeight: "400" }}>
               {filtered.length} saham
@@ -442,19 +473,17 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingBottom: 8 },
   title: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5, marginBottom: 2 },
   subtitle: { fontSize: 12, marginBottom: 10 },
+  intelBtn: {
+    backgroundColor: "#1e293b", borderRadius: 12, borderWidth: 1, borderColor: "#334155",
+    paddingHorizontal: 10, paddingVertical: 6, marginTop: 2,
+  },
+  intelBtnText: { color: "#94a3b8", fontSize: 11, fontWeight: "600" },
   searchBox: {
     flexDirection: "row", alignItems: "center",
     borderRadius: 10, borderWidth: 1,
     paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10,
   },
   searchInput: { flex: 1, fontSize: 14 },
-  tabRow: { flexDirection: "row", gap: 6, marginBottom: 10 },
-  tabChip: {
-    flex: 1, borderRadius: 10, borderWidth: 1,
-    paddingVertical: 6, alignItems: "center", gap: 1,
-  },
-  tabChipText:  { fontSize: 13 },
-  tabChipCount: { fontSize: 10, fontWeight: "700" },
   sectionTitle: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
   list: { paddingHorizontal: 16, paddingTop: 4 },
   card: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 10 },

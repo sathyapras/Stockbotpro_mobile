@@ -1,0 +1,599 @@
+Bandar Detector UX Revision + Market Intelligence Screen
+Panduan untuk Mobile Builder
+Dua topik dalam satu dokumen: perbaikan UI Bandar Detector + screen Market Intelligence versi Easy Mode
+
+BAGIAN 1 — REVISI UX BANDAR DETECTOR
+Berdasarkan review screenshot, ada 5 hal yang perlu diperbaiki:
+
+Fix 1: Label Teks pada Tab Filter
+Kondisi sekarang: Tab hanya icon + angka → user baru tidak tahu artinya Yang diinginkan: Tab dengan icon + label teks
+
+// GANTI tab bar yang hanya ikon:
+const TABS = [
+  { key: "ALL",  icon: "📊", label: "Semua",       color: "#60a5fa" },
+  { key: "ACC",  icon: "🟢", label: "Akumulasi",   color: "#34d399" },
+  { key: "DIST", icon: "🔴", label: "Distribusi",  color: "#f87171" },
+  { key: "SMI",  icon: "💎", label: "Smart Money", color: "#a78bfa" },
+];
+// Render tab:
+{TABS.map(tab => (
+  <TouchableOpacity key={tab.key}
+    onPress={() => setActiveTab(tab.key)}
+    style={{
+      paddingHorizontal: 12, paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: activeTab === tab.key ? tab.color + "25" : "transparent",
+      borderWidth: activeTab === tab.key ? 1 : 0,
+      borderColor: tab.color,
+      flexDirection: "row", alignItems: "center", gap: 4,
+    }}>
+    <Text style={{ fontSize: 12 }}>{tab.icon}</Text>
+    <Text style={{ color: activeTab === tab.key ? tab.color : "#64748b", fontSize: 11, fontWeight: "600" }}>
+      {tab.label} {count[tab.key]}
+    </Text>
+  </TouchableOpacity>
+))}
+
+Fix 2: Warna Summary Bar "Distribusi"
+Kondisi sekarang: Background maroon terlalu gelap, teks sulit dibaca Yang diinginkan: Warna lebih kontras dan konsisten
+
+// Summary bar 3 kartu
+const SUMMARY_CARDS = [
+  {
+    key: "acc",
+    label: "Akumulasi",
+    bgColor: "#052e16",        // hijau gelap
+    borderColor: "#16a34a",
+    textColor: "#4ade80",
+  },
+  {
+    key: "dist",
+    label: "Distribusi",
+    bgColor: "#2d0a0a",        // merah gelap yang lebih terang dari sebelumnya
+    borderColor: "#dc2626",
+    textColor: "#f87171",      // merah muda jelas
+  },
+  {
+    key: "neu",
+    label: "Netral",
+    bgColor: "#0f1629",        // abu gelap
+    borderColor: "#475569",
+    textColor: "#94a3b8",
+  },
+];
+{SUMMARY_CARDS.map(card => (
+  <View key={card.key} style={{
+    flex: 1, padding: 12, borderRadius: 10,
+    backgroundColor: card.bgColor,
+    borderWidth: 1, borderColor: card.borderColor,
+    alignItems: "center",
+  }}>
+    <Text style={{ color: card.textColor, fontSize: 24, fontWeight: "900" }}>
+      {counts[card.key]}
+    </Text>
+    <Text style={{ color: card.textColor + "cc", fontSize: 10, marginTop: 2 }}>
+      {card.label}
+    </Text>
+  </View>
+))}
+
+Fix 3: Teks VWAP Interpretation Lebih Mencolok
+Kondisi sekarang: Teks "Harga di bawah VWAP bandar" warnanya sama dengan subtitle Yang diinginkan: Warna berbeda + font lebih bold
+
+// Fungsi interpretasi VWAP (server sudah kirim bandarAvg1d)
+function vwapLine(currentPrice, bandarAvg1d) {
+  if (!bandarAvg1d || !currentPrice) return null;
+  const diff = currentPrice - bandarAvg1d;
+  const pct  = ((diff / bandarAvg1d) * 100).toFixed(1);
+  
+  if (diff > 0) return {
+    text: `Harga ${diff.toLocaleString("id-ID")} di ATAS VWAP bandar (+${pct}%)`,
+    color: "#34d399",
+    icon: "📈",
+  };
+  return {
+    text: `Harga ${Math.abs(diff).toLocaleString("id-ID")} di BAWAH VWAP bandar (${pct}%)`,
+    color: "#f87171",
+    icon: "📉",
+  };
+}
+// Render:
+const vwap = vwapLine(currentPrice, item.bandarAvg1d);
+{vwap && (
+  <Text style={{
+    color: vwap.color,
+    fontSize: 11,
+    fontWeight: "600",     // lebih tebal dari sebelumnya
+    marginTop: 4,
+  }}>
+    {vwap.icon} {vwap.text}
+  </Text>
+)}
+
+Fix 4: Signal 5D dan 10D — Fallback dari Nilai NBS
+Masalah: vwapContext dan trendContext dari AFL bisa null atau tidak konsisten dengan nilai NBS aktual. Contoh: NBS 5D = -4326B tapi badge "NEU".
+
+Server sekarang sudah mengirim: flowState, vwapCtx, trendCtx (raw strings)
+
+Solusi — derive signal dari nilai NBS jika context string kosong:
+
+function deriveSignal(rawCtx, nbsValue) {
+  // 1. Pakai context dari server jika ada
+  if (rawCtx && rawCtx.trim() !== "") {
+    return flowToSignal(rawCtx);
+  }
+  // 2. Fallback: derive dari nilai NBS
+  if (nbsValue > 0)  return "Accumulation";
+  if (nbsValue < 0)  return "Distribution";
+  return "Neutral";
+}
+// Penggunaan di BandarCard:
+const signal1d  = deriveSignal(item.flowState, item.oneDayBillion);
+const signal5d  = deriveSignal(item.vwapCtx,   item.fiveDayBillion);
+const signal10d = deriveSignal(item.trendCtx,  item.tenDayBillion);
+
+Fix 5: Timeframe Indicator — Kotak Berwarna per Sinyal
+Kondisi sekarang: Tiga kotak abu-abu semua → MIXED tidak informatif Yang diinginkan: Kotak berwarna sesuai sinyal masing-masing TF
+
+function TimeframeDots({ signal1d, signal5d, signal10d }) {
+  const dotColor = (sig) => {
+    if (sig === "Accumulation")  return "#34d399";
+    if (sig === "Distribution")  return "#f87171";
+    return "#475569";  // Neutral = abu gelap
+  };
+  
+  const labels = [
+    { label: "1D", signal: signal1d },
+    { label: "5D", signal: signal5d },
+    { label: "10D", signal: signal10d },
+  ];
+  
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      {labels.map(tf => (
+        <View key={tf.label} style={{ alignItems: "center", gap: 2 }}>
+          <View style={{
+            width: 14, height: 14, borderRadius: 3,
+            backgroundColor: dotColor(tf.signal),
+          }} />
+          <Text style={{ color: "#475569", fontSize: 8 }}>{tf.label}</Text>
+        </View>
+      ))}
+      <Text style={{ color: "#64748b", fontSize: 10, marginLeft: 4 }}>
+        {getBandarStrength(signal1d, signal5d, signal10d).label}
+      </Text>
+    </View>
+  );
+}
+// Strength label:
+function getBandarStrength(s1, s5, s10) {
+  const signals = [s1, s5, s10];
+  const acc  = signals.filter(s => s === "Accumulation").length;
+  const dist = signals.filter(s => s === "Distribution").length;
+  if (acc === 3)  return { label: "ACC KUAT ✦", color: "#10b981" };
+  if (acc === 2)  return { label: "ACC",         color: "#34d399" };
+  if (dist === 3) return { label: "DIST KUAT ✦", color: "#dc2626" };
+  if (dist === 2) return { label: "DIST",        color: "#f87171" };
+  return           { label: "MIXED",             color: "#64748b" };
+}
+
+BAGIAN 2 — MARKET INTELLIGENCE SCREEN (Easy Mode)
+Screen ini memberikan gambaran kondisi pasar secara keseluruhan — mirip "dashboard" untuk trader sebelum mulai trading.
+
+Versi Easy Mode — tidak perlu semua komponen dari web app, cukup 4 bagian utama:
+
+┌─────────────────────────────────────────────┐
+│  Market Intelligence          Sel, 07 Apr   │
+├─────────────────────────────────────────────┤
+│  [1] Market Pulse Card                      │
+├─────────────────────────────────────────────┤
+│  [2] Phase Distribution                     │
+├─────────────────────────────────────────────┤
+│  [3] Flow State Distribution                │
+├─────────────────────────────────────────────┤
+│  [4] Smart Money Flow (NBS Total)           │
+└─────────────────────────────────────────────┘
+
+Endpoint yang Dipakai
+// Fetch 2 endpoint secara paralel
+const [aggregateRes, bandarRes] = await Promise.all([
+  fetch(`${API}/api/broker-summary/market-aggregate`, { headers: { Authorization: `Bearer ${jwt}` } }),
+  fetch(`${API}/api/analysis/bandar-detector?index=COMPOSITE`, { headers: { Authorization: `Bearer ${jwt}` } }),
+]);
+const aggregate = await aggregateRes.json();
+// → { smAccPct, avgFlowScore, smBrokPulse, total, latestDate }
+const bandarList = await bandarRes.json();
+// → array of BandarRow (sudah difilter tanpa IDX*/COMPOSITE)
+
+[1] Market Pulse Card
+Skor kondisi pasar dari 0–100. Dihitung dari smBrokPulse (Smart Money Broker Pulse).
+
+function getMarketPulse(smBrokPulse, smAccPct) {
+  // Hybrid: 70% scanner signal + 30% broker pulse
+  const hybridPulse = Math.round(smBrokPulse * 0.7 + smAccPct * 0.3);
+  
+  let label, color, bg, desc;
+  if (hybridPulse >= 70) {
+    label = "BULLISH";   color = "#34d399"; bg = "#052e16";
+    desc  = "Kondisi pasar kuat — momentum mendukung";
+  } else if (hybridPulse >= 50) {
+    label = "NETRAL";    color = "#fbbf24"; bg = "#1c1500";
+    desc  = "Pasar campuran — selektif dan hati-hati";
+  } else if (hybridPulse >= 35) {
+    label = "WASPADA";   color = "#f97316"; bg = "#1c0a00";
+    desc  = "Momentum lemah — lebih banyak cash";
+  } else {
+    label = "BEARISH";   color = "#f87171"; bg = "#2d0a0a";
+    desc  = "Kondisi buruk — hindari posisi baru";
+  }
+  return { hybridPulse, label, color, bg, desc };
+}
+
+Tampilan:
+
+┌──────────────────────────────────────────┐
+│  Market Pulse                            │
+│                                          │
+│         ██████████████░░░░░░            │
+│              46 / 100                   │
+│           🟡 WASPADA                    │
+│   Momentum campuran — pilih selektif    │
+│                                          │
+│  SM Acc%: 20%   Flow Score: 48/100      │
+│  SM Pulse: 31   • 262 saham tercover    │
+└──────────────────────────────────────────┘
+
+function MarketPulseCard({ aggregate }) {
+  const { smAccPct, avgFlowScore, smBrokPulse, total, latestDate } = aggregate;
+  const hybridPulse = Math.round(smBrokPulse * 0.7 + smAccPct * 0.3);
+  const pulse = getMarketPulse(hybridPulse, smAccPct);
+  
+  const dateLabel = latestDate
+    ? new Date(latestDate).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+    : "–";
+  
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>⚡ Market Pulse</Text>
+        <Text style={{ color: "#475569", fontSize: 11 }}>SM {dateLabel}</Text>
+      </View>
+      
+      {/* Progress Bar */}
+      <View style={{ height: 10, backgroundColor: "#0f1629", borderRadius: 5, marginBottom: 8 }}>
+        <View style={{
+          height: 10, width: `${pulse.hybridPulse}%`,
+          backgroundColor: pulse.color, borderRadius: 5,
+        }} />
+      </View>
+      
+      {/* Score + Label */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 22 }}>
+          {pulse.hybridPulse}
+          <Text style={{ color: "#475569", fontSize: 14 }}>/100</Text>
+        </Text>
+        <View style={{ backgroundColor: pulse.bg, borderRadius: 8,
+          paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: pulse.color }}>
+          <Text style={{ color: pulse.color, fontWeight: "700", fontSize: 13 }}>{pulse.label}</Text>
+        </View>
+      </View>
+      
+      <Text style={{ color: "#94a3b8", fontSize: 11, marginBottom: 12 }}>{pulse.desc}</Text>
+      
+      {/* Stats Row */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between",
+        backgroundColor: "#0f1629", borderRadius: 8, padding: 10 }}>
+        {[
+          { label: "SM Acc%",       value: `${smAccPct}%`,       sub: `${total} saham` },
+          { label: "Avg Flow Score", value: `${avgFlowScore}/100`, sub: "Rata-rata flow SM" },
+          { label: "SM Pulse",      value: `${smBrokPulse}/100`, sub: "60% Acc + 40% Flow" },
+        ].map(s => (
+          <View key={s.label} style={{ alignItems: "center" }}>
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 14 }}>{s.value}</Text>
+            <Text style={{ color: "#475569", fontSize: 9, textAlign: "center" }}>{s.label}</Text>
+            <Text style={{ color: "#334155", fontSize: 8, textAlign: "center" }}>{s.sub}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+[2] Phase Distribution
+Distribusi fase Smart Money dari data broker. Dihitung dari bandarList (semua saham yang ada data broker).
+
+Mapping fase broker ke display:
+
+Fase Server	Display	Warna
+IGNITION	Markup	#60a5fa (biru)
+EARLY_ACC	Accumulation	#34d399 (hijau)
+STRONG_TREND	Markup	#60a5fa (biru)
+EXHAUSTION	Late Stage	#fbbf24 (kuning)
+DISTRIBUTION	Distribution	#f87171 (merah)
+CHURNING	Consolidation	#94a3b8 (abu)
+// Hitung phase distribution dari smart-money endpoint
+// GET /api/broker-summary/smart-money → { data: [...] }
+// Setiap item punya field: phase
+const PHASE_MAP = {
+  IGNITION:     { label: "Markup",       color: "#60a5fa" },
+  EARLY_ACC:    { label: "Accumulation", color: "#34d399" },
+  STRONG_TREND: { label: "Markup",       color: "#60a5fa" },
+  EXHAUSTION:   { label: "Late Stage",   color: "#fbbf24" },
+  DISTRIBUTION: { label: "Distribution", color: "#f87171" },
+  CHURNING:     { label: "Consolidation",color: "#94a3b8" },
+};
+function buildPhaseDistribution(smartMoneyData) {
+  const counts = {};
+  const total = smartMoneyData.length;
+  
+  for (const stock of smartMoneyData) {
+    const phase = stock.phase ?? "CHURNING";
+    const display = PHASE_MAP[phase]?.label ?? "Consolidation";
+    counts[display] = (counts[display] ?? 0) + 1;
+  }
+  
+  return Object.entries(counts)
+    .map(([label, count]) => ({
+      label,
+      count,
+      pct: Math.round((count / total) * 100),
+      color: Object.values(PHASE_MAP).find(p => p.label === label)?.color ?? "#94a3b8",
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+Tampilan Phase Distribution:
+
+⚡ Phase Distribution
+LATE STAGE    ████████████████████  40%  25 saham
+MARKUP        ████████              21%  13 saham
+CONSOLIDATION ████████              21%  13 saham
+ACCUMULATION  ██████                16%  10 saham
+DISTRIBUTION  █                     3%   2 saham
+
+function PhaseDistributionCard({ smartMoneyData }) {
+  const phases = buildPhaseDistribution(smartMoneyData);
+  const maxPct = Math.max(...phases.map(p => p.pct), 1);
+  
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+      <Text style={{ color: "white", fontWeight: "700", fontSize: 15, marginBottom: 14 }}>
+        ⚡ Phase Distribution
+      </Text>
+      
+      {phases.map(p => (
+        <View key={p.label} style={{ marginBottom: 10 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+            <Text style={{ color: p.color, fontSize: 11, fontWeight: "600" }}>{p.label}</Text>
+            <Text style={{ color: "#64748b", fontSize: 11 }}>
+              {p.pct}%  ·  {p.count} saham
+            </Text>
+          </View>
+          <View style={{ height: 6, backgroundColor: "#0f1629", borderRadius: 3 }}>
+            <View style={{
+              height: 6,
+              width: `${(p.pct / maxPct) * 100}%`,
+              backgroundColor: p.color + "cc",
+              borderRadius: 3,
+            }} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+[3] Flow State Distribution
+Distribusi NBS signal dari Bandar Detector — lebih granular dari Phase Distribution karena mencakup flowState raw dari AFL radar.
+
+// Dari bandarList (GET /api/analysis/bandar-detector?index=COMPOSITE)
+// Setiap item punya: signal1d (Accumulation | Distribution | Neutral)
+// Dan item.flowState untuk "Strong Accumulation" vs "Accumulation"
+function buildFlowStateDistribution(bandarList) {
+  const counts = {
+    "STRONG ACC":  0,
+    "ACC":         0,
+    "NEUTRAL":     0,
+    "DIST":        0,
+    "STRONG DIST": 0,
+  };
+  
+  for (const item of bandarList) {
+    const fs = (item.flowState ?? "").toUpperCase();
+    if      (fs.includes("STRONG ACCUMULATION"))  counts["STRONG ACC"]++;
+    else if (fs.includes("ACCUMULATION"))          counts["ACC"]++;
+    else if (fs.includes("STRONG DISTRIBUTION"))   counts["STRONG DIST"]++;
+    else if (fs.includes("DISTRIBUTION"))          counts["DIST"]++;
+    else                                            counts["NEUTRAL"]++;
+  }
+  
+  const total = bandarList.length || 1;
+  return [
+    { key: "STRONG ACC",  label: "★ Akumulasi",  color: "#10b981", icon: "★" },
+    { key: "ACC",         label: "Akumulasi",    color: "#34d399", icon: "●" },
+    { key: "NEUTRAL",     label: "Netral",       color: "#64748b", icon: "○" },
+    { key: "DIST",        label: "Distribusi",   color: "#f87171", icon: "●" },
+    { key: "STRONG DIST", label: "★ Distribusi", color: "#dc2626", icon: "★" },
+  ].map(item => ({
+    ...item,
+    count: counts[item.key],
+    pct: Math.round((counts[item.key] / total) * 100),
+  }));
+}
+
+Tampilan:
+
+👥 Flow State Distribution
+Primary Truth — Smart Money ngapain?
+★ Akumulasi  ████        10 (16%)
+  Akumulasi  █████       13 (21%)
+  Netral     ●            2  (3%)
+  Distribusi ████████████33 (52%)
+★ Distribusi ███          5  (8%)
+
+function FlowStateCard({ bandarList }) {
+  const flows = buildFlowStateDistribution(bandarList);
+  const maxCount = Math.max(...flows.map(f => f.count), 1);
+  
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>
+          👥 Flow State
+        </Text>
+        <TouchableOpacity>
+          <Text style={{ color: "#475569", fontSize: 11 }}>Insight ▾</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={{ color: "#475569", fontSize: 10, marginBottom: 14 }}>
+        Primary Truth — Smart Money ngapain?
+      </Text>
+      
+      {flows.map(f => (
+        <View key={f.key} style={{ flexDirection: "row", alignItems: "center",
+          gap: 8, marginBottom: 8 }}>
+          <Text style={{ color: f.color, fontSize: 10, width: 80, textAlign: "right" }}>
+            {f.icon} {f.label}
+          </Text>
+          <View style={{ flex: 1, height: 6, backgroundColor: "#0f1629", borderRadius: 3 }}>
+            <View style={{
+              height: 6,
+              width: `${(f.count / maxCount) * 100}%`,
+              backgroundColor: f.color,
+              borderRadius: 3,
+            }} />
+          </View>
+          <Text style={{ color: "#64748b", fontSize: 10, width: 50 }}>
+            {f.count} ({f.pct}%)
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+[4] Smart Money Flow — NBS Total Pasar
+Aggregate NBS dari semua saham untuk gambaran aliran dana besar.
+
+// Hitung total NBS dari bandarList (sudah ada nbs data)
+// bandarList = GET /api/analysis/bandar-detector?index=COMPOSITE
+function buildMarketFlow(bandarList) {
+  let total5d = 0, total10d = 0;
+  let accCount5d = 0;
+  
+  for (const item of bandarList) {
+    total5d  += item.fiveDayBillion  ?? 0;
+    total10d += item.tenDayBillion   ?? 0;
+    if ((item.fiveDayBillion ?? 0) > 0) accCount5d++;
+  }
+  
+  const formatT = (bn) => {
+    const abs  = Math.abs(bn);
+    const sign = bn >= 0 ? "+" : "-";
+    if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(1)}T`;
+    return `${sign}${abs.toFixed(0)}B`;
+  };
+  
+  return {
+    nbs5d:   total5d,
+    nbs10d:  total10d,
+    nbs5dStr:  formatT(total5d),
+    nbs10dStr: formatT(total10d),
+    label5d:   total5d >= 0 ? "Net beli (akumulasi)" : "Net jual (distribusi)",
+    label10d:  total10d >= 0 ? "Net beli (akumulasi)" : "Net jual (distribusi)",
+    color5d:   total5d >= 0 ? "#34d399" : "#f87171",
+    color10d:  total10d >= 0 ? "#34d399" : "#f87171",
+  };
+}
+
+Tampilan:
+
+↘ Smart Money Flow                Net Buy/Sell 5D & 10D
+Net Buy/Sell 5D        Net Buy/Sell 10D
+  -2.1T                  -5.7T
+Net jual (distribusi)  Net jual (distribusi)
+
+function SmartMoneyFlowCard({ bandarList }) {
+  const flow = buildMarketFlow(bandarList);
+  
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 14 }}>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>↘ Smart Money Flow</Text>
+        <Text style={{ color: "#475569", fontSize: 10 }}>Net Buy/Sell 5D & 10D</Text>
+      </View>
+      
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        {[
+          { label: "Net Buy/Sell 5D",  value: flow.nbs5dStr,  sub: flow.label5d,  color: flow.color5d  },
+          { label: "Net Buy/Sell 10D", value: flow.nbs10dStr, sub: flow.label10d, color: flow.color10d },
+        ].map(item => (
+          <View key={item.label} style={{ flex: 1, backgroundColor: "#0f1629", borderRadius: 10, padding: 12 }}>
+            <Text style={{ color: "#64748b", fontSize: 10, marginBottom: 4 }}>{item.label}</Text>
+            <Text style={{ color: item.color, fontWeight: "900", fontSize: 22 }}>{item.value}</Text>
+            <Text style={{ color: item.color + "99", fontSize: 10, marginTop: 2 }}>{item.sub}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+Komponen Utama: MarketIntelligenceScreen
+export function MarketIntelligenceScreen() {
+  // Fetch paralel — tidak saling tunggu
+  const { data: aggregate, isLoading: loadingAgg } = useQuery({
+    queryKey: ["market-aggregate"],
+    queryFn: () => fetchWithAuth("/api/broker-summary/market-aggregate"),
+    staleTime: 10 * 60 * 1000,  // 10 menit
+  });
+  const { data: bandarList = [], isLoading: loadingBandar } = useQuery({
+    queryKey: ["bandar-market-intel"],
+    queryFn: () => fetchWithAuth("/api/analysis/bandar-detector?index=COMPOSITE"),
+    staleTime: 10 * 60 * 1000,
+  });
+  
+  // Smart money data untuk phase distribution
+  const { data: smData } = useQuery({
+    queryKey: ["smart-money-all"],
+    queryFn: () => fetchWithAuth("/api/broker-summary/smart-money")
+      .then(r => r.data ?? []),
+    staleTime: 10 * 60 * 1000,
+  });
+  const isLoading = loadingAgg || loadingBandar;
+  if (isLoading) return <LoadingSkeleton />;
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629" }}
+      contentContainerStyle={{ padding: 16 }}>
+      
+      {/* Header */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between",
+        alignItems: "center", marginBottom: 16 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 20 }}>
+          Market Intelligence
+        </Text>
+        <Text style={{ color: "#475569", fontSize: 11 }}>
+          {new Date().toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+        </Text>
+      </View>
+      
+      {/* 4 Section Cards */}
+      {aggregate && <MarketPulseCard aggregate={aggregate} />}
+      {smData?.length > 0 && <PhaseDistributionCard smartMoneyData={smData} />}
+      {bandarList.length > 0 && <FlowStateCard bandarList={bandarList} />}
+      {bandarList.length > 0 && <SmartMoneyFlowCard bandarList={bandarList} />}
+      
+    </ScrollView>
+  );
+}
+
+Endpoint Summary
+Data	Endpoint	Stale Time
+Market Pulse (smBrokPulse, smAccPct, avgFlowScore)	GET /api/broker-summary/market-aggregate	10 menit
+Phase Distribution (phase per saham)	GET /api/broker-summary/smart-money	10 menit
+Flow State Distribution + NBS Total	GET /api/analysis/bandar-detector?index=COMPOSITE	10 menit
+Catatan: index=COMPOSITE di bandar-detector sekarang sudah bebas dari simbol IDX* dan COMPOSITE — hanya saham individual yang muncul.
+
+Versi Easy Mode ini cukup untuk memberikan gambaran kondisi pasar tanpa kompleksitas penuh web app.
