@@ -1,0 +1,427 @@
+Prioritas 3 — Fitur Premium Populer
+Stockpick Signal · Watchlist · AI Robo Chat
+Panduan implementasi mobile untuk Replit Mobile App Builder
+
+FITUR 1: STOCKPICK SIGNAL
+Apa itu Stockpick Signal?
+Fitur andalan StockBot Pro — sistem AI dua tahap (Stage 1 + Stage 2) yang memilih saham terbaik setiap hari untuk di-trade. Data ini sudah dihitung di server, mobile hanya menampilkannya.
+
+Ada 3 jenis sinyal utama:
+
+Sinyal	Keterangan	API
+BOW (Buy on Weakness)	Saham dip yang sedang diakumulasi bandar	GET /api/bow
+BOS (Buy on Strength)	Saham breakout dengan momentum kuat	GET /api/bos
+Stockpick Daily	Sinyal harian gabungan dari engine AI	GET /api/stockpick/daily
+1A. BOW — Buy on Weakness
+URL: GET https://stockbotpro.replit.app/api/bow
+
+Auth: Header Authorization: Bearer <JWT_TOKEN> (perlu login)
+
+Response:
+
+{
+  "data": [
+    {
+      "symbol": "ANTM",
+      "date": "2026-04-07",
+      "status": "BUY",
+      "grade": "A",
+      "rank": 1,
+      "score": 85.4,
+      "confPct": 78.2,
+      "rsVsIHSG": 12.5,
+      "valB": 49.0,
+      "close": 1590,
+      "buyClose": 1580,
+      "buyBreak": 1620,
+      "entry": 1580,
+      "stopLoss": 1520,
+      "slPct": -3.8,
+      "tp1": 1700,
+      "tp2": 1820,
+      "pctToTp1": 7.6,
+      "rr": 1.83,
+      "rsi": 42.1,
+      "stochK": 28.5,
+      "days": "3D",
+      "holdPL": 0.0,
+      "secTrend": "Uptrend",
+      "setupType": "Dip",
+      "action": "BUY",
+      "signals": "Volume Surge, MA Support",
+      "commentary": "Akumulasi kuat terlihat di level support, broker besar masuk diam-diam..."
+    }
+  ],
+  "meta": {
+    "rows": 45,
+    "fileName": "bow_20260407.csv",
+    "uploadedAt": "2026-04-07T10:30:00Z",
+    "approvedCount": 150
+  }
+}
+
+Penjelasan field penting:
+
+Field	Arti	Tampilkan sebagai
+status	BUY / HOLD / SOLD	Badge warna
+grade	A/B/C kualitas sinyal	Badge A=hijau, B=kuning, C=abu
+rank	Peringkat dari semua kandidat	Nomor urut
+score	Skor algoritma 0–100	Progress bar atau angka
+confPct	Confidence %	Persentase
+rsVsIHSG	Relative strength vs IHSG	+/- dengan warna
+valB	Nilai transaksi broker (miliar)	"49.0B"
+buyClose	Entry harga close	Harga masuk (di bawah harga)
+buyBreak	Entry harga breakout	Harga masuk (breakout)
+stopLoss	Harga stop loss	Merah
+tp1	Target profit 1	Hijau muda
+tp2	Target profit 2	Hijau tua
+rr	Risk-reward ratio	"1:1.83"
+commentary	Analisa teks dari AFL	Teks singkat italik
+1B. BOS — Buy on Strength
+URL: GET https://stockbotpro.replit.app/api/bos
+
+Auth: Header Authorization: Bearer <JWT_TOKEN>
+
+Response:
+
+{
+  "data": [
+    {
+      "symbol": "BBCA",
+      "date": "2026-04-07",
+      "signal": "BUY",
+      "trend": "Strong Up",
+      "close": 9500,
+      "entry": 9550,
+      "stopLoss": 9200,
+      "slPct": -3.66,
+      "tp1": 10100,
+      "tp2": 10800,
+      "sellPrice": 0,
+      "glPct": 0,
+      "hold": "Active",
+      "highest": 9500,
+      "valB": 320.5,
+      "support": 9200,
+      "resistance": 10100,
+      "shortTrend": "Uptrend",
+      "vwap": 9420,
+      "vwapTrend": "Above",
+      "vwapPct": 0.85,
+      "vwapFilter": "Pass",
+      "secTrend": "Financials Up",
+      "rr": 1.83,
+      "commentary": "Breakout dari resistance dengan volume tinggi..."
+    }
+  ]
+}
+
+Perbedaan BOW vs BOS:
+
+BOW → saham yang sedang turun/dip, cari entry murah, RSI rendah (< 50)
+BOS → saham yang sudah breakout ke atas, konfirmasi tren naik, entry di resistance lama
+1C. Stockpick Daily (Engine AI 2 Tahap)
+URL: GET https://stockbotpro.replit.app/api/stockpick/daily
+
+Auth: Header Authorization: Bearer <JWT_TOKEN>
+
+Response:
+
+{
+  "date": "2026-04-07",
+  "total": 5,
+  "weakness": 3,
+  "strength": 2,
+  "picks": [
+    {
+      "id": 42,
+      "pickDate": "2026-04-07",
+      "ticker": "ANTM",
+      "strategy": "buy-on-weakness",
+      "stage2Score": 87.3,
+      "closePx": 1590,
+      "vwap": 1580,
+      "vol50dPct": 285.4,
+      "nbs": 49.0,
+      "support": 1520,
+      "resistance": 1680,
+      "entryLow": 1560,
+      "entryHigh": 1590,
+      "stopLoss": 1490,
+      "target1": 1700,
+      "target2": 1850,
+      "slPct": -6.29,
+      "tp1Pct": 6.92,
+      "tp2Pct": 16.35,
+      "rr1": 1.1,
+      "rr2": 2.6,
+      "stage2Signals": ["Smart Money Acc", "Vol Surge 285%", "At Support", "RSI 42"],
+      "status": "active",
+      "resultPct": null,
+      "closedAt": null
+    }
+  ]
+}
+
+Penjelasan field penting:
+
+Field	Arti
+strategy	"buy-on-weakness" atau "buy-on-strength"
+stage2Score	Skor final setelah filter smart money (0–100)
+entryLow – entryHigh	Range zona entry ideal
+stopLoss	Harga stop loss (sudah dihitung, jangan ubah)
+target1 / target2	TP1 dan TP2
+slPct / tp1Pct / tp2Pct	Persentase SL/TP dari entry
+rr1 / rr2	Risk-reward ratio ke TP1 dan TP2
+stage2Signals	Array label sinyal yang terpenuhi
+status	active / tp1_hit / tp2_hit / sl_hit / expired
+vol50dPct	Volume hari ini vs rata-rata 50 hari (%) — 285% = 2.85x lebih besar
+Stats endpoint:
+
+GET /api/stockpick/stats
+→ { totalPicks, activePicks, wins, losses, winRatePct, avgReturnPct }
+
+TAMPILAN STOCKPICK DI MOBILE
+Layout screen:
+
+┌──────────────────────────────────────┐
+│ 📊 Stockpick Signal    7 April 2026  │
+│                                      │
+│ [BOW 45] [BOS 32] [Daily Picks 5]    │
+├──────────────────────────────────────┤
+│ Win Rate: 73.2%  Avg Return: +5.8%   │
+│ ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ (bar hijau/merah)  │
+├──────────────────────────────────────┤
+│ 1. ANTM  [A] [BOW]  Score: 85       │
+│    Entry: 1.560-1.590  SL: 1.490    │
+│    TP1: 1.700 (+7.6%)  TP2: 1.820   │
+│    RR: 1:1.83  ▲ Smart Money Acc    │
+├──────────────────────────────────────┤
+│ 2. BBCA  [A] [BOS]  Score: 82       │
+│    Entry: 9.550  SL: 9.200          │
+│    TP1: 10.100 (+5.8%)  TP2: 10.800 │
+│    RR: 1:1.83  ▲ Breakout           │
+└──────────────────────────────────────┘
+
+Card komponen tiap sinyal:
+
+function SignalCard({ pick }) {
+  const isWeakness = pick.strategy === "buy-on-weakness";
+  const statusConfig = {
+    active:   { color: "#60a5fa", label: "Aktif" },
+    tp1_hit:  { color: "#34d399", label: "TP1 ✓" },
+    tp2_hit:  { color: "#a78bfa", label: "TP2 ✓" },
+    sl_hit:   { color: "#f87171", label: "SL Hit" },
+    expired:  { color: "#94a3b8", label: "Expired" },
+  };
+  const status = statusConfig[pick.status] ?? statusConfig.active;
+  
+  return (
+    <TouchableOpacity onPress={() => navigate(`/stocks/${pick.ticker}`)}>
+      <View style={cardStyle}>
+        {/* Header */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <Text style={{ fontWeight: "900", fontSize: 18 }}>{pick.ticker}</Text>
+            <Badge color={isWeakness ? "#34d399" : "#a78bfa"}>
+              {isWeakness ? "BOW" : "BOS"}
+            </Badge>
+            <Badge color={status.color}>{status.label}</Badge>
+          </View>
+          <ScoreCircle score={pick.stage2Score} />
+        </View>
+        
+        {/* Entry Zone */}
+        <View style={{ flexDirection: "row", gap: 16, marginTop: 8 }}>
+          <InfoBlock label="Entry" value={
+            pick.entryLow ? `${formatRp(pick.entryLow)}–${formatRp(pick.entryHigh)}`
+                          : formatRp(pick.closePx)
+          } color="#fbbf24" />
+          <InfoBlock label="Stop Loss" value={`${formatRp(pick.stopLoss)} (${pick.slPct?.toFixed(1)}%)`} color="#f87171" />
+        </View>
+        
+        {/* TP targets */}
+        <View style={{ flexDirection: "row", gap: 16, marginTop: 4 }}>
+          <InfoBlock label="TP1" value={`${formatRp(pick.target1)} (+${pick.tp1Pct?.toFixed(1)}%)`} color="#34d399" />
+          <InfoBlock label="TP2" value={`${formatRp(pick.target2)} (+${pick.tp2Pct?.toFixed(1)}%)`} color="#a78bfa" />
+          <InfoBlock label="RR" value={`1:${pick.rr1?.toFixed(1)}`} color="#60a5fa" />
+        </View>
+        
+        {/* Signals */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+          {pick.stage2Signals.map(s => (
+            <SignalChip key={s} label={s} />
+          ))}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+Format harga Rupiah:
+
+function formatRp(n) {
+  if (!n) return "-";
+  if (n >= 1000) return n.toLocaleString("id-ID");  // "1.590" atau "9.500"
+  return String(n);
+}
+
+FITUR 2: WATCHLIST
+Apa itu Watchlist?
+User bisa simpan saham favorit (maks 20 saham). Setiap saham di watchlist otomatis dilengkapi data live: harga terkini, perubahan, Smart Money fase, dan tren MA.
+
+Semua endpoint butuh Auth header!
+
+API Watchlist
+Base URL: https://stockbotpro.replit.app/api/watchlist
+
+Header wajib:
+
+Authorization: Bearer <JWT_TOKEN>
+
+GET /api/watchlist — ambil semua saham watchlist user
+Response:
+
+[
+  {
+    "id": 12,
+    "symbol": "ANTM",
+    "name": "Aneka Tambang Tbk",
+    "addedAt": "2026-04-01T08:00:00Z",
+    "price": 1590,
+    "change": -10,
+    "changePercent": -0.63,
+    "smfPhase": "IGNITION",
+    "smfScore": 82,
+    "smfTrend": "GROWING",
+    "maTrend": "Uptrend"
+  },
+  {
+    "id": 13,
+    "symbol": "BBCA",
+    "name": "Bank Central Asia Tbk",
+    "addedAt": "2026-04-02T09:00:00Z",
+    "price": 9500,
+    "change": 50,
+    "changePercent": 0.53,
+    "smfPhase": "STRONG_TREND",
+    "smfScore": 74,
+    "smfTrend": "STABLE",
+    "maTrend": "Uptrend"
+  }
+]
+
+POST /api/watchlist — tambah saham
+// Request body:
+{ "symbol": "TLKM" }
+// Response (201):
+{
+  "id": 14,
+  "symbol": "TLKM",
+  "name": "Telkom Indonesia",
+  "addedAt": "2026-04-07T10:00:00Z"
+}
+// Error jika sudah ada:
+{ "error": "TLKM sudah ada di watchlist" }
+// Error jika sudah penuh:
+{ "error": "Maksimum 20 saham di watchlist. Hapus beberapa untuk menambahkan yang baru." }
+
+DELETE /api/watchlist/:symbol — hapus saham
+DELETE /api/watchlist/TLKM
+// Response:
+{ "success": true, "message": "TLKM dihapus dari watchlist" }
+
+TAMPILAN WATCHLIST DI MOBILE
+┌──────────────────────────────────────┐
+│ ⭐ Watchlist Saya           14/20    │
+│                                      │
+│ [+ Tambah Saham]                     │
+├──────────────────────────────────────┤
+│ ANTM  Aneka Tambang                  │
+│ 1.590  ▼ -0.63% (-10)               │
+│ 🔥 IGNITION  Score: 82  ▲ Menguat    │
+│ MA: Uptrend                          │
+├──────────────────────────────────────┤
+│ BBCA  Bank Central Asia              │
+│ 9.500  ▲ +0.53% (+50)               │
+│ 💪 STRONG TREND  Score: 74  → Stabil │
+│ MA: Uptrend                          │
+└──────────────────────────────────────┘
+
+Card watchlist tiap saham:
+
+function WatchlistCard({ item, onDelete }) {
+  const isUp = item.changePercent >= 0;
+  
+  return (
+    <Swipeable
+      renderRightActions={() => (
+        <TouchableOpacity onPress={() => onDelete(item.symbol)}
+          style={{ backgroundColor: "#f87171", justifyContent: "center",
+                   alignItems: "center", width: 80 }}>
+          <Text style={{ color: "white" }}>🗑️ Hapus</Text>
+        </TouchableOpacity>
+      )}
+    >
+      <TouchableOpacity onPress={() => navigate(`/stocks/${item.symbol}`)}>
+        <View style={cardStyle}>
+          {/* Baris 1: Ticker + Harga */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <View>
+              <Text style={{ fontWeight: "900", fontSize: 16 }}>{item.symbol}</Text>
+              <Text style={{ fontSize: 11, color: "#94a3b8" }}>{item.name}</Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ fontWeight: "700", fontSize: 16 }}>
+                {item.price?.toLocaleString("id-ID")}
+              </Text>
+              <Text style={{ color: isUp ? "#34d399" : "#f87171", fontSize: 12 }}>
+                {isUp ? "▲" : "▼"} {Math.abs(item.changePercent).toFixed(2)}%
+                ({isUp ? "+" : ""}{item.change?.toLocaleString("id-ID")})
+              </Text>
+            </View>
+          </View>
+          
+          {/* Baris 2: Smart Money + MA */}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
+            <PhaseBadge phase={item.smfPhase} />
+            <Text style={{ fontSize: 10, color: "#94a3b8" }}>Score: {item.smfScore}</Text>
+            <FlowTrendIcon trend={item.smfTrend} />
+            <Text style={{ fontSize: 10, color: "#94a3b8" }}>MA: {item.maTrend}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Swipeable>
+  );
+}
+
+Modal tambah saham:
+
+function AddToWatchlist({ onAdd }) {
+  const [ticker, setTicker] = useState("");
+  
+  async function handleAdd() {
+    const res = await fetch(`${API_BASE}/api/watchlist`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+      body: JSON.stringify({ symbol: ticker.toUpperCase() })
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error); return; }
+    onAdd(data);
+    setTicker("");
+  }
+  
+  return (
+    // Modal/BottomSheet dengan TextInput
+    <TextInput
+      placeholder="Cari ticker... (misal: ANTM)"
+      value={ticker}
+      onChangeText={t => setTicker(t.toUpperCase())}
+      autoCapitalize="characters"
+      maxLength={6}
+    />
+  );
+}
+
+Swipe-to-delete: Gunakan react-native-gesture-handler Swipeable untuk hapus dengan geser kiri.

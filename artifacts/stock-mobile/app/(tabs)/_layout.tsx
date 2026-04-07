@@ -24,6 +24,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "waveform.path.ecg", selected: "waveform.path.ecg.rectangle.fill" }} />
         <Label>Bandar</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="stockpick">
+        <Icon sf={{ default: "target", selected: "target" }} />
+        <Label>Stockpick</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="screener">
         <Icon sf={{ default: "line.3.horizontal.decrease.circle", selected: "line.3.horizontal.decrease.circle.fill" }} />
         <Label>Screener</Label>
@@ -103,6 +107,18 @@ function ClassicTabLayout() {
               <SymbolView name="waveform.path.ecg" tintColor={color} size={24} />
             ) : (
               <Feather name="activity" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="stockpick"
+        options={{
+          title: "Stockpick",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="target" tintColor={color} size={24} />
+            ) : (
+              <Feather name="crosshair" size={22} color={color} />
             ),
         }}
       />
