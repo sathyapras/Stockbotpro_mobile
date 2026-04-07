@@ -47,6 +47,17 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
     - Computes avg3d/5d/15d, momentum, phase (6 phases), flowScore (0-100), sparkline
   - 4 filter tabs: Top Akumulasi / Entry Peluang / Peringatan / Strong Trend
   - Sparkline bar chart via react-native-svg (`components/Sparkline.tsx`)
+- **STOCKTOOLS_SCREENER** proxy added — 289 IDX stocks with RSI, MA, BB, RS, strategies
+- **Stock Detail Screen** (`app/stock/[code].tsx`) rebuilt with 4 tabs:
+  - Trading Plan: BOW/BOS real data or derived plan, TP/SL boxes, RR bar, signal checklist, commentary
+  - Financials: RSI slider, BB%, volume ratio, MA status, RS, active strategies, 1D broker
+  - Smart Money: Phase ring, sparkline 15D, key metrics, broker bar, consistency
+  - Price Levels: Visual horizontal bar chart of price vs MA20/MA50/52W High + distance table
+- **stockDetailService.ts**: Aggregates all 5 AFL endpoints per ticker; computeVerdict() helper
+- **Tab deep-linking**: pass `?tab=plan|financials|smartmoney|levels` to open specific tab
+  - Bandar tab → Stock Detail opens Smart Money tab
+  - Screener tool results → Stock Detail opens Financials tab
+  - Stockpick/BOW/BOS → Stock Detail opens Trading Plan tab (default)
 - **Data sources**: See `.local/stockbot-docs/data-sources.md` for full reference
 
 ## Data Reference

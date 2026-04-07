@@ -72,7 +72,7 @@ function SmartMoneyCard({ item }: { item: SmartMoneyResult }) {
   return (
     <TouchableOpacity
       style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={() => router.push(`/stock/${item.ticker}`)}
+      onPress={() => router.push(`/stock/${item.ticker}?tab=smartmoney` as any)}
       activeOpacity={0.75}
     >
       <View style={styles.cardHeader}>

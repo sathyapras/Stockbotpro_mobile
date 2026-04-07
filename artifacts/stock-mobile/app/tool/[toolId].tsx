@@ -357,7 +357,7 @@ export default function ToolResultScreen() {
               stock={item}
               toolColor={toolColor}
               strength={tool ? getStrength(item, tool) : 50}
-              onPress={() => router.push(`/stock/${item.ticker}`)}
+              onPress={() => router.push(`/stock/${item.ticker}?tab=financials` as any)}
             />
           )}
           contentContainerStyle={[

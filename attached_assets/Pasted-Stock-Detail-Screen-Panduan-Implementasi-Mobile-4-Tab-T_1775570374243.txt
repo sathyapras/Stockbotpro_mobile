@@ -1,0 +1,637 @@
+Stock Detail Screen — Panduan Implementasi Mobile
+4 Tab: Trading Plan · Chart · Financials · Smart Money
+Panduan lengkap untuk Replit Mobile App Builder
+
+GAMBARAN UMUM
+Stock Detail adalah screen terpenting di StockBot Pro — menampilkan analisa lengkap satu saham dari 4 sudut pandang berbeda dalam satu layar bertab.
+
+Stock Detail Screen (/stocks/:symbol)
+├── Header: Harga + Verdict Card
+├── Tab 1: Trading Plan  (entry, SL, TP, RR ratio)
+├── Tab 2: Chart         (candlestick + MA overlay)
+├── Tab 3: Financials    (RSI, MACD, BB, MA, FA ratios)
+└── Tab 4: Smart Money   (fase bandar, sparkline 15H, top broker)
+
+4 ENDPOINT YANG DIPANGGIL
+Data	Method	URL	Auth
+Harga terkini	GET	/api/stocks/:symbol/quote	JWT
+Candlestick history	GET	/api/stocks/:symbol/history?period=1mo	JWT
+Analisa teknikal + trading plan	GET	/api/stocks/:symbol/analysis	JWT
+Smart Money (Broker Summary)	GET	/api/broker-summary/smart-money?ticker=:symbol	JWT
+Panggil quote + analysis + smart-money secara paralel saat screen dibuka. History dipanggil terpisah setelah user pilih period.
+
+// Parallel fetch saat mount
+const [quote, analysis, smartMoney] = await Promise.all([
+  fetch(`${API}/api/stocks/${symbol}/quote`).then(r => r.json()),
+  fetch(`${API}/api/stocks/${symbol}/analysis`).then(r => r.json()),
+  fetch(`${API}/api/broker-summary/smart-money?ticker=${symbol}`).then(r => r.json()),
+]);
+
+BAGIAN 1: HEADER SAHAM
+Data dari /api/stocks/:symbol/quote
+{
+  "symbol": "ANTM",
+  "name": "Aneka Tambang Tbk",
+  "price": 1590,
+  "change": -10,
+  "changePercent": -0.63,
+  "volume": 45000000,
+  "avgVolume": 38000000,
+  "marketCap": 38200000000000,
+  "high52w": 2120,
+  "low52w": 1390,
+  "open": 1600,
+  "high": 1610,
+  "low": 1575,
+  "previousClose": 1600,
+  "sector": "Mining",
+  "lastUpdated": "2026-04-07T10:00:00Z"
+}
+
+Tampilan Header
+┌──────────────────────────────────────┐
+│ ← Kembali              [⭐ Watchlist] │
+│                                      │
+│ [logo] ANTM    [Mining]              │
+│        Aneka Tambang Tbk             │
+│                          1.590       │
+│                      ▼ -10 (-0.63%) │
+│                                      │
+│ Open: 1.600  High: 1.610  Low: 1.575 │
+│ Vol: 45.0M   52W H: 2.120  L: 1.390  │
+└──────────────────────────────────────┘
+
+Implementasi:
+
+function StockHeader({ quote }) {
+  const isUp = quote.changePercent >= 0;
+  
+  return (
+    <View>
+      {/* Nama + harga */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <View>
+          <Text style={{ fontWeight: "900", fontSize: 24 }}>{quote.symbol}</Text>
+          <Text style={{ color: "#94a3b8", fontSize: 12 }}>{quote.name}</Text>
+          <SectorBadge sector={quote.sector} />
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ fontWeight: "900", fontSize: 24 }}>
+            {quote.price?.toLocaleString("id-ID")}
+          </Text>
+          <Text style={{ color: isUp ? "#34d399" : "#f87171", fontWeight: "700" }}>
+            {isUp ? "▲" : "▼"} {Math.abs(quote.change)} ({Math.abs(quote.changePercent).toFixed(2)}%)
+          </Text>
+        </View>
+      </View>
+      
+      {/* OHLCV grid */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 12 }}>
+        <OHLCVItem label="Open"  value={quote.open} />
+        <OHLCVItem label="High"  value={quote.high}  color="#34d399" />
+        <OHLCVItem label="Low"   value={quote.low}   color="#f87171" />
+        <OHLCVItem label="Vol"   value={formatVolume(quote.volume)} />
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+        <OHLCVItem label="52W H" value={quote.high52w} />
+        <OHLCVItem label="52W L" value={quote.low52w} />
+        <OHLCVItem label="Avg Vol" value={formatVolume(quote.avgVolume)} />
+        <OHLCVItem label="Mkt Cap" value={formatMarketCap(quote.marketCap)} />
+      </View>
+    </View>
+  );
+}
+function formatMarketCap(n) {
+  if (n >= 1e12) return `${(n / 1e12).toFixed(1)}T`;
+  if (n >= 1e9)  return `${(n / 1e9).toFixed(1)}B`;
+  return `${(n / 1e6).toFixed(0)}M`;
+}
+
+BAGIAN 2: VERDICT CARD (AI Analysis Summary)
+Data dari /api/stocks/:symbol/analysis — field overallSignal, tapeReadingSignal, indicators.rsi, dan periods.
+
+Logika Verdict (dijalankan di frontend)
+function computeVerdict(analysis) {
+  const sig       = (analysis.overallSignal ?? "").toUpperCase();
+  const rsi       = analysis.indicators?.rsi ?? 50;
+  const tape      = analysis.tapeReadingSignal ?? "";
+  const periods   = analysis.periods ?? [];
+  
+  const isBuy     = sig.includes("BUY");
+  const isSell    = sig.includes("SELL");
+  const oversold  = rsi < 35;
+  const overbought = rsi > 68;
+  const accuCount = periods.filter(p => p.signal.toUpperCase().includes("ACCUM")).length;
+  const distCount = periods.filter(p => p.signal.toUpperCase().includes("DIST")).length;
+  if (isBuy && oversold && accuCount >= 2)
+    return { label: "STRONG BUY", sub: "Momentum balik — Konfirmasi teknikal kuat",
+             color: "#34d399", emoji: "🚀", score: 92,
+             action: "Segera akumulasi di zona support" };
+  if (isBuy && oversold)
+    return { label: "BUY ON WEAKNESS", sub: "RSI oversold — Peluang beli murah",
+             color: "#34d399", emoji: "✅", score: 78,
+             action: "Akumulasi bertahap di support zone" };
+  if (isBuy && tape.toUpperCase().includes("ACCUM"))
+    return { label: "ACCUMULATE", sub: "Smart money masuk — potensi breakout",
+             color: "#34d399", emoji: "⚡", score: 72,
+             action: "Entry bertahap, konfirmasi volume" };
+  if (isBuy)
+    return { label: "BUY", sub: "Sinyal teknikal positif",
+             color: "#34d399", emoji: "📈", score: 65,
+             action: "Entry di zona support dengan volume konfirmasi" };
+  if (isSell && overbought && distCount >= 2)
+    return { label: "STRONG SELL", sub: "Distribusi aktif — hindari posisi baru",
+             color: "#f87171", emoji: "🔴", score: 88,
+             action: "Segera kurangi / exit posisi" };
+  if (isSell)
+    return { label: "AVOID / SELL", sub: "Tekanan jual dominan saat ini",
+             color: "#f87171", emoji: "⚠️", score: 60,
+             action: "Tunggu reversal — jangan beli" };
+  return { label: "WAIT & WATCH", sub: "Belum ada sinyal kuat — pantau dulu",
+           color: "#fbbf24", emoji: "👀", score: 45,
+           action: "Pasang alert di support, tunggu konfirmasi" };
+}
+
+Tampilan Verdict Card
+┌──────────────────────────────────────┐
+│  [Ring:65]  🚀 STRONG BUY            │
+│             Momentum balik —          │
+│             Konfirmasi teknikal kuat  │
+│  → Segera akumulasi di zona support  │
+│                                      │
+│  [⭐ Watchlist]     [⚡ Order]         │
+└──────────────────────────────────────┘
+
+Score Ring (SVG di React Native):
+
+import Svg, { Circle, Text as SvgText } from "react-native-svg";
+function ScoreRing({ score, color }) {
+  const r = 22, c = 2 * Math.PI * r;
+  const dash = (score / 100) * c;
+  return (
+    <Svg width={60} height={60} viewBox="0 0 60 60">
+      <Circle cx={30} cy={30} r={r} fill="none" stroke={color + "30"} strokeWidth={5} />
+      <Circle cx={30} cy={30} r={r} fill="none" stroke={color} strokeWidth={5}
+        strokeDasharray={`${dash} ${c}`} strokeLinecap="round"
+        transform="rotate(-90, 30, 30)" />
+      <SvgText x={30} y={35} textAnchor="middle" fontSize={13}
+        fontWeight="bold" fill={color}>{score}</SvgText>
+    </Svg>
+  );
+}
+
+BAGIAN 3: TAB 1 — TRADING PLAN
+Data dari /api/stocks/:symbol/analysis.
+
+Response field yang dipakai
+{
+  "support": 1520,
+  "resistance": 1680,
+  "targetPrice": 1700,
+  "stopLoss": 1490,
+  "price": 1590,
+  "overallSignal": "Strong Buy",
+  "tapeReadingSignal": "Accumulation",
+  "commentary": "ANTM — Aneka Tambang Tbk. Harga terkini di 1590 turun -0.63%. RSI di 42.1 (normal). MA20 di 1580, MA50 di 1610. Terdapat indikasi akumulasi. Support di 1520, Resistance di 1680."
+}
+
+Kalkulasi Risk-Reward
+function calcRR(entry, target, sl) {
+  const risk   = Math.abs(entry - sl);
+  const reward = Math.abs(target - entry);
+  if (risk <= 0) return null;
+  return {
+    ratio:     (reward / risk).toFixed(1),     // "1.3"
+    riskPct:   ((risk   / entry) * 100).toFixed(1),  // "6.3"
+    rewardPct: ((reward / entry) * 100).toFixed(1),  // "6.9"
+  };
+}
+// Penggunaan:
+const entry  = analysis.price;     // harga saat ini
+const sl     = analysis.stopLoss;  // sudah dihitung server
+const target = analysis.targetPrice; // sudah dihitung server
+const rr     = calcRR(entry, target, sl);
+// → { ratio: "1.3", riskPct: "6.3", rewardPct: "6.9" }
+
+Tampilan Tab Trading Plan
+┌──────────────────────────────────────┐
+│ 🎯 TRADING PLAN                      │
+│                                      │
+│ Harga Sekarang   Support    Resistance│
+│    1.590          1.520       1.680   │
+│                                      │
+│ ┌─────────────┐  ┌─────────────┐     │
+│ │ 🎯 TARGET   │  │ 🔴 STOP LOSS│     │
+│ │   1.700     │  │   1.490     │     │
+│ │ +6.9% dari  │  │ -6.3% dari  │     │
+│ │ entry       │  │ entry       │     │
+│ └─────────────┘  └─────────────┘     │
+│                                      │
+│ Risk/Reward:  1 : 1.3                │
+│ ████████░░░░░░░░  (visual RR bar)    │
+│                                      │
+│ ── Sinyal ──                         │
+│ ✅ RSI < 40 (oversold)               │
+│ ✅ Harga > MA20                      │
+│ ✅ Akumulasi terdeteksi              │
+│ ✅ MACD > Signal                     │
+│                                      │
+│ ── Robo Commentary ──                │
+│ "ANTM — Aneka Tambang Tbk. Harga     │
+│ terkini di 1.590 turun -0.63%..."   │
+└──────────────────────────────────────┘
+
+Komponen Trading Plan:
+
+function TradingPlanTab({ analysis }) {
+  const entry  = analysis.price;
+  const sl     = analysis.stopLoss;
+  const target = analysis.targetPrice;
+  const rr     = calcRR(entry, target, sl);
+  
+  const signals = [
+    { ok: analysis.indicators.rsi < 40,         text: `RSI ${analysis.indicators.rsi?.toFixed(1)} — oversold` },
+    { ok: entry > analysis.indicators.movingAverage20, text: `Harga di atas MA20 (${analysis.indicators.movingAverage20?.toFixed(0)})` },
+    { ok: analysis.tapeReadingSignal === "Accumulation", text: "Volume konfirmasi akumulasi" },
+    { ok: analysis.indicators.macd > analysis.indicators.macdSignal, text: "MACD di atas signal line" },
+  ];
+  
+  return (
+    <ScrollView>
+      {/* Support & Resistance */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <MetricBox label="Support"    value={analysis.support?.toLocaleString("id-ID")}    color="#34d399" />
+        <MetricBox label="Harga Kini" value={entry?.toLocaleString("id-ID")} />
+        <MetricBox label="Resistance" value={analysis.resistance?.toLocaleString("id-ID")} color="#f87171" />
+      </View>
+      
+      {/* TP & SL */}
+      <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
+        <PlanBox icon="🎯" label="Target (TP)"  value={target?.toLocaleString("id-ID")}
+          sub={rr ? `+${rr.rewardPct}% dari entry` : null} color="#34d399" />
+        <PlanBox icon="🔴" label="Stop Loss"     value={sl?.toLocaleString("id-ID")}
+          sub={rr ? `-${rr.riskPct}% dari entry` : null}   color="#f87171" />
+      </View>
+      
+      {/* RR Ratio */}
+      {rr && (
+        <View style={{ marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: "#1e2433" }}>
+          <Text style={{ color: "#94a3b8", fontSize: 10 }}>Risk/Reward Ratio</Text>
+          <Text style={{ fontWeight: "900", fontSize: 20, color: "white" }}>
+            1 : {rr.ratio}
+          </Text>
+          {/* Visual bar */}
+          <View style={{ flexDirection: "row", height: 8, borderRadius: 4, overflow: "hidden", marginTop: 6 }}>
+            <View style={{ flex: 1, backgroundColor: "#f87171" }} />
+            <View style={{ flex: parseFloat(rr.ratio), backgroundColor: "#34d399" }} />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
+            <Text style={{ color: "#f87171", fontSize: 9 }}>Risk {rr.riskPct}%</Text>
+            <Text style={{ color: "#34d399", fontSize: 9 }}>Reward {rr.rewardPct}%</Text>
+          </View>
+        </View>
+      )}
+      
+      {/* Checklist Sinyal */}
+      <View style={{ marginTop: 12 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", marginBottom: 6 }}>KONFIRMASI SINYAL</Text>
+        {signals.map((s, i) => (
+          <SignalRow key={i} ok={s.ok} text={s.text} />
+        ))}
+      </View>
+      
+      {/* Commentary */}
+      <View style={{ marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: "#1e2433" }}>
+        <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", marginBottom: 4 }}>ROBO COMMENTARY</Text>
+        <Text style={{ color: "#cbd5e1", fontSize: 11, lineHeight: 16 }}>
+          {analysis.commentary}
+        </Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+BAGIAN 4: TAB 2 — CHART
+Data dari /api/stocks/:symbol/history?period=1mo
+[
+  { "date": "2026-03-06", "open": 1620, "high": 1640, "low": 1610, "close": 1625, "volume": 38000000 },
+  { "date": "2026-03-07", "open": 1625, "high": 1650, "low": 1615, "close": 1640, "volume": 42000000 },
+  ...
+]
+
+Period Options
+const PERIODS = [
+  { id: "1mo", label: "1M" },
+  { id: "3mo", label: "3M" },
+  { id: "6mo", label: "6M" },
+  { id: "1y",  label: "1Y" },
+  { id: "5d",  label: "1W" },
+];
+
+Saat user ganti period, fetch ulang:
+
+GET /api/stocks/ANTM/history?period=3mo
+
+MA Overlay (dihitung di frontend)
+function computeMA(closes, period) {
+  return closes.map((_, i) => {
+    if (i < period - 1) return null;
+    const slice = closes.slice(i - period + 1, i + 1);
+    return slice.reduce((a, b) => a + b, 0) / period;
+  });
+}
+// Contoh penggunaan:
+const closes = candles.map(c => c.close);
+const ma20   = computeMA(closes, 20);   // array panjang sama, null awal
+const ma50   = computeMA(closes, 50);
+const ma200  = computeMA(closes, 200);
+
+Library Candlestick Chart
+Rekomendasi: react-native-wagmi-charts atau victory-native
+
+npx expo install react-native-wagmi-charts react-native-reanimated react-native-gesture-handler
+
+import { CandlestickChart } from "react-native-wagmi-charts";
+function StockChart({ candles, ma20, ma50 }) {
+  const data = candles.map(c => ({
+    timestamp: new Date(c.date).getTime(),
+    open: c.open, high: c.high, low: c.low, close: c.close,
+  }));
+  
+  return (
+    <CandlestickChart.Provider data={data}>
+      <CandlestickChart height={280}>
+        <CandlestickChart.Candles
+          positiveColor="#34d399"
+          negativeColor="#f87171"
+        />
+        {/* MA lines sebagai overlay — implementasi manual dengan SVG polyline */}
+      </CandlestickChart>
+      
+      {/* Price label saat pan */}
+      <CandlestickChart.PriceText style={{ color: "white", fontWeight: "bold" }} />
+      <CandlestickChart.DatetimeText style={{ color: "#94a3b8", fontSize: 10 }} />
+    </CandlestickChart.Provider>
+  );
+}
+
+Tampilan Tab Chart
+┌──────────────────────────────────────┐
+│ [1W] [1M] [3M] [6M] [1Y]            │
+│ ── MA: [20] [50] [200] ──            │
+│                                      │
+│  7.152 ┤                    ╮        │
+│  7.100 ┤          ╭─╮  ╭──╯         │
+│  7.050 ┤   ╭─╮   ╯  ╰─╯            │
+│  7.000 ┤───╯  ╰───                  │
+│  6.950 ┤                            │
+│        └──────────────────────      │
+│        Mar 06          Apr 03        │
+│                                      │
+│  ██████████░░░░░██████░░░  (volume) │
+│                                      │
+│ MA20: 1.580  MA50: 1.610  MA200: –  │
+│ [Candle] [Line]     [MA20] [MA50]   │
+└──────────────────────────────────────┘
+
+BAGIAN 5: TAB 3 — FINANCIALS
+Data dari /api/stocks/:symbol/analysis — field indicators dan faRatios.
+
+Response fields
+{
+  "indicators": {
+    "rsi": 42.1,
+    "macd": -59.68,
+    "macdSignal": -68.58,
+    "macdHistogram": 8.90,
+    "stochastic": 28.5,
+    "movingAverage20": 1580,
+    "movingAverage50": 1610,
+    "movingAverage200": 1750,
+    "vwap20": 1595,
+    "bollingerUpper": 1680,
+    "bollingerLower": 1510,
+    "volume": 45000000,
+    "avgVolume": 38000000
+  },
+  "faRatios": {
+    "pe": 12.4,
+    "pb": 1.8,
+    "beta": 1.2,
+    "peg": 0.9,
+    "roe": 14.5,
+    "eps": 128.5,
+    "dy": 2.8,
+    "de": 0.65
+  }
+}
+
+Tampilan Tab Financials
+┌──────────────────────────────────────┐
+│ 📊 TECHNICAL INDICATORS              │
+│                                      │
+│ RSI (14)                      42.1   │
+│ Oversold 30 ●────────── Overbought 70│
+│                                      │
+│ MACD                         -59.68  │
+│ Signal: -68.58  Hist: +8.90          │
+│                                      │
+│ Stochastic K                   28.5  │
+│ ██░░░░░░░░░░░░ (0-100 bar)          │
+│                                      │
+│ ── Moving Averages ──                │
+│ MA20: 1.580  [Below/Above harga]     │
+│ MA50: 1.610  [Below]                 │
+│ MA200: 1.750 [Below]                 │
+│ VWAP: 1.595                          │
+│                                      │
+│ ── Bollinger Bands ──                │
+│ Upper: 1.680  Lower: 1.510           │
+│ Width: 10.3%  Harga di: tengah       │
+│                                      │
+│ 📋 FUNDAMENTAL RATIOS                │
+│ P/E: 12.4   P/B: 1.8   Beta: 1.2    │
+│ ROE: 14.5%  EPS: 128.5  DY: 2.8%   │
+│ D/E: 0.65   PEG: 0.9               │
+└──────────────────────────────────────┘
+
+RSI Slider komponen:
+
+function RSISlider({ rsi }) {
+  const pct = Math.max(0, Math.min(100, rsi));
+  const color = rsi < 30 ? "#34d399" : rsi > 70 ? "#f87171" : "#60a5fa";
+  const label = rsi < 30 ? "Oversold" : rsi > 70 ? "Overbought" : "Normal";
+  
+  return (
+    <View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ color: "#94a3b8", fontSize: 10 }}>RSI (14)</Text>
+        <Text style={{ color, fontWeight: "700" }}>{rsi?.toFixed(1)}</Text>
+      </View>
+      <View style={{ height: 6, backgroundColor: "#1e2433", borderRadius: 3, marginTop: 4 }}>
+        {/* Zona warna: merah 0-30, hijau 30-70, merah 70-100 */}
+        <View style={{ flexDirection: "row", height: "100%", borderRadius: 3, overflow: "hidden" }}>
+          <View style={{ flex: 30, backgroundColor: "#34d399" + "50" }} />
+          <View style={{ flex: 40, backgroundColor: "#60a5fa" + "50" }} />
+          <View style={{ flex: 30, backgroundColor: "#f87171" + "50" }} />
+        </View>
+        {/* Marker posisi RSI */}
+        <View style={{ position: "absolute", left: `${pct}%`, top: -2,
+          width: 10, height: 10, borderRadius: 5, backgroundColor: color,
+          marginLeft: -5 }} />
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
+        <Text style={{ fontSize: 8, color: "#34d399" }}>Oversold 30</Text>
+        <Text style={{ fontSize: 8, color, fontWeight: "600" }}>{label}</Text>
+        <Text style={{ fontSize: 8, color: "#f87171" }}>Overbought 70</Text>
+      </View>
+    </View>
+  );
+}
+
+MA Status (above/below):
+
+function MARow({ label, ma, price }) {
+  if (!ma || ma === 0) return null;
+  const isAbove = price > ma;
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+      <Text style={{ color: "#94a3b8", fontSize: 11 }}>{label}</Text>
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+        <Text style={{ fontWeight: "700" }}>{ma?.toFixed(0)}</Text>
+        <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+          backgroundColor: isAbove ? "#34d399" + "20" : "#f87171" + "20" }}>
+          <Text style={{ color: isAbove ? "#34d399" : "#f87171", fontSize: 9, fontWeight: "600" }}>
+            {isAbove ? "Above" : "Below"}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+Fundamental Ratios grid:
+
+const FA_ITEMS = [
+  { key: "pe",  label: "P/E",    suffix: "x",  good: v => v < 20,    warn: v => v > 40 },
+  { key: "pb",  label: "P/B",    suffix: "x",  good: v => v < 2,     warn: v => v > 5  },
+  { key: "beta",label: "Beta",   suffix: "",   good: v => v < 1,     warn: v => v > 2  },
+  { key: "roe", label: "ROE",    suffix: "%",  good: v => v > 15,    warn: v => v < 5  },
+  { key: "eps", label: "EPS",    suffix: "",   good: v => v > 0,     warn: null        },
+  { key: "dy",  label: "Div Yield", suffix: "%", good: v => v > 3,  warn: null        },
+  { key: "de",  label: "D/E",    suffix: "x",  good: v => v < 0.5,  warn: v => v > 1.5 },
+  { key: "peg", label: "PEG",    suffix: "x",  good: v => v < 1,    warn: v => v > 2  },
+];
+
+BAGIAN 6: TAB 4 — SMART MONEY
+Data dari /api/broker-summary/smart-money?ticker=ANTM.
+
+Konten tab ini sama persis dengan yang sudah dijelaskan di BROKER_SUMMARY_DEEP_DIVE.md — silakan merujuk ke dokumen tersebut untuk detail lengkap.
+
+Ringkasan yang ditampilkan:
+
+┌──────────────────────────────────────┐
+│ Smart Money Phase    Flow Score       │
+│  🔥 IGNITION              82 / 100    │
+│  ▲ AKUMULASI                          │
+│                                      │
+│ ── Top Broker Signal ──               │
+│ SM1: Big Acc   SM3: Normal Acc   SM5: Neutral │
+│ VWAP: 1.590   B: 15 / S: 34         │
+│                                      │
+│ ── Flow 15 Hari ──                   │
+│ [sparkline bar chart: +/-]            │
+│                                      │
+│ ── Key Metrics ──                    │
+│ Avg3D: +49.0B  Avg5D: +38.2B         │
+│ Fuel: +141.7B  Dominasi: Healthy     │
+│ Net Broker: -19                      │
+│                                      │
+│ ── Konsistensi 15 Hari ──            │
+│ Akumulasi:  12/15 hari (80%)         │
+│ Distribusi:  3/15 hari (20%)         │
+└──────────────────────────────────────┘
+
+API call:
+
+const { data } = useQuery({
+  queryKey: ["sm-ticker", symbol],
+  queryFn: async () => {
+    const r = await fetch(`${API}/api/broker-summary/smart-money?ticker=${symbol}`);
+    return r.json();
+  },
+  staleTime: 5 * 60 * 1000,  // 5 menit
+});
+const sm = data?.data?.[0]; // ambil data saham ini
+
+BAGIAN 7: HOLD MODE (Pantau Posisi)
+Web app StockBot Pro punya fitur "Hold Mode" — jika user sudah hold saham BOW/BOS sebelumnya, tampilan berubah dari "Trading Plan" ke "Pantau Posisi" dengan:
+
+P/L % sejak harga masuk
+Sisa upside ke target
+Tanggal & durasi hold
+Di mobile: Implementasikan dengan LocalStorage/AsyncStorage. Saat user tap saham yang masuk BOW/BOS dan sudah ada entry price di local state, ubah tampilan Trading Plan:
+
+// Simpan di AsyncStorage per symbol
+const holdData = {
+  symbol: "ANTM",
+  entryPrice: 1580,
+  entryDate: "2026-04-05",
+  targetPrice: 1700,
+  stopLoss: 1490,
+};
+// Hitung P/L live
+const plPct = ((currentPrice - holdData.entryPrice) / holdData.entryPrice) * 100;
+// Hitung hari hold
+const holdDays = Math.floor((Date.now() - new Date(holdData.entryDate)) / 86400000);
+
+BAGIAN 8: TOMBOL WATCHLIST
+Dari header atau Verdict Card, user bisa add/remove saham ke watchlist:
+
+async function toggleWatchlist(symbol) {
+  const isInWL = watchlist.some(w => w.symbol === symbol);
+  
+  if (isInWL) {
+    await fetch(`${API}/api/watchlist/${symbol}`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${jwt}` }
+    });
+  } else {
+    await fetch(`${API}/api/watchlist`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+      body: JSON.stringify({ symbol })
+    });
+  }
+  refetchWatchlist();
+}
+
+RINGKASAN NAVIGASI KE STOCK DETAIL
+Stock Detail bisa dibuka dari banyak tempat:
+
+// Dari Bandar Detector
+navigate(`/stocks/${ticker}`);
+// Dari Watchlist
+navigate(`/stocks/${item.symbol}`);
+// Dari StockTools hasil screener
+navigate(`/stocks/${stock.symbol}`);
+// Dari BOW/BOS signal list
+navigate(`/stocks/${row.symbol}`);
+// Dari Stockpick Daily
+navigate(`/stocks/${pick.ticker}`);
+
+Tab default saat masuk dari BOW/BOS: langsung ke tab Trading Plan Tab default saat masuk dari Bandar Detector: langsung ke tab Smart Money Tab default saat masuk dari StockTools: langsung ke tab Financials
+
+CACHING
+// Quote: 5 menit (live feel tapi tidak terlalu sering)
+{ staleTime: 5 * 60 * 1000 }
+// History: 1 jam (hanya berubah setelah pasar tutup)
+{ staleTime: 60 * 60 * 1000 }
+// Analysis: 30 menit
+{ staleTime: 30 * 60 * 1000 }
+// Smart Money: 5 menit
+{ staleTime: 5 * 60 * 1000 }
+
+Semua kalkulasi teknikal dilakukan di server. Mobile hanya perlu tampilkan nilai yang diterima dari API.
+
+Add detailed documentation for the s
