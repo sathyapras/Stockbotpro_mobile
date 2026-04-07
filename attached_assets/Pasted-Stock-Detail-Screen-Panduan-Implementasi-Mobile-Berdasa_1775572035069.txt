@@ -1,0 +1,603 @@
+Stock Detail Screen — Panduan Implementasi Mobile
+Berdasarkan Desain Aktual yang Sudah Berjalan
+Referensi: screenshot ACES · 356 · Grade D · BOW signal aktif
+
+GAMBARAN UMUM
+Screen paling penting di StockBot Pro. Menampilkan analisa satu saham secara lengkap dalam 4 tab, dengan Verdict Card dan header metrik cepat yang selalu terlihat di atas.
+
+Stock Detail Screen
+├── Header: Ticker · Harga · % Change · Score Ring
+├── Verdict Card (BUY ON WEAKNESS / STRONG BUY / dll)
+├── Metrics Strip: MA20 · MA50 · 52W H · VOL
+├── ── 4 Tab ──────────────────────────────────────
+│   ├── Trading Plan   (sinyal BOW/BOS CSV + plan entry)
+│   ├── Financials     (data pasar + FA Ratios)
+│   ├── Smart Money    (fase broker + sparkline 15H)
+│   └── Chart          (candlestick + MA + S/R levels)
+
+SUMBER DATA — PRIORITAS
+Prioritas	Sumber	Dipakai untuk
+1 (tertinggi)	BOW CSV (bowRow)	Entry, SL, TP1, TP2, Grade, RSI, StochK, Commentary, Grade
+2	BOS CSV (bosRow)	Entry, SL, TP1, TP2, G/L, VWAP trend, Commentary
+3 (fallback)	API /api/stocks/:symbol/analysis	Semua field jika tidak ada BOW/BOS
+4 ENDPOINT API
+Data	URL	Auth
+Harga + OHLCV	GET /api/stocks/:symbol/quote	JWT
+Chart history	GET /api/stocks/:symbol/history?period=1y	JWT
+Analisa teknikal	GET /api/stocks/:symbol/analysis	JWT
+Smart Money	GET /api/broker-summary/smart-money?ticker=:symbol	JWT
+Fetch paralel saat mount:
+
+const [quote, analysis, smartMoney] = await Promise.all([
+  fetch(`${API}/api/stocks/${symbol}/quote`, { headers: { Authorization: `Bearer ${jwt}` } }).then(r => r.json()),
+  fetch(`${API}/api/stocks/${symbol}/analysis`, { headers: { Authorization: `Bearer ${jwt}` } }).then(r => r.json()),
+  fetch(`${API}/api/broker-summary/smart-money?ticker=${symbol}`, { headers: { Authorization: `Bearer ${jwt}` } }).then(r => r.json()),
+]);
+// History fetch terpisah saat tab Chart dibuka
+
+BAGIAN 1: HEADER SAHAM
+Tampilan Aktual
+┌──────────────────────────────────────┐
+│ ← ACES                        [78]○  │
+│                                      │
+│ ACES                                 │
+│ 356  ▲ 0.00%                         │
+│                                      │
+│ ▩ BUY ON WEAKNESS                    │
+│   RSI oversold — peluang beli murah  │
+│   → Akumulasi bertahap di support zone│
+│                                      │
+│ MA20   MA50    52W H   VOL           │
+│ 381,8  394,72  680     13.8M         │
+└──────────────────────────────────────┘
+
+Score Ring (pojok kanan atas)
+Angka 78 = verdict.score — dihitung dari computeVerdict() (lihat Bagian 3).
+
+import Svg, { Circle, Text as SvgText } from "react-native-svg";
+function ScoreRing({ score, color }) {
+  const r = 22, c = 2 * Math.PI * r;
+  const dash = (score / 100) * c;
+  return (
+    <Svg width={60} height={60} viewBox="0 0 60 60">
+      <Circle cx={30} cy={30} r={r} fill="none" stroke={color + "30"} strokeWidth={5} />
+      <Circle cx={30} cy={30} r={r} fill="none" stroke={color} strokeWidth={5}
+        strokeDasharray={`${dash} ${c}`} strokeLinecap="round"
+        transform="rotate(-90, 30, 30)" />
+      <SvgText x={30} y={35} textAnchor="middle" fontSize={13} fontWeight="bold" fill={color}>
+        {score}
+      </SvgText>
+    </Svg>
+  );
+}
+
+Metrics Strip (MA20 · MA50 · 52W H · VOL)
+Tampilkan tepat di bawah Verdict Card, selalu visible di atas tabs:
+
+// Data dari analysis.indicators + quote
+const metricsStrip = [
+  { label: "MA20",  value: analysis?.indicators?.movingAverage20?.toFixed(1) ?? "—" },
+  { label: "MA50",  value: analysis?.indicators?.movingAverage50?.toFixed(2) ?? "—" },
+  { label: "52W H", value: quote?.high52w?.toLocaleString("id-ID")             ?? "—" },
+  { label: "VOL",   value: formatVolume(quote?.volume ?? 0) },
+];
+
+BAGIAN 2: STRUKTUR DATA BOW ROW
+Saat saham ada di BOW CSV, semua field utama diambil dari bowRow:
+
+interface BowRow {
+  symbol:    string;   // "ACES"
+  entry:     number;   // 356  — harga entry ideal
+  tp1:       number;   // 374  — Take Profit 1
+  tp2:       number;   // 392  — Take Profit 2 (opsional)
+  stopLoss:  number;   // 346  — Stop Loss
+  rr:        number;   // 1.8  — Risk/Reward ratio dari AFL
+  rsi:       number;   // 28   — RSI dari AFL
+  stochK:    number;   // 8    — Stochastic K dari AFL
+  grade:     string;   // "A" | "B" | "C" | "D"
+  status:    string;   // "BUY" | "HOLD" | "WAIT"
+  confPct:   number;   // 72   — Confidence 0-100%
+  rsVsIHSG:  number;   // +3.5 — RS saham vs IHSG (%)
+  days:      string;   // "hari ke-1" | "entry hari ini"
+  secTrend:  string;   // "IDXNONCYC BEAR" | "NOT MAPPED"
+  setupType: string;   // "A-Extreme" | "B-Normal" | "C-Support"
+  action:    string;   // "BUY BASE" | "SCALP ONLY" | "NO TRADE"
+  commentary:string;   // teks panjang dari AFL robo commentary
+  score:     number;   // skor numerik AFL
+  holdPL:    number;   // P/L % (hanya jika status HOLD)
+}
+
+Field tambahan BOS CSV:
+
+interface BosRow {
+  symbol:   string;
+  entry:    number;
+  tp1:      number;
+  tp2:      number;
+  stopLoss: number;
+  rr:       number;
+  signal:   string;   // "BUY" | "HOLD"
+  hold:     string;   // durasi hold "4 hari"
+  glPct:    number;   // G/L % posisi aktif
+  highest:  number;   // harga tertinggi sejak entry
+  vwapTrend:string;   // "NAIK" | "TURUN" | "FLAT"
+  vwap:     number;   // harga VWAP
+  trend:    string;   // "BULL" | "BEAR"
+  commentary:string;
+}
+
+BAGIAN 3: VERDICT CARD
+7 Kemungkinan Verdict
+Verdict	Kondisi	Warna	Emoji	Score
+STRONG BUY	isBuy + RSI < 35 + accuCount ≥ 2	Hijau	🚀	92
+BUY ON WEAKNESS	isBuy + RSI < 35	Hijau	✅	78
+ACCUMULATE	isBuy + tape = Accumulation	Hijau	⚡	72
+BUY	isBuy (default)	Hijau	📈	65
+STRONG SELL	isSell + RSI > 68 + distCount ≥ 2	Merah	🔴	88
+AVOID / SELL	isSell	Merah	⚠️	60
+WAIT & WATCH	semua kondisi lainnya	Amber	👀	45
+function computeVerdict(analysis) {
+  const sig        = (analysis?.overallSignal ?? "").toUpperCase();
+  const rsi        = analysis?.indicators?.rsi ?? 50;
+  const tape       = analysis?.tapeReadingSignal ?? "";
+  const periods    = analysis?.periods ?? [];
+  const isBuy      = sig.includes("BUY");
+  const isSell     = sig.includes("SELL");
+  const oversold   = rsi < 35;
+  const overbought = rsi > 68;
+  const accuCount  = periods.filter(p => p.signal.toUpperCase().includes("ACCUM")).length;
+  const distCount  = periods.filter(p => p.signal.toUpperCase().includes("DIST")).length;
+  if (isBuy && oversold && accuCount >= 2)
+    return { label: "STRONG BUY",    sub: "Momentum balik — Konfirmasi teknikal kuat",
+             color: "#34d399", emoji: "🚀", score: 92,
+             action: "Segera akumulasi di zona support" };
+  if (isBuy && oversold)
+    return { label: "BUY ON WEAKNESS", sub: "RSI oversold — Peluang beli murah",
+             color: "#34d399", emoji: "✅", score: 78,
+             action: "Akumulasi bertahap di support zone" };
+  if (isBuy && tape.toUpperCase().includes("ACCUM"))
+    return { label: "ACCUMULATE",    sub: "Smart money masuk — potensi breakout",
+             color: "#34d399", emoji: "⚡", score: 72,
+             action: "Entry bertahap, konfirmasi volume" };
+  if (isBuy)
+    return { label: "BUY",           sub: "Sinyal teknikal positif",
+             color: "#34d399", emoji: "📈", score: 65,
+             action: "Entry di zona support dengan volume konfirmasi" };
+  if (isSell && overbought && distCount >= 2)
+    return { label: "STRONG SELL",   sub: "Distribusi aktif — hindari posisi baru",
+             color: "#f87171", emoji: "🔴", score: 88,
+             action: "Segera kurangi / exit posisi" };
+  if (isSell)
+    return { label: "AVOID / SELL",  sub: "Tekanan jual dominan saat ini",
+             color: "#f87171", emoji: "⚠️", score: 60,
+             action: "Tunggu reversal — jangan beli" };
+  return   { label: "WAIT & WATCH",  sub: "Belum ada sinyal kuat — pantau dulu",
+             color: "#fbbf24", emoji: "👀", score: 45,
+             action: "Pasang alert di support, tunggu konfirmasi" };
+}
+
+BAGIAN 4: TAB 1 — TRADING PLAN
+Tampilan Aktual (dari screenshot ACES)
+┌──────────────────────────────────────┐
+│ 🔰 Data: Buy on Weakness · Grade D · hari ke-1 │
+│                                      │
+│ ┌─────────────────┐ ┌──────────────┐ │
+│ │ 🎯 Target (TP1) │ │ 🔴 Stop Loss │ │
+│ │     374         │ │     346      │ │
+│ │   +5.1%         │ │   -2.8%      │ │
+│ └─────────────────┘ └──────────────┘ │
+│                                      │
+│ ENTRY      TP2     RSI    STOCHK     │
+│ 356-366    392      28       8       │
+│                                      │
+│ Risk / Reward                 1 : 1.8│
+│ [████░░░░░░░░░░░░░░░░░░░░░░░░░░░]   │
+│ Risk 2.8%                Reward 5.1% │
+│                                      │
+│ KONFIRMASI SINYAL                    │
+│ ✅ RSI 28 — oversold                 │
+│ ☐  Breakout momentum terkonfirmasi   │
+│ ✅ BOW signal aktif                  │
+│ ✅ COMPRESS, RS+, A-Extreme          │
+│                                      │
+│ ROBO COMMENTARY                      │
+│ === WATCH [D] === Struktur harga...  │
+└──────────────────────────────────────┘
+
+Signal Badge (bar hijau di atas TP1/SL)
+// "🔰 Data: Buy on Weakness · Grade D · hari ke-1"
+function SignalBadge({ bowRow, bosRow }) {
+  const source = bowRow ? "Buy on Weakness" : bosRow ? "Buy on Strength" : null;
+  const grade  = bowRow?.grade ?? null;
+  const days   = bowRow?.days ?? bosRow?.hold ?? null;
+  if (!source) return null;
+  
+  const gradeColor = {
+    "A": "#34d399", "B": "#60a5fa", "C": "#fbbf24", "D": "#f87171"
+  }[grade] ?? "#94a3b8";
+  
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, padding: 8,
+      borderRadius: 10, backgroundColor: "#34d39920", borderWidth: 1, borderColor: "#34d39940" }}>
+      <Text style={{ fontSize: 12 }}>🔰</Text>
+      <Text style={{ color: "#34d399", fontWeight: "700", fontSize: 11 }}>
+        Data: {source}
+      </Text>
+      {grade && (
+        <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6,
+          backgroundColor: gradeColor + "25", borderWidth: 1, borderColor: gradeColor + "50" }}>
+          <Text style={{ color: gradeColor, fontWeight: "900", fontSize: 10 }}>Grade {grade}</Text>
+        </View>
+      )}
+      {days && <Text style={{ color: "#94a3b8", fontSize: 10 }}>· {days}</Text>}
+    </View>
+  );
+}
+
+Grade System (A/B/C/D)
+Grade berasal dari AFL AFL bowRow.grade. Interpretasi:
+
+Grade	Arti	Warna
+A	Setup sangat baik — high confidence	Hijau (#34d399)
+B	Setup baik — layak dipertimbangkan	Biru (#60a5fa)
+C	Setup biasa — pantau dulu	Amber (#fbbf24)
+D	Setup lemah — hati-hati	Merah (#f87171)
+TP1 & SL Box (2 kotak besar)
+function PlanBoxes({ entry, tp1, sl, tp2, rr }) {
+  const tpPct  = entry > 0 ? ((tp1  - entry) / entry * 100).toFixed(1) : null;
+  const slPct  = entry > 0 ? ((entry - sl)   / entry * 100).toFixed(1) : null;
+  const tp2Pct = entry > 0 && tp2 > 0 ? ((tp2 - entry) / entry * 100).toFixed(1) : null;
+  
+  return (
+    <View>
+      {/* 2 kotak besar TP1 + SL */}
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flex: 1, padding: 16, borderRadius: 16,
+          backgroundColor: "#34d39910", borderWidth: 2, borderColor: "#34d39940" }}>
+          <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "700" }}>🎯 TARGET (TP1)</Text>
+          <Text style={{ color: "#34d399", fontWeight: "900", fontSize: 28, marginTop: 4 }}>
+            {tp1?.toLocaleString("id-ID")}
+          </Text>
+          {tpPct && <Text style={{ color: "#34d399", fontSize: 13 }}>+{tpPct}%</Text>}
+        </View>
+        <View style={{ flex: 1, padding: 16, borderRadius: 16,
+          backgroundColor: "#f8717110", borderWidth: 2, borderColor: "#f8717140" }}>
+          <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "700" }}>🔴 STOP LOSS</Text>
+          <Text style={{ color: "#f87171", fontWeight: "900", fontSize: 28, marginTop: 4 }}>
+            {sl?.toLocaleString("id-ID")}
+          </Text>
+          {slPct && <Text style={{ color: "#f87171", fontSize: 13 }}>-{slPct}%</Text>}
+        </View>
+      </View>
+      
+      {/* Baris ENTRY · TP2 · RSI · STOCHK */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between",
+        marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: "#1e2433" }}>
+        <InfoCell label="ENTRY"  value={entry > 0 ? `${entry}–${Math.round(entry * 1.01)}` : "—"} color="#fbbf24" />
+        <InfoCell label="TP2"   value={tp2 > 0 ? tp2?.toLocaleString("id-ID") : "—"} color="#60a5fa" />
+        <InfoCell label="RSI"   value={rsi?.toFixed(0)} color={rsi < 35 ? "#34d399" : rsi > 65 ? "#f87171" : "white"} />
+        <InfoCell label="STOCHK" value={stochK?.toFixed(0)} color={stochK < 20 ? "#34d399" : "white"} />
+      </View>
+      
+      {/* Risk / Reward Bar */}
+      {rr && (
+        <View style={{ marginTop: 12 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+            <Text style={{ color: "#94a3b8", fontSize: 11 }}>Risk / Reward</Text>
+            <Text style={{ color: "#fbbf24", fontWeight: "900", fontSize: 18 }}>1 : {rr}</Text>
+          </View>
+          <View style={{ height: 8, borderRadius: 4, overflow: "hidden", flexDirection: "row" }}>
+            <View style={{ flex: 1, backgroundColor: "#f87171" }} />
+            <View style={{ flex: parseFloat(rr), backgroundColor: "#34d399" }} />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+            <Text style={{ color: "#f87171", fontSize: 10 }}>Risk {slPct}%</Text>
+            <Text style={{ color: "#34d399", fontSize: 10 }}>Reward {tpPct}%</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+KONFIRMASI SINYAL (Bullet List)
+Bullet list dibangun secara dinamis dari kombinasi BOW CSV + API:
+
+Jika saham ada di BOW CSV (hasBow = true):
+
+✅/⚠️/❌  Status: BUY · Grade A          (dari bowRow.status + bowRow.grade)
+✅/⚠️/❌  Score: 82 · Confidence: 74%   (dari bowRow.score + bowRow.confPct)
+✅/⚠️/❌  RS vs IHSG: +3.5% — outperform (dari bowRow.rsVsIHSG)
+✅/⚠️/❌  RSI 28 — Oversold (zona beli)  (dari bowRow.rsi)
+✅/⚠️/❌  StochK 8 — Oversold            (dari bowRow.stochK)
+✅/⚠️/❌  Sector Trend: IDXNONCYC BULL   (dari bowRow.secTrend)
+⚠️        Action: BUY BASE · A-Extreme   (dari bowRow.action + bowRow.setupType)
+✅/⚠️/❌  Tape Reading: Accumulation     (dari API analysis)
+✅/⚠️/❌  Smart Money 5H: +2.3B          (dari API analysis.periods)
+✅/⚠️/❌  VWAP 20H: 1.595               (dari API analysis.indicators.vwap20)
+
+Jika saham ada di BOS CSV (hasBos = true, tidak ada BOW):
+
+✅/⚠️/❌  Signal: BUY · BULL TREND
+⚠️        Durasi posisi: 4 hari
+✅/❌      G/L: +3.2% — posisi profit
+✅/⚠️     Harga tertinggi: 6.750 — Target 1: 6.800
+✅/⚠️/❌  VWAP Trend: NAIK · VWAP 6.710
+✅/⚠️/❌  Tape Reading: Accumulation
+
+Jika tidak ada BOW/BOS (hanya API fallback):
+
+✅/❌      Overall Signal: Strong Buy
+✅/⚠️/❌  RSI 42.1 — Normal
+✅/⚠️/❌  Tape Reading: Accumulation
+✅/⚠️/❌  Smart Money 5H: +1.8B
+✅/⚠️/❌  Harga di 23% zona S-R — dekat support
+✅/⚠️     VWAP 20H: 1.595 — di atas VWAP
+
+// Helper bullet item
+function BulletItem({ ok, text }) {
+  const color = ok === "warn" ? "#fbbf24" : ok ? "#34d399" : "#f87171";
+  const icon  = ok === "warn" ? "⚠️" : ok ? "✅" : "☐";
+  return (
+    <View style={{ flexDirection: "row", gap: 8, marginBottom: 6 }}>
+      <Text style={{ fontSize: 14, lineHeight: 18 }}>{icon}</Text>
+      <Text style={{ color: ok ? "white" : "#64748b", fontSize: 12, flex: 1 }}>{text}</Text>
+    </View>
+  );
+}
+
+ROBO COMMENTARY
+Teks panjang dari bowRow.commentary (atau bosRow.commentary / analysis.commentary).
+
+Penting: Strip metadata AFL dari akhir teks:
+
+// Commentary bisa berisi suffix: "| Grade=A | Score=82 | ..."
+// Potong dari karakter | Grade= ke belakang sebelum ditampilkan
+const metaIdx = commentary.indexOf("| Grade=");
+const bodyText = (metaIdx >= 0 ? commentary.slice(0, metaIdx) : commentary).trim();
+
+Format tampilan:
+
+ROBO COMMENTARY
+═══════════════════════════════
+=== WATCH [D] === Struktur harga belum sepenuhnya terbentuk.
+Awal kompresi terdeteksi — market sedang konsolidasi...
+
+BAGIAN 5: TAB 2 — FINANCIALS
+Data dari /api/stocks/:symbol/quote dan /api/stocks/:symbol/analysis
+Blok 1 — Market Data Grid (3 kolom × 3 baris):
+
+Market Cap  Volume    Avg Volume
+52W High    52W Low   Prev Close
+Day High    Day Low   Open
+
+Blok 2 — 52 Week Range Slider:
+
+// % posisi harga di antara 52W Low ↔ 52W High
+const rangePct = ((price - low52w) / (high52w - low52w)) * 100;
+// "356 — 23% dari range tahunan"
+
+Tampilan:
+
+52W Low 1.390              52W High 2.120
+[══════════════════░░░░░░░░░░░░░░░░]
+          356 — 23% dari range tahunan
+
+Blok 3 — FA Ratios (4 kolom × 2 baris):
+
+P/E   P/B   PEG   Beta
+ROE   EPS   DY%   D/E
+
+Data dari analysis.faRatios. Jika null → tampilkan "N/A" dengan warna redup.
+
+const faItems = [
+  { lbl: "P/E",  val: fa?.pe   != null ? fa.pe.toFixed(1)   : "N/A" },
+  { lbl: "P/B",  val: fa?.pb   != null ? fa.pb.toFixed(2)   : "N/A" },
+  { lbl: "PEG",  val: fa?.peg  != null ? fa.peg.toFixed(2)  : "N/A" },
+  { lbl: "Beta", val: fa?.beta != null ? fa.beta.toFixed(2) : "N/A" },
+  { lbl: "ROE",  val: fa?.roe  != null ? `${fa.roe.toFixed(1)}%` : "N/A" },
+  { lbl: "EPS",  val: fa?.eps  != null ? fa.eps.toFixed(0)  : "N/A" },
+  { lbl: "DY%",  val: fa?.dy   != null ? `${fa.dy.toFixed(1)}%`  : "N/A" },
+  { lbl: "D/E",  val: fa?.de   != null ? fa.de.toFixed(2)   : "N/A" },
+];
+
+BAGIAN 6: TAB 3 — SMART MONEY
+Konten sepenuhnya dari GET /api/broker-summary/smart-money?ticker=:symbol.
+
+Untuk detail lengkap lihat BROKER_SUMMARY_DEEP_DIVE.md.
+
+Ringkasan tampilan:
+
+┌──────────────────────────────────────┐
+│ Smart Money Phase         Flow Score │
+│ 🔥 IGNITION                  82/100  │
+│ ▲ AKUMULASI (berubah hari ini)       │
+│                                      │
+│ ── Top Broker Signal ──              │
+│ SM1: Big Acc  SM3: Normal  SM5: Acc  │
+│ VWAP: 1.590       B: 15 / S: 34     │
+│                                      │
+│ ── Flow 15 Hari ──                   │
+│ [████ bar chart positif/negatif] 15H │
+│ ● Akumulasi  ● Distribusi            │
+│                                      │
+│ ── Key Metrics ──                    │
+│ Avg3D: +49.0B  Avg5D: +38.2B        │
+│ Fuel: 141.7%   Dominasi: Healthy     │
+│ Net Broker: -19                      │
+│                                      │
+│ ── Konsistensi 15 Hari ──            │
+│ Akumulasi:  ████████████░░░  12/15   │
+│ Distribusi: ██░░░░░░░░░░░░░   3/15   │
+│                                      │
+│ Flow Trend: ▲ Menguat                │
+└──────────────────────────────────────┘
+
+API call:
+
+const { data } = useQuery({
+  queryKey: ["sm-ticker", symbol],
+  queryFn: async () => {
+    const r = await fetch(`${API}/api/broker-summary/smart-money?ticker=${symbol}`,
+      { headers: { Authorization: `Bearer ${jwt}` } });
+    return r.json();
+  },
+  staleTime: 5 * 60 * 1000,
+});
+const sm = data?.data?.[0];
+
+Phase colors:
+
+const PHASE_META = {
+  IGNITION:     { label: "IGNITION",     color: "#a78bfa" },
+  EARLY_ACC:    { label: "EARLY ACC",    color: "#34d399" },
+  STRONG_TREND: { label: "STRONG TREND", color: "#60a5fa" },
+  EXHAUSTION:   { label: "EXHAUSTION",   color: "#fbbf24" },
+  DISTRIBUTION: { label: "DISTRIBUTION", color: "#f87171" },
+  CHURNING:     { label: "CHURNING",     color: "#94a3b8" },
+};
+
+BAGIAN 7: TAB 4 — CHART
+History Endpoint
+GET /api/stocks/:symbol/history?period=1y
+
+Returns array: [{ date, open, high, low, close, volume }]
+
+Period options di chart:
+
+const CHART_RANGES = [
+  { id: "3M", label: "3M", days: 65  },
+  { id: "6M", label: "6M", days: 130 },
+  { id: "1Y", label: "1Y", days: null }, // semua data
+];
+
+Chart type toggle: Candle | Line (simpan ke local state)
+
+Overlay Lines yang Ditampilkan
+// Warna overlay
+const OVERLAY_COLORS = {
+  ma20:       "#F59E0B",  // amber
+  ma50:       "#A78BFA",  // violet
+  support:    "#34d399",  // green (dashed)
+  resistance: "#f87171",  // red (dashed)
+  vwap:       "#38BDF8",  // sky blue (dashed)
+  entryBOW:   "#F59E0B",  // amber (dashed — dari bowRow.entry)
+  slBOW:      "#f87171",  // red (dashed — dari bowRow.stopLoss)
+  tp1BOW:     "#34d399",  // green (solid)
+  tp2BOW:     "#4ade80",  // light green (dashed)
+};
+
+Label pada chart:
+
+─ MA20   ─ MA50   ╌ S (support)   ╌ R (resistance)   ╌ VWAP
+╌ E (entry BOW)   ╌ SL   ── T1   ╌ T2
+
+PENTING — Jika saham ada di BOW CSV, tampilkan tambahan reference lines:
+
+E = bowRow.entry (amber dashed)
+SL = bowRow.stopLoss (red dashed)
+T1 = bowRow.tp1 (green solid)
+T2 = bowRow.tp2 (light green dashed, jika > 0)
+Key Indicators di Bawah Chart
+Di bawah chart (masih dalam tab Chart), tampilkan chips indikator:
+
+RSI (14)    Stochastic   MACD
+42.1        28.5         -59.68
+[Normal]    [Oversold]   [Negatif]
+MA20   MA50   MA200  VWAP 20D
+1.580  1.610  1.750  1.595
+                     Di bawah ⚠️
+[0─────────────────────────────100]
+   30 (OS)     42.1         70 (OB)
+
+Robo Commentary di Bawah Chart
+Jika ada bowRow.commentary atau bosRow.commentary, tampilkan di sini:
+
+📄 Analisa BOW    (atau "Analisa BOS" / "Technical Commentary")
+═══════════════════════════════════════
+=== WATCH [D] === Struktur harga...
+
+BAGIAN 8: HOLD MODE (Pantau Posisi)
+Aktif ketika bowRow.status.includes("HOLD") atau bosRow.signal.includes("HOLD").
+
+Tab berubah nama dari "Trading Plan" ke "Trading Position".
+
+Konten tab berubah menampilkan:
+
+┌──────────────────────────────────────┐
+│ 📊 PANTAU POSISI           [4 hari]  │
+│                                      │
+│ ┌─────────────────┐ ┌──────────────┐ │
+│ │  P/L Posisi     │ │ Harga Masuk  │ │
+│ │    +3.2%        │ │    6.680     │ │
+│ │  Posisi untung  │ │ Sisa upside  │ │
+│ │                 │ │ ke target:   │ │
+│ │                 │ │    +3.5%     │ │
+│ └─────────────────┘ └──────────────┘ │
+│                                      │
+│ Target (TP1)          Stop Loss      │
+│   6.920                 6.540        │
+│  +3.5% dari entry      -2.1% dari   │
+│                                      │
+│ ── Panduan Hold ──                   │
+│ ✓ Pertahankan selama di atas 6.540  │
+│ → Partial profit di 6.920           │
+│ → Target lanjutan (TP2): 7.100      │
+│ ! Keluar jika close < 6.540         │
+└──────────────────────────────────────┘
+
+// Kalkulasi
+const holdPL    = bowRow?.holdPL ?? bosRow?.glPct ?? 0;
+const holdDays  = bowRow?.days ?? bosRow?.hold ?? "";
+const plColor   = holdPL > 0 ? "#34d399" : holdPL < 0 ? "#f87171" : "#94a3b8";
+const sisiUpside = entry > 0 && target > 0
+  ? (((target - entry) / entry) * 100).toFixed(1) : null;
+
+BAGIAN 9: POSITION SIZE CALCULATOR
+Ada di tab Trading Plan, di sebelah kanan Risk/Reward box. User bisa edit modal dan risk%.
+
+// Default: modal 25jt, risk 2%
+const [capital, setCapital]   = useState(25_000_000);  // persist ke AsyncStorage
+const [riskPct, setRiskPct]   = useState(2);            // persist ke AsyncStorage
+// Kalkulasi
+const riskPerShare = entry - sl;                        // risiko per lembar saham
+const maxRupiah    = capital * riskPct / 100;           // max loss dalam rupiah
+const lotByRisk    = Math.floor(maxRupiah / riskPerShare / 100);    // lot berdasar risk
+const lotByCapital = Math.floor(capital / (entry * 100));           // lot berdasar modal
+const maxLot       = Math.min(lotByRisk, lotByCapital);             // ambil yang kecil
+const actualCost   = maxLot * 100 * entry;                          // biaya total
+// Tampilkan: "~5 lot · ~Rp 17.8 jt"
+// Sub: "Risiko/saham: Rp 10 → max rugi Rp 5.000 (2% dari 25 jt)"
+// Alert: "Stop loss jika close < 346"
+
+BAGIAN 10: TOMBOL WATCHLIST
+Ada di Verdict Card. POST/DELETE ke watchlist API:
+
+async function toggleWatchlist(symbol, isAlreadyInWL) {
+  const url = `${API}/api/watchlist${isAlreadyInWL ? `/${symbol}` : ""}`;
+  await fetch(url, {
+    method: isAlreadyInWL ? "DELETE" : "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+    body: isAlreadyInWL ? undefined : JSON.stringify({ symbol }),
+  });
+}
+
+RINGKASAN NAVIGASI & CACHING
+Navigasi ke Stock Detail dari:
+
+navigate(`/stocks/${symbol}`);
+// Tab default tergantung asal navigasi — lihat tabel di bawah
+
+Asal Navigasi	Tab Default
+BOW List	Trading Plan
+BOS List	Trading Plan
+Bandar Detector	Smart Money
+StockTools hasil	Financials
+Watchlist	Trading Plan
+Durasi Cache:
+
+{ staleTime: 5  * 60 * 1000 }  // quote + smart money: 5 menit
+{ staleTime: 30 * 60 * 1000 }  // analysis: 30 menit
+{ staleTime: 60 * 60 * 1000 }  // history chart: 1 jam
+
+BOW/BOS CSV adalah sumber data primer — selalu diutamakan di atas API fallback.

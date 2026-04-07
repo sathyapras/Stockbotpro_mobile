@@ -32,8 +32,8 @@ async function fetchJson<T>(name: string): Promise<T> {
 
 export interface TradingPlan {
   type: "BOW" | "BOS" | "COMPUTED";
-  status: string;
-  grade: string;
+  status: string;          // "BUY" | "HOLD" | "SOLD" | "WAIT"
+  grade: string;           // "A" | "B" | "C" | "D" | "–"
   entry: number;
   entryHigh: number | null;
   stopLoss: number;
@@ -44,11 +44,23 @@ export interface TradingPlan {
   rr: number;
   rsi: number | null;
   stochK: number | null;
-  holdDays: string;
-  signals: string[];
-  commentary: string;
-  action: string;
+  holdDays: string;        // "hari ke-3" | "7 hari" (BOS)
+  signals: string[];       // OHLCV signal chips
+  commentary: string;      // stripped commentary
+  action: string;          // "BUY BASE" | "NO TRADE" etc
   score: number;
+  // Extended BOW fields
+  conf: number;            // confidence %
+  rsPct: number;           // RS vs IHSG %
+  secTrend: string;        // "Financials BEAR"
+  setupType: string;       // "A-Extreme" | "C-Support"
+  holdPl: number;          // P/L % when status=HOLD (BOW)
+  // Extended BOS fields
+  glPct: number;           // G/L % for BOS
+  highest: number;         // highest price since entry (BOS)
+  vwapTrend: string;       // "NAIK 1 bar" (BOS)
+  vwap: number;            // VWAP price (BOS)
+  pctVsVwap: number;       // % vs VWAP (BOS)
 }
 
 export interface StockQuote {
@@ -146,55 +158,68 @@ function parse1dBroker(r: BrokerRow): OneDayBroker {
   };
 }
 
+function stripCommentaryMeta(raw: string | undefined): string {
+  if (!raw) return "";
+  const s = raw.replace(/%%/g, "%").trim();
+  const metaIdx = s.indexOf("| Grade=");
+  return (metaIdx >= 0 ? s.slice(0, metaIdx) : s).trim();
+}
+
 function bowToPlan(r: BOWRaw): TradingPlan {
   const entry = pf(r.Entry);
   const tp1 = pf(r.TP1);
   const tp1Pct = entry > 0 ? ((tp1 - entry) / entry) * 100 : pf(r.DistTP1);
-  const signals: string[] = [];
-  if (r.OHLCVSignals?.trim()) signals.push(...r.OHLCVSignals.trim().split(" ").filter(Boolean));
-  if (r.Type?.trim()) signals.push(r.Type.trim());
+  const signals: string[] = (r.OHLCVSignals?.trim() ?? "").split(" ").filter(Boolean);
   return {
-    type: "BOW", status: r.Status, grade: r.Grade ?? "–",
+    type: "BOW", status: r.Status ?? "HOLD", grade: r.Grade ?? "–",
     entry, entryHigh: pf(r.BuyBreak) || null,
     stopLoss: pf(r.StopLoss), slPct: pf(r.SL_pct),
     tp1, tp2: pf(r.TP2), tp1Pct, rr: pf(r.RR),
     rsi: pf(r.RSI) || null, stochK: pf(r.StochK) || null,
-    holdDays: r.Days ?? "", signals: signals.slice(0, 5),
-    commentary: r.Commentary?.replace(/%%/g, "%").trim() ?? "",
+    holdDays: r.Days ?? "", signals: signals.slice(0, 6),
+    commentary: stripCommentaryMeta(r.Commentary),
     action: r.Action ?? "", score: pf(r.Score),
+    conf: pf(r.Conf), rsPct: pf(r.RS_pct),
+    secTrend: r.SecTrend ?? "", setupType: r.Type ?? "",
+    holdPl: pf(r.HoldPL_pct),
+    glPct: 0, highest: 0, vwapTrend: "", vwap: 0, pctVsVwap: 0,
   };
 }
 
 function bosToPlan(r: BOSRaw): TradingPlan {
   const entry = pf(r.Entry);
   const tp1 = pf(r.Target1);
-  const slPct = pf(r.SL_pct.replace(/%%/g, ""));
+  const slPct = pf(r.SL_pct);
   const tp1Pct = entry > 0 ? ((tp1 - entry) / entry) * 100 : 0;
+  const rrCalc = tp1Pct > 0 && slPct > 0 ? tp1Pct / slPct : 0;
   const signals: string[] = [r.Trend, r.ShortTrend].filter(Boolean);
   if (r.VWAP_Filter === "[VWAP OK]") signals.push("VWAP OK");
+  const status = (r.Signal ?? "").replace("Signal ", "").toUpperCase() || "HOLD";
   return {
-    type: "BOS", status: r.Signal?.replace("Signal ", "") ?? "HOLD", grade: "–",
+    type: "BOS", status, grade: "–",
     entry, entryHigh: null,
     stopLoss: pf(r.StopLoss), slPct,
-    tp1, tp2: pf(r.Target2), tp1Pct,
-    rr: tp1Pct > 0 && slPct < 0 ? tp1Pct / Math.abs(slPct) : 0,
+    tp1, tp2: pf(r.Target2), tp1Pct, rr: rrCalc,
     rsi: null, stochK: null,
     holdDays: r.Hold ?? "", signals: signals.slice(0, 4),
     commentary: r.Commentary?.replace(/%%/g, "%").trim() ?? "",
     action: r.VWAP_Filter ?? "", score: 0,
+    conf: 0, rsPct: 0, secTrend: r.SecTrend ?? "", setupType: "",
+    holdPl: 0,
+    glPct: pf(r.GL_pct), highest: pf(r.Highest),
+    vwapTrend: r.VWAP_Trend ?? "", vwap: pf(r.VWAP), pctVsVwap: pf(r.PctVsVWAP),
   };
 }
 
 function computedPlan(q: StockQuote): TradingPlan {
-  // Derive simple plan from screener data
   const entry = q.price;
   const support = q.ma20 > 0 ? q.ma20 * 0.97 : entry * 0.95;
   const sl = support * 0.97;
   const tp1 = q.high52w > entry ? Math.min(q.high52w, entry * 1.08) : entry * 1.07;
   const tp2 = entry * 1.14;
-  const slPct = ((sl - entry) / entry) * 100;
+  const slPct = Math.abs(((sl - entry) / entry) * 100);
   const tp1Pct = ((tp1 - entry) / entry) * 100;
-  const rr = tp1Pct > 0 && slPct < 0 ? tp1Pct / Math.abs(slPct) : 0;
+  const rr = tp1Pct > 0 && slPct > 0 ? tp1Pct / slPct : 0;
   return {
     type: "COMPUTED", status: q.rsi < 40 ? "BUY" : q.rsi > 65 ? "HOLD" : "WATCH",
     grade: "–", entry, entryHigh: null,
@@ -205,6 +230,9 @@ function computedPlan(q: StockQuote): TradingPlan {
     commentary: q.commentary,
     action: q.rsi < 40 ? "Potensi Rebound" : "Pantau Support",
     score: q.totalScore * 15,
+    conf: 0, rsPct: q.rs > 1 ? (q.rs - 1) * 100 : (q.rs - 1) * 100,
+    secTrend: "", setupType: "", holdPl: 0,
+    glPct: 0, highest: 0, vwapTrend: "", vwap: 0, pctVsVwap: 0,
   };
 }
 
