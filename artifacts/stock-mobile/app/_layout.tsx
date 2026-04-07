@@ -12,7 +12,6 @@ import * as SystemUI from "expo-system-ui";
 import React, { useEffect } from "react";
 import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -37,6 +36,7 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="stock/[code]" options={{ headerBackTitle: "Back" }} />
+      <Stack.Screen name="tool/[toolId]" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -73,9 +73,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <WatchlistProvider>
             <GestureHandlerRootView>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
+              <RootLayoutNav />
             </GestureHandlerRootView>
           </WatchlistProvider>
         </QueryClientProvider>
