@@ -20,6 +20,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "bookmark", selected: "bookmark.fill" }} />
         <Label>Watchlist</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="bandar">
+        <Icon sf={{ default: "waveform.path.ecg", selected: "waveform.path.ecg.rectangle.fill" }} />
+        <Label>Bandar</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="screener">
         <Icon sf={{ default: "line.3.horizontal.decrease.circle", selected: "line.3.horizontal.decrease.circle.fill" }} />
         <Label>Screener</Label>
@@ -87,6 +91,18 @@ function ClassicTabLayout() {
               <SymbolView name="bookmark" tintColor={color} size={24} />
             ) : (
               <Feather name="bookmark" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="bandar"
+        options={{
+          title: "Bandar",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="waveform.path.ecg" tintColor={color} size={24} />
+            ) : (
+              <Feather name="activity" size={22} color={color} />
             ),
         }}
       />

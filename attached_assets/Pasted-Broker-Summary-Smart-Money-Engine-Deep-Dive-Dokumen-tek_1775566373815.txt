@@ -1,0 +1,448 @@
+Broker Summary & Smart Money Engine — Deep Dive
+Dokumen teknis untuk mobile app builder Menjelaskan cara baca data, logika kalkulasi, dan panduan tampilan interaktif
+
+1. APA ITU BROKER SUMMARY?
+Setiap hari bursa, BEI (Bursa Efek Indonesia) mempublikasikan data transaksi per broker per saham. Dari data ini kita bisa tahu:
+
+Siapa yang beli (broker apa, berapa nilai)
+Siapa yang jual
+Apakah "smart money" sedang akumulasi atau distribusi
+AFL (Amibroker) server milik owner mengolah raw data BEI ini dan mengekspornya ke format JSON yang disimpan di database StockBot Pro.
+
+2. STRUKTUR DATA MENTAH (dari AFL server)
+AFL server menghasilkan file JSON dengan format berikut per saham per hari:
+
+{
+  "ticker": "ANTM",
+  "date": "2026-04-02",
+  "top1_rpb": "Big Acc | 61.9",
+  "top3_rpb": "Big Acc | 51.5",
+  "top5_rpb": "Big Acc | 43.5",
+  "average_rpbn": "49.0 bn",
+  "net_value_rpb": "141.7 bn",
+  "vwap": 1590,
+  "broker_buy": 15,
+  "broker_sell": 34,
+  "acc_dist": "Acc"
+}
+
+Penjelasan field mentah:
+Field	Arti	Contoh
+top1_rpb	Sentimen + nilai NET transaksi broker terbesar	`"Big Acc
+top3_rpb	Sama, untuk top 3 broker gabungan	`"Big Acc
+top5_rpb	Sama, untuk top 5 broker gabungan	
+average_rpbn	Rata-rata nilai transaksi broker (miliar)	"49.0 bn" → 49 miliar
+net_value_rpb	Total net value seluruh pasar untuk saham ini	"141.7 bn"
+vwap	VWAP (harga rata-rata tertimbang volume)	1590
+broker_buy	Jumlah broker yang net beli	15
+broker_sell	Jumlah broker yang net jual	34
+acc_dist	Kesimpulan AFL: akumulasi atau distribusi	"Acc" atau "Dist"
+Parsing format "Label | Nilai":
+"Big Acc | 61.9"
+ └─ label: "Big Acc"   → kategori kekuatan transaksi
+ └─ val: 61.9          → nilai dalam miliar rupiah
+Label yang mungkin:
+- "Big Acc"    → akumulasi besar (> threshold tertentu)
+- "Small Acc"  → akumulasi kecil
+- "Neutral"    → seimbang/tidak signifikan
+- "Small Dist" → distribusi kecil
+- "Big Dist"   → distribusi besar
+
+3. DATA YANG TERSIMPAN DI DATABASE
+Setelah AFL data diproses dan disimpan, DB menyimpan 15 hari terakhir per saham:
+
+Tabel: broker_summary
+- ticker       → kode saham (ANTM, BBCA, dll)
+- date         → tanggal bursa
+- top1_val_bn  → nilai top 1 broker (miliar), signed: + = acc, - = dist
+- top1_label   → label kategori ("Big Acc", "Neutral", dll)
+- top3_val_bn  → nilai top 3 broker gabungan
+- top3_label   → label top 3
+- top5_val_bn  → nilai top 5 broker gabungan
+- top5_label   → label top 5
+- avg_val_bn   → rata-rata nilai broker (SIGNED: + acc / - dist)
+- net_val_bn   → net value total pasar
+- avg_price    → VWAP harga hari itu
+- broker_buy   → jumlah broker yang beli
+- broker_sell  → jumlah broker yang jual
+- acc_dist     → "Acc" atau "Dist"
+
+Kunci penting: avg_val_bn selalu SIGNED (positif = akumulasi, negatif = distribusi). Ini yang menjadi basis semua kalkulasi engine.
+
+4. ENGINE KALKULASI SMART MONEY
+Ini adalah inti dari fitur Bandar Detector. Backend mengambil 15 hari data per saham lalu menghitung 6 metrik utama:
+
+4.1 Rata-rata Bergerak (avg3d, avg5d, avg15d)
+const avgVals = days.map(r => r.avg_val_bn);  // array 15 hari, terbaru di index 0
+const avg3d  = mean(avgVals.slice(0, 3));   // rata-rata 3 hari terakhir
+const avg5d  = mean(avgVals.slice(0, 5));   // rata-rata 5 hari terakhir
+const avg15d = mean(avgVals);               // rata-rata 15 hari terakhir
+
+Interpretasi:
+
+avg3d > 0 → broker sedang akumulasi dalam 3 hari terakhir
+avg3d < 0 → broker sedang distribusi dalam 3 hari terakhir
+Makin besar nilainya (misal +50B), makin agresif akumulasinya
+4.2 Momentum (mom3d, mom5d)
+const mom3d = avg3d - avg5d;   // apakah 3 hari ini lebih kuat dari 5 hari?
+const mom5d = avg5d - avg15d;  // apakah 5 hari ini lebih kuat dari 15 hari?
+
+Interpretasi:
+
+mom3d > 0 → tekanan beli semakin meningkat (momentum positif)
+mom3d < 0 → tekanan beli melambat/menurun
+mom3d > 0 + avg3d > 0 = sinyal kuat akumulasi
+4.3 Broker Dominance (dominance)
+const dominance = Math.abs(top1_val_bn) / Math.abs(top3_val_bn);
+// Label:
+if (dominance > 0.7)       label = "Single Broker"  // 1 broker dominan total
+else if (dominance >= 0.4) label = "Healthy"         // distribusi sehat antar broker
+else                       label = "Weak"             // tidak ada dominan
+
+Interpretasi: Akumulasi "Single Broker" bisa bearish (pump & dump), sedangkan "Healthy" lebih sustain.
+
+4.4 Fuel & BrokerNet
+const fuel      = net_val_bn;                              // total net value pasar
+const brokerNet = broker_buy - broker_sell;                // selisih jumlah broker beli vs jual
+
+Interpretasi:
+
+fuel > 0 = uang masuk ke saham ini secara keseluruhan
+brokerNet < 0 = lebih banyak broker jual (bisa jadi smart money beli dari retail yang panik)
+4.5 AccDays & DistDays
+const accDays  = days.filter(r => r.avg_val_bn > 0).length;  // berapa hari acc dari 15 hari
+const distDays = days.filter(r => r.avg_val_bn < 0).length;  // berapa hari dist
+
+Interpretasi: accDays = 12 dari 15 hari = konsisten akumulasi.
+
+5. KLASIFIKASI FASE (classifyPhase)
+Berdasarkan 6 metrik di atas, sistem mengklasifikasikan setiap saham ke salah satu dari 6 fase:
+
+function classifyPhase({ avg3d, mom3d, fuel, brokerNet, dominance, distDays, totalDays }) {
+  // IGNITION: avg3d naik, momentum positif, TAPI lebih banyak broker jual
+  // → Smart money beli diam-diam dari retail yang jual
+  if (avg3d > 0 && mom3d > 0 && brokerNet < 0)
+    return "IGNITION";
+  // EARLY_ACC: avg3d naik, momentum positif, broker tidak terlalu terkonsentrasi
+  // → Akumulasi awal oleh beberapa broker besar, belum obvious
+  if (avg3d > 0 && mom3d > 0 && dominance < 0.7)
+    return "EARLY_ACC";
+  // STRONG_TREND: avg3d kuat, momentum stabil, fuel positif, broker net beli
+  // → Semua indikator aligned, tren kuat
+  if (avg3d > 0.5 && mom3d >= 0 && fuel > 0 && brokerNet > 0)
+    return "STRONG_TREND";
+  // EXHAUSTION: avg3d masih positif tapi momentum melemah, fuel masih ada
+  // → Akumulasi melambat, hati-hati distribusi akan segera mulai
+  if (avg3d > 0 && mom3d < 0 && fuel > 0)
+    return "EXHAUSTION";
+  // DISTRIBUTION: avg3d negatif, mayoritas hari adalah distribusi
+  // → Smart money sudah jual, hindari
+  if (avg3d < 0 && distDays >= Math.floor(totalDays * 0.6))
+    return "DISTRIBUTION";
+  // CHURNING: tidak ada tren jelas
+  return "CHURNING";
+}
+
+Tabel fase & interpretasi untuk user:
+Fase	Warna	Arti	Rekomendasi
+IGNITION	Ungu (#a78bfa)	Smart money beli diam-diam dari retail yang panik	Perhatikan — potensi entry terbaik
+EARLY_ACC	Hijau (#34d399)	Akumulasi awal oleh broker besar	Entry peluang — konfirmasi sebelum masuk
+STRONG_TREND	Biru (#60a5fa)	Tren kuat, semua indikator positif	Hold/buy on dip
+EXHAUSTION	Kuning (#fbbf24)	Momentum melemah, waspadai distribusi	Siap ambil profit
+DISTRIBUTION	Merah (#f87171)	Smart money sudah jual	Hindari / exit
+CHURNING	Abu (#94a3b8)	Tidak ada tren jelas	Wait and see
+6. FLOW SCORE (0–100)
+Flow Score adalah skor tunggal yang merangkum semua metrik menjadi angka 0–100 untuk sorting dan filtering:
+
+function computeFlowScore({ avg3d, mom3d, fuel, accDays, totalDays }) {
+  // norm(value, min, max) → normalisasi ke 0–100
+  
+  const a = norm(avg3d, -15, 15)    * 0.35;  // bobot 35%: rata-rata 3 hari
+  const b = norm(mom3d, -8,  8)     * 0.25;  // bobot 25%: momentum
+  const c = norm(fuel,  -300, 300)  * 0.25;  // bobot 25%: total uang masuk
+  const d = (accDays / totalDays) * 100      // bobot 15%: konsistensi akumulasi
+              * 0.15;
+  return Math.round(a + b + c + d);
+}
+
+Interpretasi Flow Score:
+
+≥ 70 → Akumulasi sangat kuat (tampilkan dengan warna ungu)
+50–69 → Akumulasi moderat (tampilkan dengan warna biru)
+< 50 → Lemah atau distribusi (tampilkan dengan warna abu)
+7. DELTA DAY-OVER-DAY (perubahan vs kemarin)
+API juga menghitung perubahan dibanding hari sebelumnya:
+
+// deltaNetVal: perubahan net value vs kemarin
+const deltaNetVal = fuel_hari_ini - fuel_kemarin;
+// deltaAvgVal: perubahan avg value vs kemarin
+const deltaAvgVal = avgVal_hari_ini - avgVal_kemarin;
+// flowTrend: label perubahan
+if (deltaNetVal > 1)       flowTrend = "GROWING";      // semakin kuat
+if (deltaNetVal < -1)      flowTrend = "SHRINKING";    // melemah
+if (acc_dist berubah jadi Acc)  flowTrend = "TURNING_ACC";   // balik arah jadi akumulasi
+if (acc_dist berubah jadi Dist) flowTrend = "TURNING_DIST";  // balik jadi distribusi
+else                       flowTrend = "STABLE";
+
+8. SPARKLINE DATA
+Setiap saham punya array sparkline yang berisi 15 nilai avg_val_bn dari yang terlama ke terbaru:
+
+sparkline: [−5.2, −3.1, 1.0, 2.3, 8.5, 12.1, 18.4, 22.0, 19.5, ...]
+//          ↑ 15 hari lalu                                  ↑ hari ini
+
+Nilai positif = akumulasi, negatif = distribusi. Gunakan ini untuk mini chart di card.
+
+9. RESPONSE LENGKAP API
+GET https://stockbotpro.replit.app/api/broker-summary/smart-money
+
+Response per saham:
+
+{
+  "ticker": "ANTM",
+  "name": "Aneka Tambang",
+  "sector": "Mining",
+  "indexCategory": "LQ45",
+  "date": "2026-04-02",
+  // Snapshot terbaru
+  "latestAccDist": "Acc",
+  "latestAvgPrice": 1590,
+  "top1Label": "Big Acc",
+  "top3Label": "Big Acc",
+  "top5Label": "Big Acc",
+  "brokerBuy": 15,
+  "brokerSell": 34,
+  // Engine outputs
+  "avg3d": 49.0,          // miliar, rata-rata 3 hari
+  "avg5d": 38.2,
+  "avg15d": 22.1,
+  "mom3d": 10.8,          // positif = akselerasi
+  "mom5d": 16.1,
+  "dominance": 0.6,       // 0–1, top1/top3 ratio
+  "dominanceLabel": "Healthy",
+  "brokerNet": -19,       // broker_buy - broker_sell
+  "fuel": 141.7,          // net_val_bn
+  "accDays": 12,          // dari 15 hari
+  "distDays": 3,
+  "flowScore": 82,        // 0–100
+  "phase": "IGNITION",
+  // Sparkline untuk mini chart (terlama→terbaru)
+  "sparkline": [-3.1, 2.0, 8.5, 22.0, 49.0],
+  // Delta harian
+  "deltaNetVal": 12.3,    // naik 12.3 miliar vs kemarin
+  "deltaAvgVal": 5.1,
+  "flowTrend": "GROWING",
+  "prevAccDist": "Acc"
+}
+
+10. FILTER & TABS YANG SUDAH ADA DI WEB
+Web app mengelompokkan saham ke 4 tab berdasarkan kondisi:
+
+// Tab 1: Top Akumulasi ⭐ (PALING PENTING)
+filter: latestAccDist === "Acc"
+     && (phase === "IGNITION" || phase === "EARLY_ACC")
+     && flowScore >= 50
+sort: flowScore DESC
+// Tab 2: Entry Peluang 🚀
+filter: phase === "IGNITION" || phase === "EARLY_ACC"
+sort: flowScore DESC
+// Tab 3: Peringatan ⚠️
+filter: phase === "DISTRIBUTION"
+     || (phase === "EXHAUSTION" && latestAccDist === "Dist")
+sort: flowScore ASC (yang paling lemah di atas)
+// Tab 4: Strong Trend 📈
+filter: phase === "STRONG_TREND"
+sort: flowScore DESC
+
+11. CARA MENAMPILKAN DI MOBILE (Panduan Interaktif)
+11.1 Screen: Signal Snapshot (Home Widget)
+Tampilkan ringkasan di halaman Home sebagai card horizontal scrollable:
+
+┌─────────────────────────────────────────┐
+│ 🎯 Signal Snapshot  • 7 Apr 2026     →  │
+├─────────────────────────────────────────┤
+│ [⭐ Top Akumulasi 8] [🚀 Entry 8]        │
+│ [⚠️ Peringatan 8]   [📈 Strong 8]       │
+├─────────────────────────────────────────┤
+│ 1 • BUMI  ACC  IGNITION  +26.0B  89    │
+│ 2 • MDKA  ACC  IGNITION  +19.2B  84    │
+│ 3 • AADI  ACC  IGNITION  +18.3B  81    │
+└─────────────────────────────────────────┘
+
+Implementasi FlatList tiap baris:
+
+[nomor] [dot warna fase] [ticker] [badge ACC/DIST] [nama/fase] [avg3d] [score]
+
+Interaksi:
+
+Tap tab → ganti filter (gunakan useState + array filter/sort dari Section 10)
+Tap saham → navigasi ke Stock Detail screen
+11.2 Screen: Bandar Detector (Full Screen)
+Tampilan tabel lengkap dengan filter dan sorting:
+
+┌──────────────────────────────────────────┐
+│ 🔍 [Search ticker...]  [Filter ▼] [Sort] │
+├──────────────────────────────────────────┤
+│ [ALL] [LQ45] [KOMPAS100] [JII] [WATCHLIST]│
+├──────────────────────────────────────────┤
+│ ANTM  Acc  IGNITION                      │
+│ avg3d: +49.0B  score: 82  ▲ GROWING      │
+│ ████████████░░░ (sparkline 15 hari)      │
+├──────────────────────────────────────────┤
+│ BBCA  Acc  EARLY_ACC                     │
+│ avg3d: +22.1B  score: 74  → STABLE       │
+│ ░░░███████████░ (sparkline 15 hari)      │
+└──────────────────────────────────────────┘
+
+Elemen per card:
+
+Header: ticker + badge ACC/DIST + dot warna fase + nama saham
+Baris data: avg3d, flow score, trend arrow
+Mini sparkline chart (15 titik, lebar card)
+Optional: brokerBuy vs brokerSell progress bar
+Query parameter filter:
+
+GET /api/broker-summary/smart-money?index=LQ45
+GET /api/broker-summary/smart-money?index=KOMPAS100
+GET /api/broker-summary/smart-money?index=ALL
+
+11.3 Komponen: Mini Sparkline Chart
+Sparkline adalah array 15 nilai avg_val_bn. Tampilkan sebagai bar chart mini:
+
+Contoh data: [-5, -3, 2, 8, 18, 22, 19, 25, 49]
+Tampilan:
+                              ██
+                           ████
+                        ██████
+              ████████████████
+  ─────────────────────────────  (baseline 0)
+████
+
+Aturan warna:
+
+Nilai positif → bar hijau (#34d399)
+Nilai negatif → bar merah (#f87171)
+Implementasi React Native (gunakan SVG atau Victory Native):
+
+import { Svg, Rect } from 'react-native-svg';
+function Sparkline({ data }) {
+  const max = Math.max(...data.map(Math.abs), 1);
+  const barW = chartWidth / data.length - 1;
+  
+  return (
+    <Svg width={chartWidth} height={24}>
+      {data.map((val, i) => {
+        const h = Math.max(2, (Math.abs(val) / max) * 20);
+        const y = val >= 0 ? (24 - h) : 12;
+        return (
+          <Rect
+            key={i}
+            x={i * (barW + 1)}
+            y={y}
+            width={barW}
+            height={h}
+            fill={val >= 0 ? "#34d399" : "#f87171"}
+            rx={1}
+          />
+        );
+      })}
+    </Svg>
+  );
+}
+
+11.4 Komponen: Flow Score Badge
+function FlowScoreBadge({ score }) {
+  const color = score >= 70 ? "#a78bfa"   // ungu — sangat kuat
+              : score >= 50 ? "#60a5fa"   // biru — moderat
+              : "#94a3b8";                // abu — lemah
+  return (
+    <View style={{ backgroundColor: color + "25", borderRadius: 8, padding: 4 }}>
+      <Text style={{ color, fontWeight: "900", fontSize: 16 }}>{score}</Text>
+      <Text style={{ color: "#94a3b8", fontSize: 9 }}>score</Text>
+    </View>
+  );
+}
+
+11.5 Komponen: Fase Badge
+const PHASE_CONFIG = {
+  IGNITION:     { color: "#a78bfa", label: "Ignition",     icon: "🔥" },
+  EARLY_ACC:    { color: "#34d399", label: "Early Acc",    icon: "📈" },
+  STRONG_TREND: { color: "#60a5fa", label: "Strong Trend", icon: "💪" },
+  EXHAUSTION:   { color: "#fbbf24", label: "Exhaustion",   icon: "⚠️" },
+  DISTRIBUTION: { color: "#f87171", label: "Distribution", icon: "🚨" },
+  CHURNING:     { color: "#94a3b8", label: "Churning",     icon: "↔️" },
+};
+function PhaseBadge({ phase }) {
+  const cfg = PHASE_CONFIG[phase] ?? PHASE_CONFIG.CHURNING;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+      <View style={{
+        width: 8, height: 8, borderRadius: 4,
+        backgroundColor: cfg.color
+      }} />
+      <Text style={{ color: cfg.color, fontSize: 10, fontWeight: "600" }}>
+        {cfg.label}
+      </Text>
+    </View>
+  );
+}
+
+11.6 Komponen: Broker Buy vs Sell Bar
+function BrokerBar({ brokerBuy, brokerSell }) {
+  const total = brokerBuy + brokerSell;
+  const buyPct = total > 0 ? (brokerBuy / total) * 100 : 50;
+  return (
+    <View>
+      <View style={{ flexDirection: "row", height: 4, borderRadius: 2, overflow: "hidden" }}>
+        <View style={{ flex: buyPct, backgroundColor: "#34d399" }} />
+        <View style={{ flex: 100 - buyPct, backgroundColor: "#f87171" }} />
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ color: "#34d399", fontSize: 9 }}>Buy: {brokerBuy}</Text>
+        <Text style={{ color: "#f87171", fontSize: 9 }}>Sell: {brokerSell}</Text>
+      </View>
+    </View>
+  );
+}
+
+11.7 Flow Trend Indicator
+const TREND_CONFIG = {
+  GROWING:      { icon: "▲", color: "#34d399", label: "Menguat" },
+  SHRINKING:    { icon: "▼", color: "#f87171", label: "Melemah" },
+  TURNING_ACC:  { icon: "↑", color: "#a78bfa", label: "Balik Akumulasi" },
+  TURNING_DIST: { icon: "↓", color: "#fb923c", label: "Balik Distribusi" },
+  STABLE:       { icon: "→", color: "#94a3b8", label: "Stabil" },
+};
+
+12. REFRESH STRATEGY DI MOBILE
+Data broker summary tidak real-time — update setelah penutupan bursa (after 17:30 WIB)
+Refresh cukup 1x saat app dibuka, tidak perlu polling
+Cache di mobile: simpan hasil API selama 12 jam (gunakan TanStack Query atau AsyncStorage)
+// React Query config
+useQuery({
+  queryKey: ['smart-money'],
+  queryFn: fetchSmartMoney,
+  staleTime: 12 * 60 * 60 * 1000,   // 12 jam
+  gcTime: 24 * 60 * 60 * 1000,       // simpan cache 24 jam
+})
+
+13. CONTOH LENGKAP: Card Saham di Bandar Detector
+┌──────────────────────────────────────────────┐
+│  ANTM  [ACC]    🔥 IGNITION                  │
+│  Aneka Tambang Tbk                           │
+│                                              │
+│  avg 3D: +49.0B    Score: 82  ▲ Menguat      │
+│  avg 5D: +38.2B    Acc: 12/15 hari           │
+│                                              │
+│  Broker Net: Buy 15 vs Sell 34               │
+│  [▓▓▓▓▓░░░░░░░░░░░░░░░]  30% beli           │
+│                                              │
+│  Top 1: Big Acc (+61.9B)                     │
+│  Top 3: Big Acc (+51.5B)                     │
+│                                              │
+│  Sparkline (15 hari):                        │
+│         ████████████                        │
+│  ─────────────────────  (baseline)          │
+│  ████                                       │
+└──────────────────────────────────────────────┘
+
+Tap card → Stock Detail screen dengan tab "Smart Money"
