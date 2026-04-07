@@ -4,6 +4,7 @@ import {
   SmartMoneyResult,
   fetchSmartMoneyForTicker,
 } from "./smartMoneyEngine";
+import { MasterStock, fetchMasterStockBySymbol } from "./masterStockService";
 import { ScreenerRaw } from "./stockToolsService";
 import { BOWRaw, BOSRaw } from "./stockpickService";
 
@@ -98,6 +99,7 @@ export interface StockDetail {
   plan: TradingPlan | null;
   broker1d: OneDayBroker | null;
   smartMoney: SmartMoneyResult | null;
+  masterStock: MasterStock | null;   // fundamental + technical from master DB
 }
 
 // ─── Parsers ─────────────────────────────────────────────────
@@ -282,15 +284,16 @@ export function computeVerdict(plan: TradingPlan | null, quote: StockQuote | nul
 export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
   const tickerUpper = ticker.toUpperCase();
 
-  const [screener, broker1dAll, bow, bos, smartMoney] = await Promise.all([
+  const [screener, broker1dAll, bow, bos, smartMoney, masterStock] = await Promise.all([
     fetchJson<ScreenerRaw[]>("STOCKTOOLS_SCREENER"),
     fetchJson<BrokerRow[]>("broksum_data_1d"),
     fetchJson<BOWRaw[]>("BuyOnWeakness_Signal"),
     fetchJson<BOSRaw[]>("BuyOnStrenght_Signal"),
     fetchSmartMoneyForTicker(tickerUpper).catch(() => null),
+    fetchMasterStockBySymbol(tickerUpper).catch(() => null),
   ]);
 
-  // Quote from screener
+  // Quote from screener (prefer master data for price if screener missing)
   const screenerRow = screener.find(r => r.Ticker === tickerUpper);
   const quote = screenerRow ? parseScreenerRow(screenerRow) : null;
 
@@ -298,13 +301,13 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
   const broker1dRow = broker1dAll.find(r => r.ticker === tickerUpper);
   const broker1d = broker1dRow ? parse1dBroker(broker1dRow) : null;
 
-  // Trading plan: prefer BOS, then BOW, then computed
-  const bosRow = bos.find(r => r.Ticker === tickerUpper);
+  // Trading plan: prefer BOW, then BOS, then computed
   const bowRow = bow.find(r => r.Ticker === tickerUpper);
+  const bosRow = bos.find(r => r.Ticker === tickerUpper);
   let plan: TradingPlan | null = null;
-  if (bosRow) plan = bosToPlan(bosRow);
-  else if (bowRow) plan = bowToPlan(bowRow);
+  if (bowRow) plan = bowToPlan(bowRow);
+  else if (bosRow) plan = bosToPlan(bosRow);
   else if (quote) plan = computedPlan(quote);
 
-  return { ticker: tickerUpper, quote, plan, broker1d, smartMoney };
+  return { ticker: tickerUpper, quote, plan, broker1d, smartMoney, masterStock };
 }

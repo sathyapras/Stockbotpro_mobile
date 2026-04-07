@@ -1,0 +1,516 @@
+Master Stock Data — Panduan Implementasi Mobile
+Fondasi data semua saham IDX di StockBot Pro
+Upload sekali sehari dari AFL Scanner → semua screen otomatis terupdate
+
+GAMBARAN UMUM
+Master Stock adalah database utama seluruh saham IDX yang diupload dari Amibroker AFL Scanner setiap hari oleh admin. Satu file CSV berisi semua saham dengan harga, volume, FA ratios, sektor, dan index membership.
+
+Dipakai oleh hampir semua screen:
+
+Screen	Data yang diambil
+Market Summary	Advancers · Decliners · Total Value
+StockTools count badges	changePercent · vol50dPct
+StockTools hasil screener	price · volume · sector · name
+Stock Detail Financials	P/E · P/B · Beta · ROE · EPS · DY · D/E
+Sector Rotation	Saham per sektor · top stock hari ini
+Global Screener	Semua field untuk multi-filter
+Bandar Detector	Sektor · indexCategory
+Watchlist	Harga live untuk semua saham di watchlist
+ENDPOINT
+GET https://stockbotpro.replit.app/api/master
+Auth: Bearer <JWT_TOKEN>
+
+Response:
+
+{
+  "data": [
+    {
+      "symbol": "AADI",
+      "name": "Adaro Andalan Indonesia Tbk",
+      "sector": "Energy",
+      "industry": "Oil & Gas",
+      "indexCategory": "LQ45,KOMPAS100",
+      "date": "2026-04-07",
+      "open": 7850,
+      "high": 7950,
+      "low": 7800,
+      "close": 7900,
+      "volume": 12500000,
+      "value": 98.75,
+      "changePoint": 50,
+      "changePercent": 0.64,
+      "vol50dPct": 135.2,
+      "marketCap": 95600.5,
+      "beta": 1.15,
+      "per": 8.4,
+      "pbv": 1.2,
+      "peg": 0.8,
+      "support": 7600,
+      "resistance": 8200,
+      "ytdReturn": -3.5,
+      "return10d": 2.8,
+      "return30d": -1.2,
+      "vwap": 7880,
+      "eps": 940,
+      "roe": 18.5,
+      "high52w": 9200,
+      "low52w": 6800
+    },
+    ...
+  ],
+  "meta": {
+    "rows": 847,
+    "fileName": "MasterStock_20260407.csv",
+    "uploadedAt": "2026-04-07T08:30:00Z"
+  }
+}
+
+FIELD LENGKAP MASTER STOCK
+Data Harga & Volume
+Field	Contoh	Keterangan
+symbol	"BBCA"	Kode saham IDX (tanpa .JK)
+name	"Bank Central Asia Tbk"	Nama perusahaan lengkap
+open	10050	Harga pembukaan
+high	10125	Harga tertinggi hari ini
+low	9975	Harga terendah hari ini
+close	10100	Harga penutupan ← gunakan ini sebagai "harga"
+changePoint	50	Perubahan dalam Rp (close - prevClose)
+changePercent	0.50	Perubahan dalam %
+volume	24500000	Volume lembar saham
+value	247.45	Nilai transaksi dalam Miliar Rp
+vol50dPct	135.2	Volume hari ini vs rata-rata 50 hari (%)
+Data Fundamental
+Field	Contoh	Keterangan
+per	12.4	Price Earnings Ratio (TTM)
+pbv	1.8	Price to Book Value
+peg	0.9	Price Earnings Growth
+beta	1.15	Beta 22 hari
+eps	128.5	Earnings per Share
+roe	14.5	Return on Equity (%)
+marketCap	95600.5	Market Cap dalam Miliar Rp
+Data Teknikal & Range
+Field	Contoh	Keterangan
+support	9800	Level support dari AFL
+resistance	10500	Level resistance dari AFL
+vwap	10080	VWAP hari ini
+high52w	11200	Harga tertinggi 52 minggu
+low52w	8750	Harga terendah 52 minggu
+ytdReturn	-3.5	Return year-to-date (%)
+return10d	2.8	Return 10 hari (%)
+return30d	-1.2	Return 30 hari (%)
+Klasifikasi Saham
+Field	Contoh	Keterangan
+sector	"Finance"	Sektor utama
+industry	"Banking"	Sub-sektor
+indexCategory	"LQ45,KOMPAS100"	Keanggotaan index
+date	"2026-04-07"	Tanggal data AFL
+Nilai indexCategory yang mungkin:
+
+"LQ45"             → saham LQ45 saja
+"KOMPAS100"        → saham KOMPAS100 saja
+"LQ45,KOMPAS100"   → dua-duanya
+"JII30"            → syariah JII30
+"LQ45,JII30"       → LQ45 + syariah
+""                 → saham regular (tidak masuk index utama)
+
+CARA PAKAI DI MOBILE
+1. Fetch dan Cache di App State
+// Fetch sekali saat app launch, simpan di global state / React Query
+const { data: masterData } = useQuery({
+  queryKey: ["master-stock"],
+  queryFn: async () => {
+    const r = await fetch(`${API}/api/master`, {
+      headers: { Authorization: `Bearer ${jwt}` }
+    });
+    return r.json();
+  },
+  staleTime: 60 * 60 * 1000,  // 1 jam — data hanya berubah setelah upload admin
+});
+const stocks = masterData?.data ?? [];   // array semua saham
+const meta   = masterData?.meta;         // { rows, fileName, uploadedAt }
+
+2. Buat Map untuk Lookup Cepat
+// Di-build sekali, dipakai di semua screen
+const stockMap = useMemo(
+  () => new Map(stocks.map(s => [s.symbol, s])),
+  [stocks]
+);
+// Lookup nama + sektor saham dari symbol
+const getStock = (symbol) => stockMap.get(symbol);
+// Contoh:
+const bbca = getStock("BBCA");
+// → { symbol: "BBCA", name: "Bank Central Asia Tbk", sector: "Finance", close: 10100, ... }
+
+BAGIAN 2: MARKET BREADTH (Advancers / Decliners)
+Data market breadth dihitung server dari master stock.
+
+Endpoint Market Summary
+GET https://stockbotpro.replit.app/api/market/summary
+Auth: Bearer <JWT_TOKEN>
+
+{
+  "ihsg":  { "name": "IHSG",  "value": 7125.5, "change": 32.1, "changePercent": 0.45 },
+  "lq45":  { "name": "LQ45",  "value": 918.3,  "change": 4.2,  "changePercent": 0.46 },
+  "jii":   { "name": "JII30", "value": 567.8,  "change": 2.1,  "changePercent": 0.37 },
+  "idx30": { "name": "IDX30", "value": 487.2,  "change": 2.0,  "changePercent": 0.41 },
+  "advancers": 312,
+  "decliners": 198,
+  "unchanged": 87,
+  "totalValue":  8750000000000,
+  "totalVolume": 18500000000,
+  "topMovers": [
+    { "symbol": "ANTM", "name": "Aneka Tambang", "price": 1590, "changePercent": 3.25 },
+    { "symbol": "BBCA", "name": "Bank Central Asia", "price": 10100, "changePercent": 0.50 }
+  ]
+}
+
+Kalkulasi Breadth di Frontend
+// Jika perlu hitung manual dari masterData
+function calcBreadth(stocks) {
+  let advancers = 0, decliners = 0, unchanged = 0;
+  let totalValue = 0;
+  
+  for (const s of stocks) {
+    const chg = s.changePercent ?? 0;
+    if (chg > 0.05)  advancers++;
+    else if (chg < -0.05) decliners++;
+    else unchanged++;
+    totalValue += (s.value ?? 0) * 1e9;  // value dalam Bn Rp → konversi ke Rp
+  }
+  
+  const total = advancers + decliners + unchanged;
+  return {
+    advancers, decliners, unchanged, total,
+    totalValueT: (totalValue / 1e12).toFixed(1),  // dalam Triliun Rp
+    advancerPct: Math.round((advancers / total) * 100),
+    declinerPct: Math.round((decliners / total) * 100),
+  };
+}
+
+Tampilan Market Breadth
+┌──────────────────────────────────────┐
+│ Market Breadth                        │
+│                                      │
+│ ████████████████░░░░░░░░░░░░░░░░░░   │
+│                                      │
+│ ✅ Naik: 312    ❌ Turun: 198         │
+│ ➡️ Stagnan: 87  📊 Total: 597         │
+│                                      │
+│ Nilai Transaksi: Rp 8.75T            │
+└──────────────────────────────────────┘
+
+function BreadthBar({ advancers, decliners, unchanged }) {
+  const total = advancers + decliners + unchanged;
+  const advPct = (advancers / total) * 100;
+  const decPct = (decliners / total) * 100;
+  
+  return (
+    <View>
+      <View style={{ flexDirection: "row", height: 12, borderRadius: 6, overflow: "hidden" }}>
+        <View style={{ flex: advancers, backgroundColor: "#34d399" }} />
+        <View style={{ flex: unchanged, backgroundColor: "#94a3b8" }} />
+        <View style={{ flex: decliners, backgroundColor: "#f87171" }} />
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+        <Text style={{ color: "#34d399", fontSize: 11 }}>✅ {advancers} ({advPct.toFixed(0)}%)</Text>
+        <Text style={{ color: "#94a3b8", fontSize: 11 }}>→ {unchanged}</Text>
+        <Text style={{ color: "#f87171", fontSize: 11 }}>❌ {decliners} ({decPct.toFixed(0)}%)</Text>
+      </View>
+    </View>
+  );
+}
+
+BAGIAN 3: DAFTAR SAHAM (Stock List)
+Filter dari Master Stock (client-side)
+// Semua filter dilakukan di sisi mobile, tidak perlu API tambahan
+function filterStocks(stocks, filters) {
+  let result = [...stocks];
+  
+  // Filter by index
+  if (filters.index === "LQ45") {
+    result = result.filter(s => (s.indexCategory ?? "").toUpperCase().includes("LQ45"));
+  } else if (filters.index === "KOMPAS100") {
+    result = result.filter(s => (s.indexCategory ?? "").toUpperCase().includes("KOMPAS"));
+  } else if (filters.index === "JII30") {
+    result = result.filter(s => (s.indexCategory ?? "").toUpperCase().includes("JII"));
+  }
+  
+  // Filter by sector
+  if (filters.sector) {
+    result = result.filter(s =>
+      (s.sector ?? "").toLowerCase().includes(filters.sector.toLowerCase())
+    );
+  }
+  
+  // Filter by search
+  if (filters.search) {
+    const q = filters.search.toUpperCase();
+    result = result.filter(s =>
+      s.symbol.includes(q) || (s.name ?? "").toUpperCase().includes(q)
+    );
+  }
+  
+  // Filter: hanya naik hari ini
+  if (filters.onlyUp) {
+    result = result.filter(s => (s.changePercent ?? 0) > 0);
+  }
+  
+  // Filter: volume spike
+  if (filters.volumeSpike) {
+    result = result.filter(s => (s.vol50dPct ?? 0) >= 200);
+  }
+  
+  return result;
+}
+// Sort options
+function sortStocks(stocks, sortBy) {
+  const sorted = [...stocks];
+  switch (sortBy) {
+    case "change_desc": return sorted.sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
+    case "change_asc":  return sorted.sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0));
+    case "volume_desc": return sorted.sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
+    case "value_desc":  return sorted.sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    case "cap_desc":    return sorted.sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0));
+    case "ret10d":      return sorted.sort((a, b) => (b.return10d ?? 0) - (a.return10d ?? 0));
+    case "alpha":       return sorted.sort((a, b) => a.symbol.localeCompare(b.symbol));
+    default:            return sorted;
+  }
+}
+
+Tampilan Stock Card di List
+function StockCard({ stock, onPress }) {
+  const isUp = (stock.changePercent ?? 0) >= 0;
+  const color = isUp ? "#34d399" : "#f87171";
+  
+  // Index badges
+  const cat = (stock.indexCategory ?? "").toUpperCase();
+  const badges = [];
+  if (cat.includes("LQ45"))     badges.push({ label: "LQ45",  color: "#60a5fa" });
+  if (cat.includes("KOMPAS"))   badges.push({ label: "K100",  color: "#a78bfa" });
+  if (cat.includes("JII"))      badges.push({ label: "JII",   color: "#34d399" });
+  
+  return (
+    <TouchableOpacity onPress={() => onPress(stock.symbol)}
+      style={{ padding: 12, borderRadius: 12, backgroundColor: "#1e2433", marginBottom: 8 }}>
+      
+      {/* Row 1: Ticker + Harga */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={{ fontWeight: "900", fontSize: 15, color: "white" }}>{stock.symbol}</Text>
+          {badges.map((b, i) => (
+            <View key={i} style={{ paddingHorizontal: 4, paddingVertical: 1,
+              borderRadius: 4, backgroundColor: b.color + "25" }}>
+              <Text style={{ color: b.color, fontSize: 8, fontWeight: "700" }}>{b.label}</Text>
+            </View>
+          ))}
+        </View>
+        <Text style={{ fontWeight: "700", fontSize: 15, color: "white" }}>
+          {stock.close?.toLocaleString("id-ID")}
+        </Text>
+      </View>
+      
+      {/* Row 2: Nama + % Change */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 11 }} numberOfLines={1}>
+          {stock.name}
+        </Text>
+        <Text style={{ color, fontWeight: "700", fontSize: 12 }}>
+          {isUp ? "▲" : "▼"} {Math.abs(stock.changePercent ?? 0).toFixed(2)}%
+        </Text>
+      </View>
+      
+      {/* Row 3: Sektor + Volume */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+        <Text style={{ color: "#64748b", fontSize: 10 }}>{stock.sector}</Text>
+        <Text style={{ color: "#60a5fa", fontSize: 10 }}>
+          Vol: {formatVolume(stock.volume ?? 0)}
+          {(stock.vol50dPct ?? 0) >= 150 && (
+            <Text style={{ color: "#fbbf24" }}> ★{Math.round(stock.vol50dPct ?? 0)}%</Text>
+          )}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+BAGIAN 4: TOP GAINERS & LOSERS
+Dihitung langsung dari master stock di client:
+
+// Top 10 Gainers
+const topGainers = [...stocks]
+  .filter(s => (s.changePercent ?? 0) > 0)
+  .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0))
+  .slice(0, 10);
+// Top 10 Losers
+const topLosers = [...stocks]
+  .filter(s => (s.changePercent ?? 0) < 0)
+  .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))
+  .slice(0, 10);
+// Volume Rockets (vol > 200% avg50D, harga naik)
+const volumeRockets = [...stocks]
+  .filter(s => (s.vol50dPct ?? 0) >= 200 && (s.changePercent ?? 0) > 0)
+  .sort((a, b) => (b.vol50dPct ?? 0) - (a.vol50dPct ?? 0))
+  .slice(0, 10);
+// Most Active (by value)
+const mostActive = [...stocks]
+  .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
+  .slice(0, 10);
+
+BAGIAN 5: SEKTOR SUMMARY DARI MASTER STOCK
+Bangun summary per sektor langsung di client:
+
+function buildSectorSummary(stocks) {
+  const sectorMap = new Map();
+  
+  for (const s of stocks) {
+    const sector = s.sector || "Lainnya";
+    if (!sectorMap.has(sector)) {
+      sectorMap.set(sector, { name: sector, stocks: [], advancers: 0, decliners: 0, totalValue: 0 });
+    }
+    const sec = sectorMap.get(sector);
+    sec.stocks.push(s);
+    if ((s.changePercent ?? 0) > 0) sec.advancers++;
+    else if ((s.changePercent ?? 0) < 0) sec.decliners++;
+    sec.totalValue += s.value ?? 0;  // Miliar Rp
+  }
+  
+  return Array.from(sectorMap.values())
+    .map(sec => ({
+      name: sec.name,
+      stockCount: sec.stocks.length,
+      advancers: sec.advancers,
+      decliners: sec.decliners,
+      avgChange: sec.stocks.reduce((s, st) => s + (st.changePercent ?? 0), 0) / sec.stocks.length,
+      totalValueBn: sec.totalValue,
+      topStock: sec.stocks.sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0))[0],
+    }))
+    .sort((a, b) => b.avgChange - a.avgChange);
+}
+
+BAGIAN 6: FA RATIOS DI STOCK DETAIL
+Ketika user buka Stock Detail → tab Financials, data FA diambil dari:
+
+Master stock (PE, PB, Beta, PEG) — prioritas utama
+Yahoo Finance (ROE, EPS, DY, D/E) — diambil oleh server
+// Dari response /api/stocks/:symbol/analysis
+const fa = analysis?.faRatios;
+// fa = { pe, pb, beta, peg, roe, eps, dy, de }
+// null berarti tidak tersedia — tampilkan "N/A"
+
+Cara lookup di mobile tanpa panggil API analysis:
+
+// Langsung ambil dari masterData yang sudah di-cache
+const stockInfo = stockMap.get(symbol);
+// faRatios minimal dari master:
+const faFromMaster = {
+  pe:   stockInfo?.per  > 0 ? stockInfo.per  : null,
+  pb:   stockInfo?.pbv  > 0 ? stockInfo.pbv  : null,
+  beta: stockInfo?.beta > 0 ? stockInfo.beta : null,
+  peg:  stockInfo?.peg  > 0 ? stockInfo.peg  : null,
+  eps:  stockInfo?.eps  > 0 ? stockInfo.eps  : null,
+  roe:  stockInfo?.roe  > 0 ? stockInfo.roe  : null,
+  // dy dan de tidak ada di master — tetap pakai dari /analysis endpoint
+};
+
+BAGIAN 7: INDEX MEMBERSHIP (LQ45 / KOMPAS100 / JII30)
+Cara Cek
+function getIndexBadges(stock) {
+  const cat = (stock.indexCategory ?? "").toUpperCase();
+  const badges = [];
+  if (cat.includes("LQ45"))              badges.push("LQ45");
+  if (cat.includes("KOMPAS100") || cat.includes("KOMPAS")) badges.push("KOMPAS100");
+  if (cat.includes("JII") || cat.includes("SYARIAH"))      badges.push("JII30");
+  return badges;
+}
+// Contoh penggunaan untuk filter
+const lq45Stocks    = stocks.filter(s => getIndexBadges(s).includes("LQ45"));
+const kompas100     = stocks.filter(s => getIndexBadges(s).includes("KOMPAS100"));
+const syariahStocks = stocks.filter(s => getIndexBadges(s).includes("JII30"));
+
+BAGIAN 8: VOL50D PCT — VOLUME SPIKE DETECTOR
+vol50dPct = Volume hari ini sebagai % dari rata-rata volume 50 hari.
+
+function getVolumeLabel(vol50dPct) {
+  if (vol50dPct >= 300) return { label: "MEGA SPIKE", color: "#a78bfa", show: true };
+  if (vol50dPct >= 200) return { label: "VOLUME SPIKE", color: "#fbbf24", show: true };
+  if (vol50dPct >= 150) return { label: "HIGH VOL", color: "#60a5fa", show: true };
+  if (vol50dPct >= 100) return { label: "NORMAL",   color: "#94a3b8", show: false };
+  return { label: "LOW VOL", color: "#64748b", show: false };
+}
+// Contoh tampilkan star badge jika vol spike
+const volInfo = getVolumeLabel(stock.vol50dPct ?? 0);
+{volInfo.show && (
+  <View style={{ backgroundColor: volInfo.color + "20", borderRadius: 4, paddingHorizontal: 4 }}>
+    <Text style={{ color: volInfo.color, fontSize: 9 }}>⚡ {stock.vol50dPct?.toFixed(0)}%</Text>
+  </View>
+)}
+
+BAGIAN 9: HELPER FUNCTIONS
+// Format volume
+function formatVolume(vol) {
+  if (vol >= 1e9) return `${(vol / 1e9).toFixed(1)}B`;
+  if (vol >= 1e6) return `${(vol / 1e6).toFixed(1)}M`;
+  if (vol >= 1e3) return `${(vol / 1e3).toFixed(0)}K`;
+  return String(vol);
+}
+// Format Market Cap (dalam Miliar Rp dari master, convert ke Triliun/Miliar)
+function formatMarketCap(bn) {
+  if (bn >= 1000) return `Rp ${(bn / 1000).toFixed(1)}T`;
+  return `Rp ${bn?.toFixed(0)}B`;
+}
+// Format nilai transaksi (dalam Miliar Rp)
+function formatValue(bn) {
+  if (bn >= 1000) return `${(bn / 1000).toFixed(1)}T`;
+  return `${bn?.toFixed(1)}B`;
+}
+// Warna berdasar change%
+function changeColor(pct) {
+  if (pct > 0.5)  return "#34d399";  // hijau
+  if (pct < -0.5) return "#f87171";  // merah
+  return "#94a3b8";                   // abu (flat)
+}
+// Return% color dengan threshold berbeda
+function returnColor(pct) {
+  if (pct >= 3)  return "#34d399";
+  if (pct >= 0)  return "#6ee7b7";
+  if (pct >= -3) return "#fca5a5";
+  return "#f87171";
+}
+
+BAGIAN 10: DATA FRESHNESS & UPLOAD SCHEDULE
+Data master diupload admin 1x sehari, biasanya pukul 08:00-09:00 WIB (sebelum pasar buka) atau setelah pasar tutup 16:00 WIB.
+
+Tampilkan Indikator Freshness
+function DataFreshnessChip({ uploadedAt }) {
+  const now = new Date();
+  const uploaded = new Date(uploadedAt);
+  const hoursAgo = Math.floor((now - uploaded) / 3600000);
+  
+  let label, color;
+  if (hoursAgo < 2)  { label = "Fresh";    color = "#34d399"; }
+  else if (hoursAgo < 12) { label = `${hoursAgo}j lalu`; color = "#fbbf24"; }
+  else               { label = "Perlu update"; color = "#f87171"; }
+  
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+      <Text style={{ color, fontSize: 10 }}>Data: {label}</Text>
+    </View>
+  );
+}
+
+RINGKASAN PENGGUNAAN
+// 1. Fetch sekali saat launch → cache 1 jam
+useQuery({ queryKey: ["master"], queryFn: fetchMaster, staleTime: 3600000 })
+// 2. Buat stockMap untuk lookup cepat
+const stockMap = new Map(stocks.map(s => [s.symbol, s]))
+// 3. Gunakan di screen lain:
+// Market breadth      → hitung dari stocks (advancers/decliners)
+// Top gainers/losers  → sort by changePercent
+// Volume rockets      → filter vol50dPct >= 200
+// Sector summary      → group by sector
+// LQ45/KOMPAS filter  → filter by indexCategory
+// FA ratios           → per, pbv, beta, peg langsung dari stock object
+// Stock card          → close, changePercent, volume, sector, name
+
+Semua operasi filter, sort, dan aggregasi dilakukan di sisi mobile menggunakan data yang sudah di-cache. Tidak perlu request API tambahan.

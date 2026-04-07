@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -496,11 +497,31 @@ function HoldModeContent({ plan, price, colors }: {
   );
 }
 
+// ─── FA ratio row ─────────────────────────────────────────────
+
+function FARatioRow({ label, value, note, colors }: {
+  label: string; value: string; note?: string;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "space-between",
+      alignItems: "center", paddingVertical: 5,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+      <View>
+        <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{label}</Text>
+        {note ? <Text style={{ color: "#64748b", fontSize: 9 }}>{note}</Text> : null}
+      </View>
+      <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 13 }}>{value}</Text>
+    </View>
+  );
+}
+
 // ─── Tab 2: Financials ────────────────────────────────────────
 
-function FinancialsTab({ quote, broker1d, colors }: {
+function FinancialsTab({ quote, broker1d, masterStock, colors }: {
   quote: NonNullable<any>;
   broker1d: any;
+  masterStock: any;
   colors: ReturnType<typeof useColors>;
 }) {
   const rsi = quote.rsi;
@@ -508,20 +529,69 @@ function FinancialsTab({ quote, broker1d, colors }: {
   const rsiLabel = rsi < 30 ? "Oversold" : rsi > 70 ? "Overbought" : "Normal";
   const price = quote.price;
 
-  // 52W range calculation (approximate low from high and price context)
-  const high52w = quote.high52w;
-  const approxLow52w = Math.min(price * 0.7, quote.ma50 * 0.8, price);
-  const rangePct = high52w > approxLow52w
-    ? ((price - approxLow52w) / (high52w - approxLow52w)) * 100 : 50;
+  // 52W range — use masterStock if available, else approximate
+  const high52w = masterStock?.high52w || quote.high52w;
+  const low52w = masterStock?.low52w || Math.min(price * 0.7, quote.ma50 * 0.8);
+  const rangePct = high52w > low52w
+    ? ((price - low52w) / (high52w - low52w)) * 100 : 50;
+
+  const ms = masterStock;
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}
       contentContainerStyle={{ padding: 16, gap: 12 }}>
 
+      {/* Company info from Master DB */}
+      {ms && (ms.name || ms.sector || ms.indexCategory) && (
+        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+          backgroundColor: colors.card, padding: 12, gap: 6 }}>
+          {ms.name ? (
+            <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 14 }}>
+              {ms.name}
+            </Text>
+          ) : null}
+          <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+            {ms.sector ? (
+              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5,
+                backgroundColor: "#60a5fa18", borderWidth: 1, borderColor: "#60a5fa30" }}>
+                <Text style={{ color: "#60a5fa", fontSize: 10, fontWeight: "600" }}>
+                  {ms.sector}
+                </Text>
+              </View>
+            ) : null}
+            {ms.industry ? (
+              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5,
+                backgroundColor: "#94a3b818", borderWidth: 1, borderColor: "#94a3b830" }}>
+                <Text style={{ color: "#94a3b8", fontSize: 10 }}>{ms.industry}</Text>
+              </View>
+            ) : null}
+            {(ms.indexCategory ?? "").split(",").filter(Boolean).map((idx: string) => {
+              const idxColors: Record<string, string> = {
+                LQ45: "#60a5fa", KOMPAS100: "#a78bfa", JII30: "#34d399",
+              };
+              const c = idxColors[idx.trim().toUpperCase()] ?? "#94a3b8";
+              return (
+                <View key={idx} style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5,
+                  backgroundColor: c + "22", borderWidth: 1, borderColor: c + "40" }}>
+                  <Text style={{ color: c, fontSize: 10, fontWeight: "700" }}>{idx.trim()}</Text>
+                </View>
+              );
+            })}
+          </View>
+          {ms.marketCap > 0 && (
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+              Market Cap: <Text style={{ color: colors.foreground, fontWeight: "700" }}>
+                {ms.marketCap >= 1000 ? `Rp ${(ms.marketCap / 1000).toFixed(1)}T` : `Rp ${ms.marketCap.toFixed(0)}B`}
+              </Text>
+            </Text>
+          )}
+        </View>
+      )}
+
       {/* Market data quick stats */}
       <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
         backgroundColor: colors.card, padding: 12, gap: 8 }}>
-        <SectionTitle title="MARKET DATA" colors={colors} />
+        <SectionTitle title="MARKET DATA HARI INI" colors={colors} />
         <View style={{ flexDirection: "row" }}>
           <InfoCell label="VOL HARI INI" value={formatVol(quote.volK)} color="#60a5fa" colors={colors} />
           <InfoCell label="VOL AVG 50D" value={formatVol(quote.volAvg50K)} colors={colors} />
@@ -535,18 +605,31 @@ function FinancialsTab({ quote, broker1d, colors }: {
             color={price > quote.ma20 ? "#34d399" : "#f87171"} />
           <InfoCell label="MA 50" value={fRp(quote.ma50)} colors={colors}
             color={price > quote.ma50 ? "#34d399" : "#f87171"} />
-          <InfoCell label="52W HIGH" value={fRp(quote.high52w)} color="#fbbf24" colors={colors} />
+          <InfoCell label="52W HIGH" value={fRp(high52w)} color="#fbbf24" colors={colors} />
         </View>
+        {ms && (ms.support > 0 || ms.resistance > 0) && (
+          <View style={{ flexDirection: "row", marginTop: 4 }}>
+            {ms.support > 0 && (
+              <InfoCell label="SUPPORT" value={fRp(ms.support)} color="#34d399" colors={colors} />
+            )}
+            {ms.resistance > 0 && (
+              <InfoCell label="RESISTANCE" value={fRp(ms.resistance)} color="#f87171" colors={colors} />
+            )}
+            {ms.vwap > 0 && (
+              <InfoCell label="VWAP" value={fRp(ms.vwap)} color="#38BDF8" colors={colors} />
+            )}
+          </View>
+        )}
       </View>
 
-      {/* 52W Range Slider */}
+      {/* 52W Range Slider (now uses real low52w) */}
       <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
         backgroundColor: colors.card, padding: 12, gap: 8 }}>
         <SectionTitle title="52W PRICE RANGE" colors={colors} />
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
-              52W Low ~{fRp(Math.round(approxLow52w))}
+              52W Low {fRp(Math.round(low52w))}
             </Text>
             <Text style={{ color: "#fbbf24", fontSize: 10, fontWeight: "700" }}>
               52W High {fRp(high52w)}
@@ -557,9 +640,17 @@ function FinancialsTab({ quote, broker1d, colors }: {
             <View style={{ height: 8, width: `${Math.min(99, Math.max(1, rangePct))}%` as any,
               backgroundColor: "#60a5fa", borderRadius: 4 }} />
           </View>
-          <Text style={{ color: colors.mutedForeground, fontSize: 10, textAlign: "center" }}>
-            {fRp(price)} — {rangePct.toFixed(0)}% dari range tahunan
-          </Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
+              {fRp(price)} — {rangePct.toFixed(0)}% dari range tahunan
+            </Text>
+            {ms?.ytdReturn !== undefined && ms.ytdReturn !== 0 && (
+              <Text style={{ color: ms.ytdReturn > 0 ? "#34d399" : "#f87171",
+                fontSize: 10, fontWeight: "700" }}>
+                YTD: {ms.ytdReturn > 0 ? "+" : ""}{ms.ytdReturn.toFixed(1)}%
+              </Text>
+            )}
+          </View>
         </View>
       </View>
 
@@ -600,19 +691,94 @@ function FinancialsTab({ quote, broker1d, colors }: {
               : "Di tengah band — normal"}
           </Text>
         </View>
+
+        {/* Beta from master */}
+        {ms?.beta > 0 && (
+          <View style={{ marginTop: 4, flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Beta (22D)</Text>
+            <Text style={{ color: ms.beta > 1.3 ? "#f87171" : ms.beta < 0.7 ? "#34d399" : colors.foreground,
+              fontWeight: "700" }}>
+              {ms.beta.toFixed(2)}
+              {"  "}<Text style={{ color: "#64748b", fontSize: 9 }}>
+                {ms.beta > 1.3 ? "Volatil tinggi" : ms.beta < 0.7 ? "Defensif" : "Normal"}
+              </Text>
+            </Text>
+          </View>
+        )}
       </View>
+
+      {/* Fundamental Ratios from Master DB */}
+      {ms && (ms.per > 0 || ms.pbv > 0 || ms.eps > 0 || ms.roe > 0) && (
+        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+          backgroundColor: colors.card, padding: 12, gap: 2 }}>
+          <SectionTitle title="FUNDAMENTAL (FA RATIOS)" colors={colors} />
+          {ms.per > 0 && (
+            <FARatioRow label="P/E Ratio" value={`${ms.per.toFixed(1)}x`}
+              note={ms.per < 15 ? "Murah" : ms.per > 30 ? "Mahal" : "Wajar"} colors={colors} />
+          )}
+          {ms.pbv > 0 && (
+            <FARatioRow label="P/B Value" value={`${ms.pbv.toFixed(2)}x`}
+              note={ms.pbv < 1 ? "Di bawah book value" : undefined} colors={colors} />
+          )}
+          {ms.peg > 0 && (
+            <FARatioRow label="PEG Ratio" value={ms.peg.toFixed(2)}
+              note={ms.peg < 1 ? "Undervalued vs growth" : undefined} colors={colors} />
+          )}
+          {ms.eps > 0 && (
+            <FARatioRow label="EPS" value={`Rp ${ms.eps.toLocaleString("id-ID")}`}
+              note="Earnings per Share" colors={colors} />
+          )}
+          {ms.roe > 0 && (
+            <FARatioRow label="ROE" value={`${ms.roe.toFixed(1)}%`}
+              note={ms.roe > 15 ? "Profitabilitas tinggi" : undefined} colors={colors} />
+          )}
+          {ms.dyPct > 0 && (
+            <FARatioRow label="Dividend Yield" value={`${ms.dyPct.toFixed(2)}%`}
+              colors={colors} />
+          )}
+        </View>
+      )}
+
+      {/* Return performance */}
+      {ms && (ms.return10d !== 0 || ms.return30d !== 0 || ms.ytdReturn !== 0) && (
+        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+          backgroundColor: colors.card, padding: 12, gap: 6 }}>
+          <SectionTitle title="PERFORMA RETURN" colors={colors} />
+          <View style={{ flexDirection: "row", marginTop: 4 }}>
+            {ms.return10d !== 0 && (
+              <InfoCell label="10D RETURN" colors={colors}
+                value={`${ms.return10d > 0 ? "+" : ""}${ms.return10d.toFixed(1)}%`}
+                color={ms.return10d > 0 ? "#34d399" : "#f87171"} />
+            )}
+            {ms.return30d !== 0 && (
+              <InfoCell label="30D RETURN" colors={colors}
+                value={`${ms.return30d > 0 ? "+" : ""}${ms.return30d.toFixed(1)}%`}
+                color={ms.return30d > 0 ? "#34d399" : "#f87171"} />
+            )}
+            {ms.ytdReturn !== 0 && (
+              <InfoCell label="YTD" colors={colors}
+                value={`${ms.ytdReturn > 0 ? "+" : ""}${ms.ytdReturn.toFixed(1)}%`}
+                color={ms.ytdReturn > 0 ? "#34d399" : "#f87171"} />
+            )}
+          </View>
+        </View>
+      )}
 
       {/* MA status */}
       <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
         backgroundColor: colors.card, padding: 12, gap: 10 }}>
-        <SectionTitle title="MOVING AVERAGES" colors={colors} />
+        <SectionTitle title="MOVING AVERAGES & LEVELS" colors={colors} />
         {[
           { label: "MA 20", ma: quote.ma20 },
           { label: "MA 50", ma: quote.ma50 },
           { label: "52W High", ma: high52w },
-          ...(broker1d?.vwap ? [{ label: "VWAP", ma: broker1d.vwap }] : []),
+          { label: "52W Low", ma: low52w },
+          ...(broker1d?.vwap ? [{ label: "VWAP (broker)", ma: broker1d.vwap }] : []),
+          ...(ms?.support ? [{ label: "Support", ma: ms.support }] : []),
+          ...(ms?.resistance ? [{ label: "Resistance", ma: ms.resistance }] : []),
         ].filter(x => x.ma > 0).map(({ label, ma }) => {
-          const above = price > ma;
+          const above = price >= ma;
+          const isLevel = label === "52W Low" || label === "Support";
           return (
             <View key={label} style={{ flexDirection: "row", justifyContent: "space-between",
               alignItems: "center" }}>
@@ -1159,7 +1325,12 @@ export default function StockDetailScreen() {
                 </View>
               )}
               {activeTab === "financials" && quote && (
-                <FinancialsTab quote={quote} broker1d={data.broker1d} colors={colors} />
+                <FinancialsTab
+                  quote={quote}
+                  broker1d={data.broker1d}
+                  masterStock={data.masterStock}
+                  colors={colors}
+                />
               )}
               {activeTab === "smartmoney" && (
                 <SmartMoneyTab sm={data.smartMoney} colors={colors} />

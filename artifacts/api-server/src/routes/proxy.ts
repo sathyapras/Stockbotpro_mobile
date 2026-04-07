@@ -10,13 +10,15 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL_LONG_MS = 60 * 60 * 1000; // 1 hour (for daily-upload data)
 
-const UPSTREAM: Record<string, { host: string; path: string }> = {
+const UPSTREAM: Record<string, { host: string; path: string; ttl?: number }> = {
   broksum_data_1d:         { host: "103.190.28.45",  path: "/broksum_data_1d.json" },
   broksum_data_history15d: { host: "103.190.28.45",  path: "/broksum_data_history15d.json" },
   BuyOnStrenght_Signal:    { host: "103.190.28.248", path: "/stockbotprodata/BuyOnStrenght_Signal" },
   BuyOnWeakness_Signal:    { host: "103.190.28.248", path: "/stockbotprodata/BuyOnWeakness_Signal" },
   STOCKTOOLS_SCREENER:     { host: "103.190.28.248", path: "/stockbotprodata/STOCKTOOLS_SCREENER" },
+  MASTER_STOCK_DB:         { host: "103.190.28.248", path: "/stockbotprodata/MASTER_STOCK_DB", ttl: CACHE_TTL_LONG_MS },
 };
 
 function fetchUpstream(cfg: { host: string; path: string }): Promise<unknown> {
@@ -63,8 +65,9 @@ router.get("/proxy/:name", async (req: Request, res: Response) => {
 
   const entry = cache.get(name);
   const now = Date.now();
+  const ttl = cfg.ttl ?? CACHE_TTL_MS;
 
-  if (entry && now - entry.cachedAt < CACHE_TTL_MS) {
+  if (entry && now - entry.cachedAt < ttl) {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Cache-Control", "public, max-age=900");
     res.setHeader("X-Cache", "HIT");
