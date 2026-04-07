@@ -5,6 +5,7 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -257,7 +258,11 @@ export default function MarketScreen() {
       <View style={[styles.header, { paddingTop: topPadding, backgroundColor: colors.background }]}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>IDX Market</Text>
+            <Image
+              source={require("@/assets/images/logo-stockbot.png")}
+              resizeMode="contain"
+              style={{ width: 130, height: 28 }}
+            />
             <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
               {new Date().toLocaleDateString("id-ID", {
                 weekday: "long", day: "numeric", month: "long",
