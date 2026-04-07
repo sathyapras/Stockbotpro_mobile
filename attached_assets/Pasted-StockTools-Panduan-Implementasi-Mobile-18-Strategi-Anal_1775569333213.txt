@@ -1,0 +1,527 @@
+StockTools — Panduan Implementasi Mobile
+18 Strategi Analisa + Risk Management
+Panduan lengkap untuk Replit Mobile App Builder
+
+GAMBARAN UMUM
+StockTools adalah fitur inti StockBot Pro — 18 strategi teknikal yang masing-masing menampilkan daftar saham IDX yang sudah lulus kriteria hari ini. Data dihitung di server dari data AFL, mobile hanya menampilkan hasilnya.
+
+StockTools
+├── Main Menu (18 strategi, 5 kategori)
+│   ├── Momentum (4 tools)
+│   ├── Reversal (4 tools)
+│   ├── Breakout (4 tools)
+│   ├── Smart Money (3 tools)
+│   └── Advanced: SEPA & VCP (3 tools)
+└── Risk Management (market health dashboard)
+
+BAGIAN 1: MENU UTAMA — 18 STRATEGI
+Endpoint: Count Badge (berapa saham masuk kriteria hari ini)
+GET https://stockbotpro.replit.app/api/analysis/stockpick-counts
+Auth: Bearer <JWT_TOKEN>
+
+Response:
+
+{
+  "hasData": true,
+  "counts": {
+    "buy-on-strength":      40,
+    "swing-up":             12,
+    "near-52w-high":         8,
+    "volume-spike":         15,
+    "buy-on-weakness":      45,
+    "near-support-bounce":  22,
+    "hl-higher-low":        18,
+    "bullish-divergence":    9,
+    "price-vol-breakout":   11,
+    "darvas-box":            6,
+    "bb-squeeze":           14,
+    "buy-on-retest":         7,
+    "nbs-multi-tf":         20,
+    "volume-increasing-3d": 16,
+    "rsi-divergence":       13,
+    "sepa":                  5,
+    "vcp-setup":             8,
+    "vcp-breakout":          3
+  },
+  "total": 292
+}
+
+Panggil endpoint ini saat screen StockTools dibuka — tampilkan badge count di setiap kartu tool.
+
+Daftar 18 Tool — ID, Nama, Kategori, Warna
+const TOOL_CATEGORIES = [
+  {
+    id: "Momentum",
+    tagline: "Saham dengan tenaga naik kuat",
+    color: "#f5a623",   // amber
+    tools: [
+      { id: "buy-on-strength",  name: "Buy on Strength",  desc: "Momentum kuat · Close di atas VWAP",          color: "#34d399" },
+      { id: "swing-up",         name: "Swing Up",         desc: "Lonjakan >5% dalam sehari · volume konfirmasi", color: "#fbbf24" },
+      { id: "near-52w-high",    name: "Near 52W High",    desc: "Mendekati harga tertinggi 52 minggu",           color: "#fb923c" },
+      { id: "volume-spike",     name: "Volume Spike",     desc: "Volume meledak >200% avg50D",                   color: "#f59e0b" },
+    ]
+  },
+  {
+    id: "Reversal",
+    tagline: "Saham siap berbalik arah naik",
+    color: "#34d399",   // green
+    tools: [
+      { id: "buy-on-weakness",     name: "Buy on Weakness",  desc: "Turun >1% — potensi rebound",             color: "#60a5fa" },
+      { id: "near-support-bounce", name: "Near Support",     desc: "Close dekat support — buy saat bounce",   color: "#22d3ee" },
+      { id: "hl-higher-low",       name: "HL Higher Low",    desc: "Higher low 3 hari — trend reversal",      color: "#38bdf8" },
+      { id: "bullish-divergence",  name: "RSI Divergence",   desc: "Harga LL, RSI HL — reversal bullish",     color: "#818cf8" },
+    ]
+  },
+  {
+    id: "Breakout",
+    tagline: "Saham siap menembus level kunci",
+    color: "#a78bfa",   // violet
+    tools: [
+      { id: "price-vol-breakout", name: "Price-Vol Breakout", desc: "Breakout harga + volume — konfirmasi kuat",   color: "#a78bfa" },
+      { id: "darvas-box",         name: "Darvas Box",         desc: "Breakout box Darvas — setup klasik",          color: "#e879f9" },
+      { id: "bb-squeeze",         name: "BB Squeeze",         desc: "Bollinger Band sempit — siap meledak",        color: "#f472b6" },
+      { id: "buy-on-retest",      name: "Buy on Retest",      desc: "Retest level breakout — konfirmasi ulang",    color: "#fb7185" },
+    ]
+  },
+  {
+    id: "Smart Money",
+    tagline: "Jejak akumulasi institusi & bandar",
+    color: "#38bdf8",   // sky blue
+    tools: [
+      { id: "nbs-multi-tf",         name: "NBS Multi-TF", desc: "Net Buy Smart Money 1D + 5D + 10D",           color: "#38bdf8" },
+      { id: "volume-increasing-3d", name: "Volume 3D",    desc: "Volume naik 3 hari — akumulasi bersih",       color: "#2dd4bf" },
+      { id: "rsi-divergence",       name: "RSI Hidden Div", desc: "Divergence RSI tersembunyi — momentum kuat", color: "#22d3ee" },
+    ]
+  },
+  {
+    id: "Advanced",
+    tagline: "SEPA & VCP — setup kelas institusi",
+    color: "#c084fc",   // purple
+    tools: [
+      { id: "sepa",        name: "SEPA Setup",    desc: "Stage 2 Trend + RS Strong + Breakout — Minervini", color: "#fde68a" },
+      { id: "vcp-setup",   name: "VCP Setup",     desc: "Volatility Contraction — range kecil, volume dry",  color: "#c084fc" },
+      { id: "vcp-breakout", name: "VCP Breakout", desc: "VCP trigger — breakout dengan volume konfirmasi",   color: "#a855f7" },
+    ]
+  },
+];
+
+Tampilan Menu Utama (2-kolom grid)
+┌──────────────────────────────────────┐
+│ 🔧 Stockpick Tools                   │
+│ 18 strategi analisa                  │
+│                                      │
+│ ── Momentum ──────────────── 4 tools │
+│                                      │
+│ ┌─────────────┐  ┌─────────────┐     │
+│ │ Buy on      │  │ Swing Up    │     │
+│ │ Strength    │  │             │  12 │
+│ │      [40] → │  │             │  →  │
+│ └─────────────┘  └─────────────┘     │
+│                                      │
+│ ── Reversal ───────────────── 4 tools│
+│ ...                                  │
+└──────────────────────────────────────┘
+
+Badge count: Tampilkan angka dari counts[tool.id] di pojok kanan atas setiap kartu. Jika hasData = false, sembunyikan badge (data belum diupload).
+
+BAGIAN 2: HASIL SCREENER PER TOOL
+Saat user tap salah satu tool, navigasi ke halaman hasil:
+
+Endpoint
+GET https://stockbotpro.replit.app/api/analysis/stockpick/:toolId
+Auth: Bearer <JWT_TOKEN>
+
+Contoh:
+
+GET /api/analysis/stockpick/buy-on-weakness
+GET /api/analysis/stockpick/sepa
+GET /api/analysis/stockpick/volume-spike
+
+Response (semua tool, format sama):
+
+[
+  {
+    "symbol": "ANTM",
+    "name": "Aneka Tambang Tbk",
+    "price": 1590,
+    "change": -10,
+    "changePercent": -0.63,
+    "volume": 45000000,
+    "signal": "Buy on Weakness",
+    "strength": 82,
+    "sector": "Mining",
+    "reason": "Turun -0.6%, vol 185% avg, support 1.520"
+  },
+  {
+    "symbol": "INDF",
+    "name": "Indofood Sukses Makmur",
+    "price": 6950,
+    "change": -43,
+    "changePercent": -0.61,
+    "volume": 3900000,
+    "signal": "Buy on Weakness",
+    "strength": 74,
+    "sector": "Consumer Goods",
+    "reason": "Turun -0.61%, mendekati support MA20"
+  }
+]
+
+Penjelasan field:
+
+Field	Arti	Cara tampilkan
+symbol	Kode saham	Bold, besar
+name	Nama perusahaan	Subtitle kecil
+price	Harga terakhir	Format Rp.
+changePercent	Perubahan % hari ini	+/- dengan warna
+volume	Volume hari ini	Kompres jadi "3.9M" atau "45.0M"
+signal	Label sinyal	Badge warna
+strength	Kekuatan sinyal 0–100	Progress bar / angka
+sector	Sektor	Chip kecil
+reason	Alasan singkat dari engine	Italik kecil
+Format volume untuk tampilan
+function formatVolume(vol) {
+  if (vol >= 1_000_000_000) return `${(vol / 1_000_000_000).toFixed(1)}B`;
+  if (vol >= 1_000_000)     return `${(vol / 1_000_000).toFixed(1)}M`;
+  if (vol >= 1_000)         return `${(vol / 1_000).toFixed(0)}K`;
+  return String(vol);
+}
+// 45000000 → "45.0M"
+// 3900000  → "3.9M"
+
+Tampilan Halaman Hasil (per tool)
+┌──────────────────────────────────────┐
+│ ← Buy on Weakness         [Filter ▼] │
+│ Turun >1% — potensi rebound           │
+│                                      │
+│ 45 saham memenuhi kriteria hari ini  │
+│                                      │
+│ ┌────────────────────────────────┐   │
+│ │ ANTM  Mining                   │   │
+│ │ Aneka Tambang Tbk              │   │
+│ │ 1.590  ▼ -0.63%  Vol: 45.0M   │   │
+│ │ ████████████░░░░  82           │   │
+│ │ "Turun -0.6%, mendekati support"│   │
+│ └────────────────────────────────┘   │
+│                                      │
+│ ┌────────────────────────────────┐   │
+│ │ INDF  Consumer Goods           │   │
+│ │ Indofood Sukses Makmur         │   │
+│ │ 6.950  ▼ -0.61%  Vol: 3.9M    │   │
+│ │ ████████████░░░░  74           │   │
+│ └────────────────────────────────┘   │
+└──────────────────────────────────────┘
+
+Komponen card hasil:
+
+function StockResultCard({ stock, onPress }) {
+  const isUp = stock.changePercent >= 0;
+  
+  return (
+    <TouchableOpacity onPress={() => onPress(stock.symbol)}>
+      <View style={cardStyle}>
+        {/* Header: ticker + sektor */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <View>
+            <Text style={{ fontWeight: "900", fontSize: 16 }}>{stock.symbol}</Text>
+            <Text style={{ fontSize: 10, color: "#94a3b8" }}>{stock.sector}</Text>
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={{ fontWeight: "700" }}>
+              {stock.price?.toLocaleString("id-ID")}
+            </Text>
+            <Text style={{ color: isUp ? "#34d399" : "#f87171", fontSize: 12 }}>
+              {isUp ? "▲" : "▼"} {Math.abs(stock.changePercent).toFixed(2)}%
+            </Text>
+          </View>
+        </View>
+        
+        {/* Nama + volume */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+          <Text style={{ fontSize: 11, color: "#94a3b8", flex: 1 }} numberOfLines={1}>
+            {stock.name}
+          </Text>
+          <Text style={{ fontSize: 10, color: "#60a5fa" }}>
+            Vol: {formatVolume(stock.volume)}
+          </Text>
+        </View>
+        
+        {/* Strength bar */}
+        <View style={{ marginTop: 8 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+            <Text style={{ fontSize: 9, color: "#94a3b8" }}>Strength</Text>
+            <Text style={{ fontSize: 9, fontWeight: "700",
+              color: stock.strength >= 80 ? "#a78bfa" : stock.strength >= 60 ? "#60a5fa" : "#94a3b8" }}>
+              {stock.strength}
+            </Text>
+          </View>
+          <View style={{ height: 4, backgroundColor: "#1e2433", borderRadius: 2 }}>
+            <View style={{
+              height: 4,
+              width: `${stock.strength}%`,
+              backgroundColor: stock.strength >= 80 ? "#a78bfa" : stock.strength >= 60 ? "#60a5fa" : "#94a3b8",
+              borderRadius: 2,
+            }} />
+          </View>
+        </View>
+        
+        {/* Reason text */}
+        {stock.reason && (
+          <Text style={{ fontSize: 10, color: "#64748b", fontStyle: "italic", marginTop: 5 }}>
+            {stock.reason}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+Filter & Sort di Halaman Hasil
+Implementasikan di sisi client (tidak perlu API tambahan):
+
+// Sort options
+const SORT_OPTIONS = [
+  { id: "strength", label: "Kekuatan Sinyal", fn: (a, b) => b.strength - a.strength },
+  { id: "change",   label: "% Perubahan",     fn: (a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent) },
+  { id: "volume",   label: "Volume",           fn: (a, b) => b.volume - a.volume },
+  { id: "price",    label: "Harga",            fn: (a, b) => b.price - a.price },
+];
+// Filter by sector (ambil dari data)
+const sectors = [...new Set(results.map(r => r.sector))].filter(Boolean);
+// Filter LQ45 (tidak ada dari API, gunakan list hardcoded)
+const LQ45 = new Set(["AADI","ADRO","AKRA","AMMN","AMRT","ANTM","ARTO","ASII",
+  "BBCA","BBNI","BBRI","BBTN","BFIN","BMRI","BREN","BRIS","BRPT","BSDE","BUKA",
+  "CPIN","CTRA","EXCL","GOTO","HRUM","ICBP","INDF","INKP","ISAT","JSMR","KLBF",
+  "MAPI","MBMA","MDKA","MEDC","MTEL","PGAS","PGEO","PTBA","SMGR","TBIG","TLKM",
+  "TOWR","TPIA","UNTR","UNVR"]);
+
+BAGIAN 3: PENJELASAN EDUKATIF PER STRATEGI
+Tampilkan panel "Cara Kerja" yang bisa di-toggle ketika user tap ikon info (ⓘ).
+
+Konten per strategi:
+const TOOL_EDUCATION = {
+  "buy-on-weakness": {
+    title: "Buy on Weakness",
+    desc: "Strategi membeli saham saat harga turun (dip), dengan asumsi penurunan bersifat sementara dan harga akan bounce kembali.",
+    criteria: [
+      "Harga turun > 1% hari ini",
+      "Volume tidak terlalu besar (bukan distribusi besar)",
+      "Saham masih dalam tren naik jangka menengah",
+    ],
+    tip: "Paling efektif ketika IHSG juga sedang dalam koreksi minor, bukan downtrend besar.",
+    risk: "Waspadai saham yang turun karena berita buruk fundamental — bukan kandidat BOW.",
+  },
+  "sepa": {
+    title: "SEPA — Specific Entry Point Analysis",
+    desc: "Metode Mark Minervini, juara U.S. Investing Championship. Menggabungkan Stage 2 trend dengan konfirmasi fundamental.",
+    criteria: [
+      "Harga > MA50 > MA150 > MA200",
+      "MA200 sudah naik minimal 4–8 minggu",
+      "Harga dalam 25% dari 52-week high",
+      "Relative Strength tinggi vs IHSG",
+    ],
+    tip: "Setup terbaik: SEPA + VCP aktif bersamaan = saham Stage 2 yang sedang konsolidasi ketat.",
+    risk: "SEPA adalah sinyal teknikal. Selalu cek fundamental (EPS growth) sebelum entry.",
+  },
+  "vcp-setup": {
+    title: "VCP — Volatility Contraction Pattern",
+    desc: "Pola konsolidasi di mana setiap koreksi makin kecil dan volume mengering — tanda supply habis, saham siap breakout.",
+    criteria: [
+      "2–4 kontraksi berurutan makin mengecil",
+      "Volume turun drastis saat konsolidasi",
+      "Higher low terbentuk",
+    ],
+    tip: "VCP Setup = MENUNGGU. Jangan entry dulu! Tunggu VCP Breakout (volume > 1.5x avg) sebagai trigger.",
+    risk: "False breakout tinggi tanpa volume konfirmasi.",
+  },
+  // ... dst untuk semua 18 tool
+};
+
+BAGIAN 4: RISK MANAGEMENT
+Screen terpisah yang menampilkan kondisi pasar IDX secara keseluruhan dan rekomendasi alokasi portofolio.
+
+Endpoint
+GET https://stockbotpro.replit.app/api/risk-management
+Auth: Bearer <JWT_TOKEN>
+
+Response:
+
+{
+  "marketStatus": "BULL",
+  "signal": "FULL_IN",
+  "actionLabel": "Full Position (90%)",
+  "riskLevel": 3,
+  "marketScore": 74,
+  "euphoriaWarning": false,
+  "euphoriaMessage": null,
+  "reasoning": "IHSG dalam tren naik kuat (MA5 > MA20), breadth pasar luas dengan 8/10 saham hijau, volume transaksi meningkat. Momentum positif mendukung full position.",
+  "indicators": {
+    "trend":    { "label": "Trend MA5 vs MA20",   "value": "Uptrend",         "score": 20, "max": 30 },
+    "breadth":  { "label": "Market Breadth",      "value": "8/10 stocks advancing", "score": 20, "max": 25 },
+    "distance": { "label": "Jarak dari 52W High", "value": "-3.2%",           "score": 15, "max": 20 },
+    "volume":   { "label": "Volume Trend",        "value": "Increasing",      "score": 12, "max": 15 },
+    "daily":    { "label": "IHSG Hari Ini",       "value": "+0.45%",          "score": 6,  "max": 10 }
+  },
+  "allocation": {
+    "equity": 90,
+    "cash": 5,
+    "bonds": 5
+  },
+  "sectorAdvice": {
+    "overweight":  ["Banking", "Consumer", "Technology"],
+    "underweight": ["Defensive", "Utilities"]
+  },
+  "marketData": {
+    "ihsgPrice": 7125.5,
+    "ihsgChangePercent": 0.45,
+    "ihsgYearHigh": 7350.0,
+    "ihsgYearLow": 5900.0,
+    "distFromHigh": -3.2,
+    "distFromLow": 20.8,
+    "lq45Change": 0.38,
+    "breadthRatio": 80
+  },
+  "lastUpdated": "2026-04-07T10:15:00Z"
+}
+
+Status Pasar & Tampilan
+marketStatus	signal	Warna	Rekomendasi
+BULL	FULL_IN	Hijau (#34d399)	Full Position 90%
+RECOVERY	IN	Biru (#60a5fa)	Mulai Masuk / Averaging
+SIDEWAYS	HOLD	Kuning (#fbbf24)	Tahan Posisi
+BEAR (score 28–42)	REDUCE	Oranye (#fb923c)	Kurangi Posisi
+BEAR (score < 28)	OUT	Merah (#f87171)	Keluar / Cash
+Tampilan Risk Management Screen
+┌──────────────────────────────────────┐
+│ 🛡️ Risk Management                   │
+│ Kondisi Pasar IDX                    │
+│                                      │
+│  ┌────────────────────────────────┐  │
+│  │         BULL MARKET            │  │
+│  │    Score: 74/100  Risk: 3/10   │  │
+│  │    ✅ Full Position (90%)      │  │
+│  └────────────────────────────────┘  │
+│                                      │
+│  📊 Indikator Pasar                  │
+│  Trend MA      ████████████████░░░   │
+│                20/30 → Uptrend        │
+│                                      │
+│  Market Breadth ███████████████░░░░  │
+│                20/25 → 8/10 naik     │
+│                                      │
+│  52W High      ████████████░░░░░░░  │
+│                15/20 → -3.2%         │
+│                                      │
+│  💼 Alokasi Portofolio               │
+│  Saham: [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 90%  │
+│  Kas:   [▓] 5%                       │
+│  Bonds: [▓] 5%                       │
+│                                      │
+│  📈 Sektor Overweight:               │
+│  [Banking] [Consumer] [Technology]   │
+│                                      │
+│  📉 Underweight:                     │
+│  [Defensive] [Utilities]             │
+│                                      │
+│  "IHSG dalam tren naik kuat..."      │
+└──────────────────────────────────────┘
+
+Komponen: Market Score Gauge
+function MarketScoreGauge({ score, status }) {
+  const statusConfig = {
+    BULL:      { color: "#34d399", label: "BULL MARKET",   emoji: "🚀" },
+    RECOVERY:  { color: "#60a5fa", label: "RECOVERY",      emoji: "📈" },
+    SIDEWAYS:  { color: "#fbbf24", label: "SIDEWAYS",      emoji: "↔️" },
+    BEAR:      { color: "#f87171", label: "BEAR MARKET",   emoji: "⚠️" },
+  };
+  const cfg = statusConfig[status] ?? statusConfig.SIDEWAYS;
+  
+  return (
+    <View style={{ alignItems: "center", padding: 24,
+      backgroundColor: cfg.color + "15", borderRadius: 20, borderWidth: 1,
+      borderColor: cfg.color + "40" }}>
+      <Text style={{ fontSize: 32 }}>{cfg.emoji}</Text>
+      <Text style={{ fontSize: 18, fontWeight: "900", color: cfg.color, marginTop: 4 }}>
+        {cfg.label}
+      </Text>
+      <Text style={{ fontSize: 40, fontWeight: "900", color: "white", marginTop: 8 }}>
+        {score}
+      </Text>
+      <Text style={{ fontSize: 12, color: "#94a3b8" }}>Market Score / 100</Text>
+    </View>
+  );
+}
+
+Komponen: Alokasi Portfolio Bar
+function AllocationBar({ equity, cash, bonds }) {
+  return (
+    <View>
+      {/* Bar horizontal */}
+      <View style={{ flexDirection: "row", height: 20, borderRadius: 10, overflow: "hidden" }}>
+        <View style={{ flex: equity, backgroundColor: "#34d399" }} />
+        <View style={{ flex: cash,   backgroundColor: "#fbbf24" }} />
+        <View style={{ flex: bonds,  backgroundColor: "#60a5fa" }} />
+      </View>
+      {/* Legend */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+        <LegendItem color="#34d399" label={`Saham ${equity}%`} />
+        <LegendItem color="#fbbf24" label={`Kas ${cash}%`} />
+        <LegendItem color="#60a5fa" label={`Bonds ${bonds}%`} />
+      </View>
+    </View>
+  );
+}
+
+Komponen: Euphoria Warning (jika muncul)
+{euphoriaWarning && (
+  <View style={{ backgroundColor: "#f87171" + "20", borderRadius: 12,
+    borderWidth: 1, borderColor: "#f87171" + "50", padding: 12, marginTop: 12 }}>
+    <Text style={{ color: "#f87171", fontWeight: "700", marginBottom: 4 }}>
+      ⚠️ PERINGATAN EUFORIA
+    </Text>
+    <Text style={{ color: "#f87171", fontSize: 12 }}>
+      {euphoriaMessage}
+    </Text>
+  </View>
+)}
+
+BAGIAN 5: NAVIGASI ANTAR LAYAR
+Tab StockTools
+├── Screen: Menu Utama (grid 2-kolom, 5 kategori)
+│   └── Tap tool → Screen: Hasil Screener (list saham)
+│       └── Tap saham → Stock Detail Screen
+└── Bottom CTA: "Risk Management" → Screen: Risk Management
+
+BAGIAN 6: CACHING STRATEGY
+Counts: cache 1 jam — data berubah setelah upload AFL admin
+Hasil screener: cache 1 jam per toolId
+Risk Management: cache 15 menit — pakai data live Yahoo Finance
+useQuery({
+  queryKey: ["stockpick-counts"],
+  queryFn: fetchCounts,
+  staleTime: 60 * 60 * 1000,  // 1 jam
+})
+useQuery({
+  queryKey: ["stockpick-result", toolId],
+  queryFn: () => fetchToolResult(toolId),
+  staleTime: 60 * 60 * 1000,  // 1 jam
+})
+useQuery({
+  queryKey: ["risk-management"],
+  queryFn: fetchRiskManagement,
+  staleTime: 15 * 60 * 1000,  // 15 menit
+})
+
+RINGKASAN SEMUA ENDPOINT
+Endpoint	Method	Auth	Keterangan
+/api/analysis/stockpick-counts	GET	JWT	Count badge semua 18 tool
+/api/analysis/stockpick/:toolId	GET	JWT	Hasil saham per tool (list)
+/api/risk-management	GET	JWT	Kondisi pasar + alokasi
+Tool IDs yang valid:
+
+buy-on-strength · swing-up · near-52w-high · volume-spike
+buy-on-weakness · near-support-bounce · hl-higher-low · bullish-divergence
+price-vol-breakout · darvas-box · bb-squeeze · buy-on-retest
+nbs-multi-tf · volume-increasing-3d · rsi-divergence
+sepa · vcp-setup · vcp-breakout
+
+Semua kalkulasi dilakukan di server saat data AFL diupload. Mobile hanya fetch + display.

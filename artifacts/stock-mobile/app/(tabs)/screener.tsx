@@ -1,308 +1,333 @@
-import { Feather } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import React, { useMemo } from "react";
 import {
-  FlatList,
+  ActivityIndicator,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { SignalBadge } from '@/components/SignalBadge';
-import { StockRow } from '@/components/StockRow';
-import { useColors } from '@/hooks/useColors';
+import { useColors } from "@/hooks/useColors";
 import {
-  getAllStocks,
-  getIndicators,
-  type Stock,
-  formatPrice,
-} from '@/services/stockData';
+  ALL_TOOLS,
+  CategoryDef,
+  ToolDef,
+  ToolId,
+  computeCounts,
+  fetchScreener,
+  TOOL_CATEGORIES,
+} from "@/services/stockToolsService";
 
-type SignalFilter = 'ALL' | 'BUY' | 'SELL' | 'NEUTRAL';
-type RSIFilter = 'ALL' | 'oversold' | 'normal' | 'overbought';
+// ─── Tool card (2-column grid) ────────────────────────────────
 
-const ALL_STOCKS = getAllStocks();
-
-function FilterChip({
-  label,
-  active,
+function ToolCard({
+  tool,
+  count,
   onPress,
-  color,
 }: {
-  label: string;
-  active: boolean;
+  tool: ToolDef;
+  count: number;
   onPress: () => void;
-  color?: string;
 }) {
   const colors = useColors();
-  const activeColor = color ?? colors.primary;
+  const isStockpick = !!tool.fromStockpick;
 
   return (
     <TouchableOpacity
       style={[
-        styles.chip,
+        styles.toolCard,
         {
-          backgroundColor: active ? activeColor + '22' : colors.card,
-          borderColor: active ? activeColor : colors.border,
+          backgroundColor: colors.card,
+          borderColor: tool.color + "40",
         },
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
     >
-      <Text
-        style={[
-          styles.chipText,
-          { color: active ? activeColor : colors.mutedForeground },
-        ]}
-      >
-        {label}
+      {/* Count badge */}
+      <View style={[styles.countBadge, { backgroundColor: tool.color + "20" }]}>
+        <Text style={[styles.countNum, { color: tool.color }]}>
+          {isStockpick ? "→" : count}
+        </Text>
+        {!isStockpick && (
+          <Text style={[styles.countLabel, { color: tool.color }]}>saham</Text>
+        )}
+      </View>
+
+      {/* Tool name */}
+      <Text style={[styles.toolName, { color: colors.foreground }]} numberOfLines={2}>
+        {tool.name}
       </Text>
+      <Text style={[styles.toolDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
+        {tool.desc}
+      </Text>
+
+      {/* Arrow */}
+      <Text style={[styles.arrowIcon, { color: tool.color }]}>›</Text>
     </TouchableOpacity>
   );
 }
 
-function ScreenerRow({ stock }: { stock: Stock }) {
+// ─── Category section ─────────────────────────────────────────
+
+function CategorySection({
+  category,
+  counts,
+  onToolPress,
+}: {
+  category: CategoryDef;
+  counts: Record<string, number>;
+  onToolPress: (tool: ToolDef) => void;
+}) {
   const colors = useColors();
-  const ind = getIndicators(stock.code);
+  const totalInCat = category.tools.reduce(
+    (sum, t) => sum + (t.fromStockpick ? 0 : (counts[t.id] ?? 0)),
+    0,
+  );
 
   return (
-    <StockRow
-      stock={stock}
-      showSector
-      rightElement={
-        <View style={styles.screenerRight}>
-          <Text style={[styles.priceText, { color: colors.foreground }]}>
-            {formatPrice(stock.price)}
-          </Text>
-          <View style={styles.screenerMeta}>
-            <SignalBadge signal={ind.signal} size="sm" />
-            <Text style={[styles.rsiText, { color: colors.mutedForeground }]}>
-              RSI {ind.rsi.toFixed(0)}
+    <View style={styles.categorySection}>
+      {/* Category header */}
+      <View style={styles.categoryHeader}>
+        <View style={[styles.catDot, { backgroundColor: category.color }]} />
+        <Text style={[styles.categoryTitle, { color: colors.foreground }]}>
+          {category.id}
+        </Text>
+        <Text style={[styles.categoryTagline, { color: colors.mutedForeground }]}>
+          · {category.tagline}
+        </Text>
+        {totalInCat > 0 && (
+          <View style={[styles.catTotal, { backgroundColor: category.color + "20" }]}>
+            <Text style={[styles.catTotalText, { color: category.color }]}>
+              {totalInCat}
             </Text>
           </View>
-        </View>
-      }
-    />
-  );
-}
-
-export default function ScreenerScreen() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const [signalFilter, setSignalFilter] = useState<SignalFilter>('ALL');
-  const [rsiFilter, setRSIFilter] = useState<RSIFilter>('ALL');
-
-  const results = useMemo(() => {
-    return ALL_STOCKS.filter(stock => {
-      const ind = getIndicators(stock.code);
-      if (signalFilter !== 'ALL' && ind.signal !== signalFilter) return false;
-      if (rsiFilter === 'oversold' && ind.rsi >= 40) return false;
-      if (rsiFilter === 'overbought' && ind.rsi <= 65) return false;
-      if (rsiFilter === 'normal' && (ind.rsi < 40 || ind.rsi > 65)) return false;
-      return true;
-    });
-  }, [signalFilter, rsiFilter]);
-
-  const topPadding = Platform.OS === 'web' ? 67 : insets.top + 8;
-
-  const buyCount = ALL_STOCKS.filter(s => getIndicators(s.code).signal === 'BUY').length;
-  const sellCount = ALL_STOCKS.filter(s => getIndicators(s.code).signal === 'SELL').length;
-  const neutralCount = ALL_STOCKS.filter(s => getIndicators(s.code).signal === 'NEUTRAL').length;
-
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPadding }]}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Screener</Text>
-        <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-          {results.length} stocks found
-        </Text>
-      </View>
-
-      <View style={[styles.filtersSection, { backgroundColor: colors.background }]}>
-        <View style={styles.filterGroup}>
-          <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Signal</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            <FilterChip label="All" active={signalFilter === 'ALL'} onPress={() => setSignalFilter('ALL')} />
-            <FilterChip
-              label={`Buy (${buyCount})`}
-              active={signalFilter === 'BUY'}
-              onPress={() => setSignalFilter('BUY')}
-              color={colors.up}
-            />
-            <FilterChip
-              label={`Sell (${sellCount})`}
-              active={signalFilter === 'SELL'}
-              onPress={() => setSignalFilter('SELL')}
-              color={colors.down}
-            />
-            <FilterChip
-              label={`Neutral (${neutralCount})`}
-              active={signalFilter === 'NEUTRAL'}
-              onPress={() => setSignalFilter('NEUTRAL')}
-              color={colors.neutral}
-            />
-          </ScrollView>
-        </View>
-
-        <View style={styles.filterGroup}>
-          <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>RSI</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            <FilterChip label="All RSI" active={rsiFilter === 'ALL'} onPress={() => setRSIFilter('ALL')} />
-            <FilterChip
-              label="Oversold < 40"
-              active={rsiFilter === 'oversold'}
-              onPress={() => setRSIFilter('oversold')}
-              color={colors.up}
-            />
-            <FilterChip
-              label="Normal 40-65"
-              active={rsiFilter === 'normal'}
-              onPress={() => setRSIFilter('normal')}
-            />
-            <FilterChip
-              label="Overbought > 65"
-              active={rsiFilter === 'overbought'}
-              onPress={() => setRSIFilter('overbought')}
-              color={colors.down}
-            />
-          </ScrollView>
-        </View>
-
-        {(signalFilter !== 'ALL' || rsiFilter !== 'ALL') && (
-          <TouchableOpacity
-            style={styles.clearBtn}
-            onPress={() => {
-              setSignalFilter('ALL');
-              setRSIFilter('ALL');
-            }}
-          >
-            <Feather name="x" size={12} color={colors.mutedForeground} />
-            <Text style={[styles.clearBtnText, { color: colors.mutedForeground }]}>
-              Clear filters
-            </Text>
-          </TouchableOpacity>
         )}
       </View>
 
-      <FlatList
-        data={results}
-        keyExtractor={item => item.code}
-        renderItem={({ item }) => <ScreenerRow stock={item} />}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Feather name="filter" size={32} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-              No stocks match
-            </Text>
-            <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
-              Try adjusting the filters
-            </Text>
-          </View>
-        }
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingBottom: Platform.OS === 'web' ? 100 : 90,
-        }}
-      />
+      {/* 2-column grid */}
+      <View style={styles.toolGrid}>
+        {category.tools.map((tool) => (
+          <ToolCard
+            key={tool.id}
+            tool={tool}
+            count={counts[tool.id] ?? 0}
+            onPress={() => onToolPress(tool)}
+          />
+        ))}
+      </View>
     </View>
   );
 }
 
+// ─── Main screen ─────────────────────────────────────────────
+
+export default function ScreenerScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["stocktools-screener"],
+    queryFn: fetchScreener,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const counts = useMemo(
+    () => (data ? computeCounts(data) : ({} as Record<ToolId, number>)),
+    [data],
+  );
+
+  const totalSignals = useMemo(
+    () => Object.values(counts).reduce((s, v) => s + v, 0),
+    [counts],
+  );
+
+  function handleToolPress(tool: ToolDef) {
+    if (tool.fromStockpick) {
+      // Link to Stockpick tab
+      router.push("/(tabs)/stockpick");
+    } else {
+      router.push(`/tool/${tool.id}`);
+    }
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: topPadding, paddingBottom: insets.bottom + 80 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Header ── */}
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              Stock Tools
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+              {isLoading
+                ? "Memuat 18 strategi..."
+                : `${ALL_TOOLS.length} strategi · ${totalSignals} sinyal aktif`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.refreshBtn, { borderColor: colors.border }]}
+            onPress={() => refetch()}
+          >
+            <Text style={{ color: colors.mutedForeground, fontSize: 18 }}>↻</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Loading / Error ── */}
+        {isLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
+              Menghitung sinyal AFL...
+            </Text>
+          </View>
+        ) : isError ? (
+          <View style={styles.center}>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}>⚠️</Text>
+            <Text style={[styles.errorText, { color: colors.mutedForeground }]}>
+              Gagal memuat data screener
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+              onPress={() => refetch()}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>Coba Lagi</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* ── Summary bar ── */}
+            <View
+              style={[
+                styles.summaryBar,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryNum, { color: colors.primary }]}>289</Text>
+                <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>
+                  Total IDX
+                </Text>
+              </View>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryNum, { color: "#34d399" }]}>
+                  {totalSignals}
+                </Text>
+                <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>
+                  Sinyal Aktif
+                </Text>
+              </View>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryNum, { color: "#fbbf24" }]}>
+                  {Object.values(counts).filter((v) => v > 0).length}
+                </Text>
+                <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>
+                  Strategi Aktif
+                </Text>
+              </View>
+            </View>
+
+            {/* ── 5 Category sections ── */}
+            {TOOL_CATEGORIES.map((cat) => (
+              <CategorySection
+                key={cat.id}
+                category={cat}
+                counts={counts}
+                onToolPress={handleToolPress}
+              />
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
+  container: { flex: 1 },
+  scroll: { paddingHorizontal: 16 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 14,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+  title: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
+  subtitle: { fontSize: 12, marginTop: 2 },
+  refreshBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  headerTitle: {
-    fontSize: 26,
-    fontFamily: 'Inter_700Bold',
-    fontWeight: '700' as const,
+  center: { alignItems: "center", justifyContent: "center", paddingVertical: 60, gap: 8 },
+  loadingText: { fontSize: 13, marginTop: 8 },
+  errorText: { fontSize: 14, textAlign: "center" },
+  retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
+  summaryBar: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 20,
   },
-  headerSub: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    marginTop: 2,
+  summaryItem: { flex: 1, alignItems: "center", gap: 2 },
+  summaryNum: { fontSize: 22, fontWeight: "900" },
+  summaryLabel: { fontSize: 10, fontWeight: "600" },
+  divider: { width: 1, marginHorizontal: 4 },
+  categorySection: { marginBottom: 20 },
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
   },
-  filtersSection: {
-    paddingBottom: 8,
+  catDot: { width: 10, height: 10, borderRadius: 5 },
+  categoryTitle: { fontSize: 15, fontWeight: "800" },
+  categoryTagline: { fontSize: 11, flex: 1 },
+  catTotal: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  catTotalText: { fontSize: 11, fontWeight: "800" },
+  toolGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
-  filterGroup: {
+  toolCard: {
+    width: "47.5%",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 4,
+  },
+  countBadge: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 4,
     marginBottom: 2,
   },
-  filterLabel: {
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 0.5,
-    paddingHorizontal: 16,
-    marginBottom: 6,
-    marginTop: 8,
-  },
-  chips: {
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
-    fontWeight: '600' as const,
-  },
-  clearBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 8,
-  },
-  clearBtnText: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-  },
-  screenerRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  priceText: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-    fontWeight: '600' as const,
-  },
-  screenerMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  rsiText: {
-    fontSize: 11,
-    fontFamily: 'Inter_400Regular',
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-    fontWeight: '700' as const,
-  },
-  emptyDesc: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-  },
+  countNum: { fontSize: 26, fontWeight: "900" },
+  countLabel: { fontSize: 10, fontWeight: "600" },
+  toolName: { fontSize: 13, fontWeight: "800", lineHeight: 17 },
+  toolDesc: { fontSize: 10, lineHeight: 14 },
+  arrowIcon: { fontSize: 20, fontWeight: "900", marginTop: 4, alignSelf: "flex-end" },
 });

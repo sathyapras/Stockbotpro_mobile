@@ -16,6 +16,7 @@ const UPSTREAM: Record<string, { host: string; path: string }> = {
   broksum_data_history15d: { host: "103.190.28.45",  path: "/broksum_data_history15d.json" },
   BuyOnStrenght_Signal:    { host: "103.190.28.248", path: "/stockbotprodata/BuyOnStrenght_Signal" },
   BuyOnWeakness_Signal:    { host: "103.190.28.248", path: "/stockbotprodata/BuyOnWeakness_Signal" },
+  STOCKTOOLS_SCREENER:     { host: "103.190.28.248", path: "/stockbotprodata/STOCKTOOLS_SCREENER" },
 };
 
 function fetchUpstream(cfg: { host: string; path: string }): Promise<unknown> {
