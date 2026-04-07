@@ -19,6 +19,10 @@ import {
   getFlowScoreColor,
 } from "@/services/smartMoneyEngine";
 import {
+  getBandarStrength,
+  getFlowLabel,
+} from "@/services/radarMarketService";
+import {
   TradingPlan,
   Verdict,
   computeVerdict,
@@ -854,8 +858,159 @@ function FinancialsTab({ quote, broker1d, masterStock, colors }: {
 
 // ─── Tab 3: Smart Money ───────────────────────────────────────
 
-function SmartMoneyTab({ sm, colors }: { sm: any; colors: ReturnType<typeof useColors> }) {
-  if (!sm) {
+function RadarNBSSection({ radar, currentPrice, colors }: {
+  radar: any;
+  currentPrice: number;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const flow = getFlowLabel(radar.flowState ?? "");
+  const strength = getBandarStrength(radar.signal1d, radar.signal5d, radar.signal10d);
+  const periods = [
+    { label: "1D",  value: radar.nbs1d,  signal: radar.signal1d },
+    { label: "5D",  value: radar.nbs5d,  signal: radar.signal5d },
+    { label: "10D", value: radar.nbs10d, signal: radar.signal10d },
+  ];
+
+  const vwapDiff = currentPrice && radar.vwapD1
+    ? currentPrice - radar.vwapD1 : null;
+  const vwapDiffPct = (radar.vwapD1 > 0 && vwapDiff != null)
+    ? ((vwapDiff / radar.vwapD1) * 100).toFixed(2) : null;
+
+  const signalIcon = (sig: string) =>
+    sig === "Accumulation" ? "🟢" : sig === "Distribution" ? "🔴" : "⚪";
+  const signalColor2 = (sig: string) =>
+    sig === "Accumulation" ? "#34d399" : sig === "Distribution" ? "#f87171" : "#94a3b8";
+
+  return (
+    <>
+      {/* FlowState + Strength */}
+      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: flow.color + "40",
+        backgroundColor: colors.card, padding: 12, gap: 8 }}>
+        <SectionTitle title="RADAR MARKET — BANDAR ACTIVITY" colors={colors} />
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <View style={{ gap: 2 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: flow.color }} />
+              <Text style={{ color: flow.color, fontWeight: "800", fontSize: 15 }}>
+                {radar.flowState}
+              </Text>
+            </View>
+            <Text style={{ color: "#64748b", fontSize: 10 }}>Flow State hari ini (1D)</Text>
+          </View>
+          <View style={{ backgroundColor: strength.color + "22", borderRadius: 8,
+            paddingHorizontal: 10, paddingVertical: 6, alignItems: "center" }}>
+            <Text style={{ fontSize: 12 }}>{strength.icon}</Text>
+            <Text style={{ color: strength.color, fontWeight: "700", fontSize: 11 }}>
+              {strength.label}
+            </Text>
+          </View>
+        </View>
+
+        {/* Score bars */}
+        <View style={{ gap: 6, marginTop: 4 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Bandar Score</Text>
+            <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{radar.bandarScore.toFixed(0)}/100</Text>
+          </View>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: "hidden" }}>
+            <View style={{ height: 6, width: `${Math.min(100, radar.bandarScore)}%` as any,
+              backgroundColor: "#60a5fa", borderRadius: 3 }} />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4, marginBottom: 2 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Trend Score</Text>
+            <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{radar.trendScore.toFixed(0)}/100</Text>
+          </View>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: "hidden" }}>
+            <View style={{ height: 6, width: `${Math.min(100, radar.trendScore)}%` as any,
+              backgroundColor: "#a78bfa", borderRadius: 3 }} />
+          </View>
+        </View>
+      </View>
+
+      {/* NBS Multi-Timeframe Grid */}
+      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+        backgroundColor: colors.card, padding: 12, gap: 8 }}>
+        <SectionTitle title="NET BUY/SELL (MILIAR RP)" colors={colors} />
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {periods.map(tf => (
+            <View key={tf.label} style={{ flex: 1, backgroundColor: colors.background,
+              borderRadius: 10, padding: 10, alignItems: "center",
+              borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700" }}>{tf.label}</Text>
+              <Text style={{ color: (tf.value ?? 0) >= 0 ? "#34d399" : "#f87171",
+                fontWeight: "800", fontSize: 15, marginTop: 4 }}>
+                {tf.value != null ? `${tf.value >= 0 ? "+" : ""}${tf.value.toFixed(1)}B` : "N/A"}
+              </Text>
+              <Text style={{ color: signalColor2(tf.signal), fontSize: 9, marginTop: 3 }}>
+                {signalIcon(tf.signal)}{" "}
+                {tf.signal === "Accumulation" ? "ACC" : tf.signal === "Distribution" ? "DIST" : "NEU"}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* VWAP Bandar */}
+      {radar.vwapD1 > 0 && (
+        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+          backgroundColor: colors.card, padding: 12, gap: 8 }}>
+          <SectionTitle title="VWAP BANDAR" colors={colors} />
+          <View style={{ flexDirection: "row" }}>
+            <InfoCell label="VWAP 1D" value={fRp(radar.vwapD1)} color="#38BDF8" colors={colors} />
+            {radar.vwap5dAvg > 0 && (
+              <InfoCell label="VWAP 5D" value={fRp(radar.vwap5dAvg)} color="#60a5fa" colors={colors} />
+            )}
+            {vwapDiffPct && (
+              <InfoCell label="VS VWAP" colors={colors}
+                value={`${parseFloat(vwapDiffPct) > 0 ? "+" : ""}${vwapDiffPct}%`}
+                color={parseFloat(vwapDiffPct) >= 0 ? "#34d399" : "#f87171"} />
+            )}
+          </View>
+          {vwapDiff != null && (
+            <Text style={{ color: vwapDiff >= 0 ? "#34d399" : "#f87171", fontSize: 12 }}>
+              Harga {vwapDiff >= 0 ? "di atas" : "di bawah"} VWAP bandar{" "}
+              {Math.abs(vwapDiff).toLocaleString("id-ID")} poin
+              {" → Bandar sedang "}{vwapDiff >= 0 ? "untung ✅" : "rugi ⚠️"}
+            </Text>
+          )}
+          {radar.vwapSlopeState ? (
+            <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
+              Slope VWAP: <Text style={{ color: colors.foreground, fontWeight: "600" }}>
+                {radar.vwapSlopeState}
+              </Text>
+            </Text>
+          ) : null}
+        </View>
+      )}
+
+      {/* RS Momentum */}
+      {radar.rsMom !== 0 && (
+        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+          backgroundColor: colors.card, padding: 12, flexDirection: "row", gap: 8 }}>
+          <InfoCell label="RS MOMENTUM" colors={colors}
+            value={`${radar.rsMom > 0 ? "+" : ""}${radar.rsMom.toFixed(2)}`}
+            color={radar.rsMom > 0 ? "#34d399" : "#f87171"} />
+          <InfoCell label="MA TREND" value={radar.maTrend} colors={colors} />
+          {radar.narrative ? (
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#64748b", fontSize: 9 }}>NARASI</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 9, fontStyle: "italic" }}
+                numberOfLines={2}>{radar.narrative}</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+    </>
+  );
+}
+
+function SmartMoneyTab({ sm, radar, currentPrice, colors }: {
+  sm: any;
+  radar: any;
+  currentPrice: number;
+  colors: ReturnType<typeof useColors>;
+}) {
+  if (!sm && !radar) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 24 }}>
         <Text style={{ fontSize: 32 }}>📊</Text>
@@ -865,172 +1020,179 @@ function SmartMoneyTab({ sm, colors }: { sm: any; colors: ReturnType<typeof useC
       </View>
     );
   }
-  const phaseCfg = PHASE_CONFIG[sm.phase as keyof typeof PHASE_CONFIG];
-  const trendCfg = TREND_CONFIG[sm.flowTrend as keyof typeof TREND_CONFIG];
-  const scoreColor = getFlowScoreColor(sm.flowScore);
-  const sparkMax = Math.max(...sm.sparkline.map(Math.abs), 1);
+  const phaseCfg = sm ? PHASE_CONFIG[sm.phase as keyof typeof PHASE_CONFIG] : null;
+  const trendCfg = sm ? TREND_CONFIG[sm.flowTrend as keyof typeof TREND_CONFIG] : null;
+  const scoreColor = sm ? getFlowScoreColor(sm.flowScore) : "#94a3b8";
+  const sparkMax = sm ? Math.max(...sm.sparkline.map(Math.abs), 1) : 1;
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}
       contentContainerStyle={{ padding: 16, gap: 12 }}>
 
-      {/* Phase + Score */}
-      <View style={{ borderRadius: 12, borderWidth: 1,
-        borderColor: phaseCfg.color + "50", backgroundColor: colors.card, padding: 12 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <View style={{ gap: 6 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={{ fontSize: 18 }}>{phaseCfg.icon}</Text>
-              <Text style={{ color: phaseCfg.color, fontSize: 16, fontWeight: "900" }}>
-                {phaseCfg.label}
-              </Text>
-            </View>
-            <Text style={{ color: trendCfg.color, fontSize: 13 }}>
-              {trendCfg.icon} {trendCfg.label}
-            </Text>
-          </View>
-          <View style={{ alignItems: "center" }}>
-            <ScoreRing score={sm.flowScore} color={scoreColor} />
-            <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>Flow Score</Text>
-          </View>
-        </View>
+      {/* ── Radar Market (primary source) ── */}
+      {radar && (
+        <RadarNBSSection radar={radar} currentPrice={currentPrice} colors={colors} />
+      )}
 
-        {/* Top broker labels */}
-        {(sm.top1Label || sm.top3Label) && (
-          <View style={{ marginTop: 10, gap: 4 }}>
-            {sm.top1Label ? (
-              <Text style={{ color: colors.foreground, fontSize: 11 }}>
-                SM1: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{sm.top1Label}</Text>
-              </Text>
-            ) : null}
-            {sm.top3Label ? (
-              <Text style={{ color: colors.foreground, fontSize: 11 }}>
-                SM3: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{sm.top3Label}</Text>
-              </Text>
-            ) : null}
-            {sm.latestVwap ? (
-              <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
-                VWAP: <Text style={{ color: "#38BDF8", fontWeight: "700" }}>{fRp(sm.latestVwap)}</Text>
-                {"  "}B:{sm.brokerBuy} / S:{sm.brokerSell}
-              </Text>
-            ) : null}
-          </View>
-        )}
-
-        {/* B/S bar */}
-        {(sm.brokerBuy > 0 || sm.brokerSell > 0) && (
-          <View style={{ marginTop: 10, gap: 4 }}>
-            <View style={{ height: 8, borderRadius: 4, overflow: "hidden", flexDirection: "row" }}>
-              <View style={{ flex: sm.brokerBuy, backgroundColor: "#34d399" }} />
-              <View style={{ flex: sm.brokerSell, backgroundColor: "#f87171" }} />
-            </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={{ color: "#34d399", fontSize: 10, fontWeight: "700" }}>B:{sm.brokerBuy}</Text>
-              <Text style={{ color: "#f87171", fontSize: 10, fontWeight: "700" }}>S:{sm.brokerSell}</Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* Sparkline 15H */}
-      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-        backgroundColor: colors.card, padding: 12 }}>
-        <SectionTitle title="FLOW 15 HARI" colors={colors} />
-        <View style={{ flexDirection: "row", gap: 3, height: 80,
-          alignItems: "center", marginTop: 8 }}>
-          {sm.sparkline.map((v: number, i: number) => {
-            const isPos = v >= 0;
-            const h = Math.max(2, (Math.abs(v) / sparkMax) * 40);
-            return (
-              <View key={i} style={{ flex: 1, flexDirection: "column",
-                alignItems: "center", height: 80, justifyContent: "center" }}>
-                {isPos ? (
-                  <>
-                    <View style={{ flex: 1 }} />
-                    <View style={{ height: h, width: "80%", backgroundColor: "#34d399",
-                      borderRadius: 2 }} />
-                    <View style={{ height: 40, width: "80%" }} />
-                  </>
-                ) : (
-                  <>
-                    <View style={{ height: 40, width: "80%" }} />
-                    <View style={{ height: h, width: "80%", backgroundColor: "#f87171",
-                      borderRadius: 2 }} />
-                    <View style={{ flex: 1 }} />
-                  </>
-                )}
+      {/* ── Broker History Smart Money (secondary) ── */}
+      {sm && phaseCfg && trendCfg && (
+        <>
+          {/* Phase + Score */}
+          <View style={{ borderRadius: 12, borderWidth: 1,
+            borderColor: phaseCfg.color + "50", backgroundColor: colors.card, padding: 12 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <View style={{ gap: 6 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 9,
+                  textTransform: "uppercase", letterSpacing: 1 }}>Broker History 15D</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 18 }}>{phaseCfg.icon}</Text>
+                  <Text style={{ color: phaseCfg.color, fontSize: 16, fontWeight: "900" }}>
+                    {phaseCfg.label}
+                  </Text>
+                </View>
+                <Text style={{ color: trendCfg.color, fontSize: 13 }}>
+                  {trendCfg.icon} {trendCfg.label}
+                </Text>
               </View>
-            );
-          })}
-        </View>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
-          <Text style={{ fontSize: 9, color: "#34d399" }}>● Akumulasi</Text>
-          <Text style={{ fontSize: 9, color: colors.mutedForeground }}>← 15 hari lalu · hari ini →</Text>
-          <Text style={{ fontSize: 9, color: "#f87171" }}>● Distribusi</Text>
-        </View>
-      </View>
+              <View style={{ alignItems: "center" }}>
+                <ScoreRing score={sm.flowScore} color={scoreColor} />
+                <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>Flow Score</Text>
+              </View>
+            </View>
 
-      {/* Key Metrics */}
-      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-        backgroundColor: colors.card, padding: 12, gap: 10 }}>
-        <SectionTitle title="KEY METRICS" colors={colors} />
-        <View style={{ flexDirection: "row" }}>
-          <InfoCell label="AVG 3D (BN)" colors={colors}
-            value={`${sm.avg3d > 0 ? "+" : ""}${sm.avg3d.toFixed(1)}B`}
-            color={sm.avg3d > 0 ? "#34d399" : "#f87171"} />
-          <InfoCell label="AVG 5D (BN)" colors={colors}
-            value={`${sm.avg5d > 0 ? "+" : ""}${sm.avg5d.toFixed(1)}B`}
-            color={sm.avg5d > 0 ? "#34d399" : "#f87171"} />
-          <InfoCell label="AVG 15D (BN)" colors={colors}
-            value={`${sm.avg15d > 0 ? "+" : ""}${sm.avg15d.toFixed(1)}B`}
-            color={sm.avg15d > 0 ? "#34d399" : "#f87171"} />
-        </View>
-        <View style={{ flexDirection: "row" }}>
-          <InfoCell label="FUEL (BN)" colors={colors}
-            value={`${sm.netValBn > 0 ? "+" : ""}${sm.netValBn.toFixed(1)}B`}
-            color={sm.netValBn > 0 ? "#34d399" : "#f87171"} />
-          <InfoCell label="DOMINASI" value={sm.dominanceLabel ?? "–"} colors={colors} />
-          <InfoCell label="NET BROKER" value={String(sm.brokerNet ?? "–")} colors={colors}
-            color={(sm.brokerNet ?? 0) > 0 ? "#34d399" : "#f87171"} />
-        </View>
-        {sm.latestVwap ? (
-          <View style={{ flexDirection: "row", marginTop: 2 }}>
-            <InfoCell label="VWAP" value={fRp(sm.latestVwap)} colors={colors} color="#38BDF8" />
-          </View>
-        ) : null}
-      </View>
+            {/* Top broker labels */}
+            {(sm.top1Label || sm.top3Label) && (
+              <View style={{ marginTop: 10, gap: 4 }}>
+                {sm.top1Label ? (
+                  <Text style={{ color: colors.foreground, fontSize: 11 }}>
+                    SM1: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{sm.top1Label}</Text>
+                  </Text>
+                ) : null}
+                {sm.top3Label ? (
+                  <Text style={{ color: colors.foreground, fontSize: 11 }}>
+                    SM3: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{sm.top3Label}</Text>
+                  </Text>
+                ) : null}
+                {sm.latestVwap ? (
+                  <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+                    VWAP: <Text style={{ color: "#38BDF8", fontWeight: "700" }}>{fRp(sm.latestVwap)}</Text>
+                    {"  "}B:{sm.brokerBuy} / S:{sm.brokerSell}
+                  </Text>
+                ) : null}
+              </View>
+            )}
 
-      {/* Consistency */}
-      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-        backgroundColor: colors.card, padding: 12, gap: 8 }}>
-        <SectionTitle title="KONSISTENSI 15 HARI" colors={colors} />
-        <View style={{ gap: 6 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text style={{ color: "#34d399", fontSize: 12, fontWeight: "600" }}>
-              Akumulasi: {sm.accDays}/15 hari
-            </Text>
-            <Text style={{ color: "#34d399", fontSize: 12, fontWeight: "700" }}>
-              {Math.round((sm.accDays / 15) * 100)}%
+            {/* B/S bar */}
+            {(sm.brokerBuy > 0 || sm.brokerSell > 0) && (
+              <View style={{ marginTop: 10, gap: 4 }}>
+                <View style={{ height: 8, borderRadius: 4, overflow: "hidden", flexDirection: "row" }}>
+                  <View style={{ flex: sm.brokerBuy, backgroundColor: "#34d399" }} />
+                  <View style={{ flex: sm.brokerSell, backgroundColor: "#f87171" }} />
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ color: "#34d399", fontSize: 10, fontWeight: "700" }}>B:{sm.brokerBuy}</Text>
+                  <Text style={{ color: "#f87171", fontSize: 10, fontWeight: "700" }}>S:{sm.brokerSell}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Sparkline 15H */}
+          <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+            backgroundColor: colors.card, padding: 12 }}>
+            <SectionTitle title="BROKER FLOW 15 HARI" colors={colors} />
+            <View style={{ flexDirection: "row", gap: 3, height: 80,
+              alignItems: "center", marginTop: 8 }}>
+              {sm.sparkline.map((v: number, i: number) => {
+                const isPos = v >= 0;
+                const h = Math.max(2, (Math.abs(v) / sparkMax) * 40);
+                return (
+                  <View key={i} style={{ flex: 1, flexDirection: "column",
+                    alignItems: "center", height: 80, justifyContent: "center" }}>
+                    {isPos ? (
+                      <>
+                        <View style={{ flex: 1 }} />
+                        <View style={{ height: h, width: "80%", backgroundColor: "#34d399",
+                          borderRadius: 2 }} />
+                        <View style={{ height: 40, width: "80%" }} />
+                      </>
+                    ) : (
+                      <>
+                        <View style={{ height: 40, width: "80%" }} />
+                        <View style={{ height: h, width: "80%", backgroundColor: "#f87171",
+                          borderRadius: 2 }} />
+                        <View style={{ flex: 1 }} />
+                      </>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+              <Text style={{ fontSize: 9, color: "#34d399" }}>● Akumulasi</Text>
+              <Text style={{ fontSize: 9, color: colors.mutedForeground }}>← 15 hari lalu · hari ini →</Text>
+              <Text style={{ fontSize: 9, color: "#f87171" }}>● Distribusi</Text>
+            </View>
+          </View>
+
+          {/* Key Metrics */}
+          <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+            backgroundColor: colors.card, padding: 12, gap: 10 }}>
+            <SectionTitle title="KEY METRICS BROKER" colors={colors} />
+            <View style={{ flexDirection: "row" }}>
+              <InfoCell label="AVG 3D (BN)" colors={colors}
+                value={`${sm.avg3d > 0 ? "+" : ""}${sm.avg3d.toFixed(1)}B`}
+                color={sm.avg3d > 0 ? "#34d399" : "#f87171"} />
+              <InfoCell label="AVG 5D (BN)" colors={colors}
+                value={`${sm.avg5d > 0 ? "+" : ""}${sm.avg5d.toFixed(1)}B`}
+                color={sm.avg5d > 0 ? "#34d399" : "#f87171"} />
+              <InfoCell label="AVG 15D (BN)" colors={colors}
+                value={`${sm.avg15d > 0 ? "+" : ""}${sm.avg15d.toFixed(1)}B`}
+                color={sm.avg15d > 0 ? "#34d399" : "#f87171"} />
+            </View>
+            <View style={{ flexDirection: "row" }}>
+              <InfoCell label="FUEL (BN)" colors={colors}
+                value={`${sm.netValBn > 0 ? "+" : ""}${sm.netValBn.toFixed(1)}B`}
+                color={sm.netValBn > 0 ? "#34d399" : "#f87171"} />
+              <InfoCell label="DOMINASI" value={sm.dominanceLabel ?? "–"} colors={colors} />
+              <InfoCell label="NET BROKER" value={String(sm.brokerNet ?? "–")} colors={colors}
+                color={(sm.brokerNet ?? 0) > 0 ? "#34d399" : "#f87171"} />
+            </View>
+          </View>
+
+          {/* Consistency */}
+          <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+            backgroundColor: colors.card, padding: 12, gap: 8 }}>
+            <SectionTitle title="KONSISTENSI 15 HARI" colors={colors} />
+            <View style={{ gap: 6 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: "#34d399", fontSize: 12, fontWeight: "600" }}>
+                  Akumulasi: {sm.accDays}/15 hari
+                </Text>
+                <Text style={{ color: "#34d399", fontSize: 12, fontWeight: "700" }}>
+                  {Math.round((sm.accDays / 15) * 100)}%
+                </Text>
+              </View>
+              <View style={{ height: 6, borderRadius: 3, backgroundColor: "#f8717140",
+                overflow: "hidden" }}>
+                <View style={{ height: 6, width: `${(sm.accDays / 15) * 100}%` as any,
+                  backgroundColor: "#34d399", borderRadius: 3 }} />
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: "#f87171", fontSize: 12, fontWeight: "600" }}>
+                  Distribusi: {15 - sm.accDays}/15 hari
+                </Text>
+                <Text style={{ color: "#f87171", fontSize: 12, fontWeight: "700" }}>
+                  {Math.round(((15 - sm.accDays) / 15) * 100)}%
+                </Text>
+              </View>
+            </View>
+            <Text style={{ color: colors.mutedForeground, fontSize: 10, marginTop: 4 }}>
+              Flow Trend: {trendCfg.icon} {trendCfg.label}
             </Text>
           </View>
-          <View style={{ height: 6, borderRadius: 3, backgroundColor: "#f8717140",
-            overflow: "hidden" }}>
-            <View style={{ height: 6, width: `${(sm.accDays / 15) * 100}%` as any,
-              backgroundColor: "#34d399", borderRadius: 3 }} />
-          </View>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text style={{ color: "#f87171", fontSize: 12, fontWeight: "600" }}>
-              Distribusi: {15 - sm.accDays}/15 hari
-            </Text>
-            <Text style={{ color: "#f87171", fontSize: 12, fontWeight: "700" }}>
-              {Math.round(((15 - sm.accDays) / 15) * 100)}%
-            </Text>
-          </View>
-        </View>
-        <Text style={{ color: colors.mutedForeground, fontSize: 10, marginTop: 4 }}>
-          Flow Trend: {trendCfg.icon} {trendCfg.label}
-        </Text>
-      </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -1333,7 +1495,12 @@ export default function StockDetailScreen() {
                 />
               )}
               {activeTab === "smartmoney" && (
-                <SmartMoneyTab sm={data.smartMoney} colors={colors} />
+                <SmartMoneyTab
+                  sm={data.smartMoney}
+                  radar={data.radar}
+                  currentPrice={data.quote?.price ?? data.radar?.close ?? 0}
+                  colors={colors}
+                />
               )}
               {activeTab === "levels" && (
                 <PriceLevelsTab quote={quote} colors={colors} />

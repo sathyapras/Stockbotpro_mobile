@@ -31,12 +31,15 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 ### API Server (`artifacts/api-server`)
 - Express 5 + TypeScript, port 8080
 - Routes: `/api/healthz`, `/api/proxy/:name`
-- **Proxy with in-memory cache (15 min TTL)**: serves broker summary data from upstream AFL servers
-  - `broksum_data_1d` → `http://103.190.28.45/broksum_data_1d.json`
-  - `broksum_data_history15d` → `http://103.190.28.45/broksum_data_history15d.json`
-  - `BuyOnStrenght_Signal` → `http://103.190.28.248/stockbotprodata/BuyOnStrenght_Signal`
-  - `BuyOnWeakness_Signal` → `http://103.190.28.248/stockbotprodata/BuyOnWeakness_Signal`
-- Pre-warms cache on startup for all 4 endpoints
+- **Proxy with in-memory cache**: serves broker summary data from upstream AFL servers
+  - `broksum_data_1d` → `http://103.190.28.45/broksum_data_1d.json` (15min TTL)
+  - `broksum_data_history15d` → `http://103.190.28.45/broksum_data_history15d.json` (15min TTL)
+  - `BuyOnStrenght_Signal` → `http://103.190.28.248/stockbotprodata/BuyOnStrenght_Signal` (15min TTL)
+  - `BuyOnWeakness_Signal` → `http://103.190.28.248/stockbotprodata/BuyOnWeakness_Signal` (15min TTL)
+  - `STOCKTOOLS_SCREENER` → `http://103.190.28.248/stockbotprodata/STOCKTOOLS_SCREENER` (15min TTL)
+  - `MASTER_STOCK_DB` → `http://103.190.28.248/stockbotprodata/MASTER_STOCK_DB` (60min TTL)
+  - `RADAR_MARKET` → `http://103.190.28.248/stockbotprodata/RADAR_MARKET` (60min TTL)
+- Pre-warms cache on startup for all endpoints
 
 ### Stock Insight Mobile (`artifacts/stock-mobile`)
 - Expo React Native app (iOS, Android, Web)

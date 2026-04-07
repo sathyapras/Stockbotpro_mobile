@@ -14,171 +14,324 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Sparkline } from "@/components/Sparkline";
 import { useColors } from "@/hooks/useColors";
 import {
-  PHASE_CONFIG,
-  SmartMoneyResult,
-  TREND_CONFIG,
-  fetchSmartMoney,
-  filterByTab,
-  getFlowScoreColor,
-} from "@/services/smartMoneyEngine";
+  type RadarMarket,
+  bandarDetector,
+  fetchRadarMarket,
+  formatNBS,
+  getBandarStrength,
+  getFlowLabel,
+  smartMoneyIn,
+  vwapInterpretation,
+} from "@/services/radarMarketService";
 
-type TabKey = "top_acc" | "entry" | "warning" | "strong";
+// ─── Filter tabs ──────────────────────────────────────────────
 
-const TABS: { key: TabKey; label: string; emoji: string }[] = [
-  { key: "top_acc", label: "Top Akumulasi", emoji: "⭐" },
-  { key: "entry",   label: "Entry Peluang", emoji: "🚀" },
-  { key: "warning", label: "Peringatan",    emoji: "⚠️" },
-  { key: "strong",  label: "Strong Trend",  emoji: "📈" },
+type FilterTab = "ALL" | "ACC" | "DIST" | "SMI";
+
+const FILTER_TABS: { key: FilterTab; label: string; emoji: string }[] = [
+  { key: "ALL",  label: "Semua",          emoji: "📊" },
+  { key: "ACC",  label: "Akumulasi",      emoji: "🟢" },
+  { key: "DIST", label: "Distribusi",     emoji: "🔴" },
+  { key: "SMI",  label: "Smart Money In", emoji: "💎" },
 ];
 
-function FlowScoreBadge({ score }: { score: number }) {
-  const color = getFlowScoreColor(score);
+// ─── Signal color / icon ──────────────────────────────────────
+
+function signalColor(sig: string) {
+  if (sig === "Accumulation")  return "#34d399";
+  if (sig === "Distribution")  return "#f87171";
+  return "#94a3b8";
+}
+
+function signalIcon(sig: string) {
+  if (sig === "Accumulation")  return "🟢";
+  if (sig === "Distribution")  return "🔴";
+  return "⚪";
+}
+
+// ─── Score bar ────────────────────────────────────────────────
+
+function ScoreBar({ label, value, color, colors }: {
+  label: string; value: number; color: string;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const w = Math.min(100, Math.max(0, value));
   return (
-    <View style={[styles.scoreBadge, { backgroundColor: color + "22" }]}>
-      <Text style={[styles.scoreNum, { color }]}>{score}</Text>
-      <Text style={[styles.scoreLabel, { color: color + "99" }]}>score</Text>
+    <View style={{ marginBottom: 6 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{label}</Text>
+        <Text style={{ color, fontWeight: "700", fontSize: 11 }}>{value.toFixed(0)}/100</Text>
+      </View>
+      <View style={{ height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: "hidden" }}>
+        <View style={{ height: 5, width: `${w}%` as any, backgroundColor: color, borderRadius: 3 }} />
+      </View>
     </View>
   );
 }
 
-function BrokerBar({ buy, sell }: { buy: number; sell: number }) {
-  const total = buy + sell;
-  const buyPct = total > 0 ? (buy / total) * 100 : 50;
+// ─── NBS mini grid ────────────────────────────────────────────
+
+function NBSGrid({ item, colors }: { item: RadarMarket; colors: ReturnType<typeof useColors> }) {
+  const periods = [
+    { label: "1D",  value: item.nbs1d,  signal: item.signal1d },
+    { label: "5D",  value: item.nbs5d,  signal: item.signal5d },
+    { label: "10D", value: item.nbs10d, signal: item.signal10d },
+  ];
   return (
-    <View style={{ gap: 2 }}>
-      <View style={styles.brokerBarTrack}>
-        <View style={[styles.brokerBarBuy, { flex: buyPct }]} />
-        <View style={[styles.brokerBarSell, { flex: 100 - buyPct }]} />
-      </View>
-      <View style={styles.brokerBarLabels}>
-        <Text style={styles.brokerBuyLabel}>B:{buy}</Text>
-        <Text style={styles.brokerSellLabel}>S:{sell}</Text>
-      </View>
+    <View style={{ flexDirection: "row", gap: 6, marginTop: 8 }}>
+      {periods.map(tf => {
+        const fmt = formatNBS(tf.value);
+        return (
+          <View key={tf.label} style={{ flex: 1, backgroundColor: colors.background,
+            borderRadius: 8, padding: 7, alignItems: "center",
+            borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "600" }}>{tf.label}</Text>
+            <Text style={{ color: fmt.color, fontWeight: "800", fontSize: 12, marginTop: 2 }}>
+              {fmt.text}
+            </Text>
+            <Text style={{ color: signalColor(tf.signal), fontSize: 9, marginTop: 2 }}>
+              {signalIcon(tf.signal)}{" "}
+              {tf.signal === "Accumulation" ? "ACC" : tf.signal === "Distribution" ? "DIST" : "NEU"}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
 
-function SmartMoneyCard({ item }: { item: SmartMoneyResult }) {
+// ─── Bandar Card ──────────────────────────────────────────────
+
+function BandarCard({ item }: { item: RadarMarket }) {
   const colors = useColors();
   const router = useRouter();
-  const phase = PHASE_CONFIG[item.phase];
-  const trend = TREND_CONFIG[item.flowTrend];
-  const accBg = item.latestAccDist === "Acc" ? "#34d39922" : "#f8717122";
-  const accColor = item.latestAccDist === "Acc" ? "#34d399" : "#f87171";
+  const [expanded, setExpanded] = useState(false);
+
+  const flow  = getFlowLabel(item.flowState);
+  const strength = getBandarStrength(item.signal1d, item.signal5d, item.signal10d);
+  const vwapInfo = vwapInterpretation(item.close, item.vwapD1);
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={() => router.push(`/stock/${item.ticker}?tab=smartmoney` as any)}
-      activeOpacity={0.75}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.cardLeft}>
-          <View style={styles.tickerRow}>
-            <Text style={[styles.ticker, { color: colors.foreground }]}>{item.ticker}</Text>
-            <View style={[styles.accBadge, { backgroundColor: accBg }]}>
-              <Text style={[styles.accBadgeText, { color: accColor }]}>
-                {item.latestAccDist ?? "–"}
+      activeOpacity={0.8}
+      onPress={() => router.push(`/stock/${item.ticker}` as any)}
+      onLongPress={() => setExpanded(e => !e)}
+      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+
+      {/* Header row */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 16 }}>
+              {item.ticker}
+            </Text>
+            {/* Multi-TF strength badge */}
+            <View style={{ backgroundColor: strength.color + "22", borderRadius: 6,
+              paddingHorizontal: 6, paddingVertical: 2 }}>
+              <Text style={{ color: strength.color, fontSize: 9, fontWeight: "700" }}>
+                {strength.label}
               </Text>
             </View>
-            <View style={[styles.phaseDot, { backgroundColor: phase.color }]} />
-            <Text style={[styles.phaseLabel, { color: phase.color }]}>{phase.label}</Text>
+            {/* Change % */}
+            {item.chgPct !== 0 && (
+              <Text style={{ color: item.chgPct > 0 ? "#34d399" : "#f87171",
+                fontSize: 11, fontWeight: "700" }}>
+                {item.chgPct > 0 ? "▲" : "▼"}{Math.abs(item.chgPct).toFixed(2)}%
+              </Text>
+            )}
           </View>
-          <View style={styles.metaRow}>
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-              avg 3D: {item.avg3d >= 0 ? "+" : ""}{item.avg3d.toFixed(1)}B
-            </Text>
-            <Text style={[styles.trendIcon, { color: trend.color }]}>
-              {trend.icon} {trend.label}
-            </Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-              acc: {item.accDays}/{item.accDays + item.distDays} hari
-            </Text>
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-              fuel: {item.fuel >= 0 ? "+" : ""}{item.fuel.toFixed(1)}B
-            </Text>
-          </View>
+          <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}
+            numberOfLines={1}>{item.company}</Text>
         </View>
-        <FlowScoreBadge score={item.flowScore} />
+
+        {/* Flow State badge */}
+        <View style={{ backgroundColor: flow.color + "22", borderRadius: 8,
+          paddingHorizontal: 10, paddingVertical: 5, alignItems: "center",
+          borderWidth: 1, borderColor: flow.color + "40", minWidth: 64 }}>
+          <Text style={{ color: flow.color, fontWeight: "800", fontSize: 11 }}>{flow.short}</Text>
+          <Text style={{ color: flow.color + "cc", fontSize: 8, marginTop: 1 }}>{item.flowState}</Text>
+        </View>
       </View>
 
-      <View style={styles.cardBody}>
-        <View style={styles.sparklineWrap}>
-          <Sparkline data={item.sparkline} width={160} height={28} />
-        </View>
-        <BrokerBar buy={item.brokerBuy} sell={item.brokerSell} />
-      </View>
-
-      <View style={styles.cardFooter}>
-        <Text style={[styles.topLabel, { color: colors.mutedForeground }]}>
-          Top1: <Text style={{ color: colors.foreground }}>{item.top1Label}</Text>
+      {/* Price + VWAP row */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+        <Text style={{ color: "#60a5fa", fontSize: 12, fontWeight: "600" }}>
+          Harga: {item.close.toLocaleString("id-ID")}
         </Text>
-        <Text style={[styles.topLabel, { color: colors.mutedForeground }]}>
-          Top3: <Text style={{ color: colors.foreground }}>{item.top3Label}</Text>
-        </Text>
-        {item.latestVwap ? (
-          <Text style={[styles.topLabel, { color: colors.mutedForeground }]}>
-            VWAP: <Text style={{ color: colors.foreground }}>
-              {item.latestVwap.toLocaleString("id-ID")}
+        {item.vwapD1 > 0 && (
+          <Text style={{ color: "#94a3b8", fontSize: 11 }}>
+            VWAP 1D: <Text style={{ color: colors.foreground, fontWeight: "600" }}>
+              {item.vwapD1.toLocaleString("id-ID")}
             </Text>
           </Text>
-        ) : null}
+        )}
       </View>
+
+      {/* VWAP interpretation */}
+      {vwapInfo && (
+        <Text style={{ color: vwapInfo.color, fontSize: 10, marginTop: 2 }}>{vwapInfo.text}</Text>
+      )}
+
+      {/* NBS 3-timeframe grid */}
+      <NBSGrid item={item} colors={colors} />
+
+      {/* Multi-TF strength icons */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+        <Text style={{ fontSize: 12 }}>{strength.icon}</Text>
+        <Text style={{ color: strength.color, fontSize: 10, fontWeight: "700" }}>
+          {strength.label}
+        </Text>
+        {item.rsMom !== 0 && (
+          <Text style={{ color: "#64748b", fontSize: 10, marginLeft: "auto" }}>
+            RS Mom: <Text style={{ color: item.rsMom > 0 ? "#34d399" : "#f87171",
+              fontWeight: "600" }}>
+              {item.rsMom > 0 ? "+" : ""}{item.rsMom.toFixed(1)}
+            </Text>
+          </Text>
+        )}
+      </View>
+
+      {/* Expanded section (long-press) */}
+      {expanded && (
+        <View style={{ marginTop: 8, gap: 6, borderTopWidth: 1,
+          borderTopColor: colors.border, paddingTop: 8 }}>
+          <ScoreBar label="Bandar Score" value={item.bandarScore} color="#60a5fa" colors={colors} />
+          <ScoreBar label="Trend Score"  value={item.trendScore}  color="#a78bfa" colors={colors} />
+          {item.harmonyStr > 0 && (
+            <ScoreBar label="Harmony Str" value={item.harmonyStr} color="#fbbf24" colors={colors} />
+          )}
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+            {item.vwap5dAvg > 0 && (
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#64748b", fontSize: 9 }}>VWAP 5D Avg</Text>
+                <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 12 }}>
+                  {item.vwap5dAvg.toLocaleString("id-ID")}
+                </Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#64748b", fontSize: 9 }}>Volume (Miliar)</Text>
+              <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 12 }}>
+                {item.toRpBn.toFixed(1)}B
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#64748b", fontSize: 9 }}>Perf 10D</Text>
+              <Text style={{ color: item.perf10d >= 0 ? "#34d399" : "#f87171",
+                fontWeight: "700", fontSize: 12 }}>
+                {item.perf10d >= 0 ? "+" : ""}{item.perf10d.toFixed(1)}%
+              </Text>
+            </View>
+          </View>
+          {item.narrative ? (
+            <Text style={{ color: colors.mutedForeground, fontSize: 10, fontStyle: "italic" }}>
+              {item.narrative}
+            </Text>
+          ) : null}
+        </View>
+      )}
+
+      {/* Tap hint */}
+      <Text style={{ color: "#334155", fontSize: 9, marginTop: 4, textAlign: "right" }}>
+        Tap → detail · Long press → detail bandar
+      </Text>
     </TouchableOpacity>
   );
 }
+
+// ─── Summary stats bar ────────────────────────────────────────
+
+function SummaryBar({ data, colors }: { data: RadarMarket[]; colors: ReturnType<typeof useColors> }) {
+  const acc  = data.filter(r => r.signal1d === "Accumulation").length;
+  const dist = data.filter(r => r.signal1d === "Distribution").length;
+  const neu  = data.length - acc - dist;
+  return (
+    <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+      <View style={{ flex: 1, backgroundColor: "#34d39918", borderRadius: 8,
+        borderWidth: 1, borderColor: "#34d39930", padding: 8, alignItems: "center" }}>
+        <Text style={{ color: "#34d399", fontWeight: "800", fontSize: 16 }}>{acc}</Text>
+        <Text style={{ color: "#64748b", fontSize: 9 }}>Akumulasi</Text>
+      </View>
+      <View style={{ flex: 1, backgroundColor: "#f8717118", borderRadius: 8,
+        borderWidth: 1, borderColor: "#f8717130", padding: 8, alignItems: "center" }}>
+        <Text style={{ color: "#f87171", fontWeight: "800", fontSize: 16 }}>{dist}</Text>
+        <Text style={{ color: "#64748b", fontSize: 9 }}>Distribusi</Text>
+      </View>
+      <View style={{ flex: 1, backgroundColor: colors.card, borderRadius: 8,
+        borderWidth: 1, borderColor: colors.border, padding: 8, alignItems: "center" }}>
+        <Text style={{ color: colors.mutedForeground, fontWeight: "800", fontSize: 16 }}>{neu}</Text>
+        <Text style={{ color: "#64748b", fontSize: 9 }}>Netral</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────
 
 export default function BandarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
-  const [activeTab, setActiveTab] = useState<TabKey>("top_acc");
-  const [search, setSearch] = useState("");
+  const [filterTab, setFilterTab] = useState<FilterTab>("ALL");
+  const [search, setSearch]       = useState("");
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["smart-money"],
-    queryFn: fetchSmartMoney,
-    staleTime: 12 * 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
+  const { data: radarAll = [], isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ["radar-market"],
+    queryFn:  fetchRadarMarket,
+    staleTime: 60 * 60 * 1000,
+    gcTime:    2 * 60 * 60 * 1000,
   });
 
-  const filtered = useMemo(() => {
-    const tabData = filterByTab(data ?? [], activeTab);
-    if (!search.trim()) return tabData;
-    return tabData.filter(d =>
-      d.ticker.toLowerCase().includes(search.toLowerCase()),
-    );
-  }, [data, activeTab, search]);
+  // Top 40 by |nbs1d|
+  const top40 = useMemo(() => bandarDetector(radarAll, 40), [radarAll]);
 
-  const tabCounts = useMemo(() => {
-    if (!data) return {};
-    return {
-      top_acc: filterByTab(data, "top_acc").length,
-      entry:   filterByTab(data, "entry").length,
-      warning: filterByTab(data, "warning").length,
-      strong:  filterByTab(data, "strong").length,
-    };
-  }, [data]);
+  // Smart Money In list (all 3 TF positive, unlimited)
+  const smiList = useMemo(() => smartMoneyIn(radarAll), [radarAll]);
+
+  const filtered = useMemo(() => {
+    let base: RadarMarket[];
+    if (filterTab === "ACC")  base = top40.filter(r => r.signal1d === "Accumulation");
+    else if (filterTab === "DIST") base = top40.filter(r => r.signal1d === "Distribution");
+    else if (filterTab === "SMI")  base = smiList;
+    else                           base = top40;
+
+    if (!search.trim()) return base;
+    const q = search.toLowerCase();
+    return base.filter(r =>
+      r.ticker.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)
+    );
+  }, [top40, smiList, filterTab, search]);
+
+  const counts = useMemo(() => ({
+    ALL:  top40.length,
+    ACC:  top40.filter(r => r.signal1d === "Accumulation").length,
+    DIST: top40.filter(r => r.signal1d === "Distribution").length,
+    SMI:  smiList.length,
+  }), [top40, smiList]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: topPadding, backgroundColor: colors.background }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Bandar Detector</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Smart Money Flow · Broker Summary 15D
+          Net Buy/Sell · VWAP Bandar · Smart Money Flow
         </Text>
 
+        {/* Summary bar (only when data loaded) */}
+        {radarAll.length > 0 && !isLoading && (
+          <SummaryBar data={radarAll} colors={colors} />
+        )}
+
+        {/* Search */}
         <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={{ color: colors.mutedForeground, marginRight: 6 }}>🔍</Text>
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Cari ticker..."
+            placeholder="Cari ticker atau nama..."
             placeholderTextColor={colors.mutedForeground}
             value={search}
             onChangeText={setSearch}
@@ -191,72 +344,75 @@ export default function BandarScreen() {
           )}
         </View>
 
+        {/* Filter tabs */}
         <View style={styles.tabRow}>
-          {TABS.map(t => (
-            <TouchableOpacity
-              key={t.key}
-              style={[
-                styles.tabChip,
-                {
-                  backgroundColor: activeTab === t.key
-                    ? colors.primary + "22"
-                    : colors.card,
-                  borderColor: activeTab === t.key ? colors.primary : colors.border,
-                },
-              ]}
-              onPress={() => setActiveTab(t.key)}
-            >
-              <Text
-                style={[
-                  styles.tabChipText,
-                  { color: activeTab === t.key ? colors.primary : colors.mutedForeground },
-                ]}
-                numberOfLines={1}
-              >
-                {t.emoji} {tabCounts[t.key] !== undefined ? tabCounts[t.key] : ""}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {FILTER_TABS.map(t => {
+            const active = filterTab === t.key;
+            const tabColor = t.key === "ACC" ? "#34d399" : t.key === "DIST" ? "#f87171"
+              : t.key === "SMI" ? "#a78bfa" : colors.primary;
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.tabChip, {
+                  backgroundColor: active ? tabColor + "22" : colors.card,
+                  borderColor: active ? tabColor : colors.border,
+                }]}
+                onPress={() => setFilterTab(t.key)}>
+                <Text style={[styles.tabChipText, { color: active ? tabColor : colors.mutedForeground }]}>
+                  {t.emoji}
+                </Text>
+                <Text style={[styles.tabChipCount, { color: active ? tabColor : colors.mutedForeground }]}>
+                  {counts[t.key]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        <Text style={[styles.tabTitle, { color: colors.foreground }]}>
-          {TABS.find(t => t.key === activeTab)?.emoji}{" "}
-          {TABS.find(t => t.key === activeTab)?.label}
-          {" "}<Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
-            ({filtered.length} saham)
+        {/* Section title */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+            {FILTER_TABS.find(t => t.key === filterTab)?.emoji}{" "}
+            {FILTER_TABS.find(t => t.key === filterTab)?.label}
+            {"  "}<Text style={{ color: colors.mutedForeground, fontSize: 12, fontWeight: "400" }}>
+              {filtered.length} saham
+            </Text>
           </Text>
-        </Text>
+          {filterTab === "SMI" && (
+            <Text style={{ color: "#a78bfa", fontSize: 10 }}>NBS 1D+5D+10D positif</Text>
+          )}
+          {filterTab === "ALL" && (
+            <Text style={{ color: "#64748b", fontSize: 10 }}>Top 40 by aktivitas</Text>
+          )}
+        </View>
       </View>
 
+      {/* ── Content ── */}
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-            Menganalisis Smart Money Flow...
+            Memuat data Bandar Detector...
           </Text>
         </View>
       ) : isError ? (
         <View style={styles.center}>
           <Text style={{ fontSize: 32 }}>⚠️</Text>
           <Text style={[styles.errorText, { color: colors.mutedForeground }]}>
-            Gagal memuat data. Periksa koneksi internet.
+            Gagal memuat data. Periksa koneksi.
           </Text>
           <TouchableOpacity
             style={[styles.retryBtn, { backgroundColor: colors.primary }]}
-            onPress={() => refetch()}
-          >
+            onPress={() => refetch()}>
             <Text style={{ color: "#fff", fontWeight: "600" }}>Coba Lagi</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={i => i.ticker}
-          renderItem={({ item }) => <SmartMoneyCard item={item} />}
-          contentContainerStyle={[
-            styles.list,
-            { paddingBottom: insets.bottom + 80 },
-          ]}
+          keyExtractor={r => r.ticker}
+          renderItem={({ item }) => <BandarCard item={item} />}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
           refreshControl={
             <RefreshControl
               refreshing={isFetching && !isLoading}
@@ -267,7 +423,7 @@ export default function BandarScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={{ fontSize: 32, marginBottom: 8 }}>🔍</Text>
-              <Text style={[{ color: colors.mutedForeground, textAlign: "center" }]}>
+              <Text style={{ color: colors.mutedForeground, textAlign: "center" }}>
                 Tidak ada saham ditemukan
               </Text>
             </View>
@@ -279,78 +435,34 @@ export default function BandarScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 8 },
-  title: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
-  subtitle: { fontSize: 12, marginBottom: 12 },
+  title: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5, marginBottom: 2 },
+  subtitle: { fontSize: 12, marginBottom: 10 },
   searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 12,
+    flexDirection: "row", alignItems: "center",
+    borderRadius: 10, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10,
   },
   searchInput: { flex: 1, fontSize: 14 },
-  tabRow: { flexDirection: "row", gap: 8, marginBottom: 12, flexWrap: "nowrap" },
+  tabRow: { flexDirection: "row", gap: 6, marginBottom: 10 },
   tabChip: {
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    flex: 1,
-    alignItems: "center",
+    flex: 1, borderRadius: 10, borderWidth: 1,
+    paddingVertical: 6, alignItems: "center", gap: 1,
   },
-  tabChipText: { fontSize: 11, fontWeight: "700" },
-  tabTitle: { fontSize: 15, fontWeight: "700", marginBottom: 4 },
+  tabChipText:  { fontSize: 13 },
+  tabChipCount: { fontSize: 10, fontWeight: "700" },
+  sectionTitle: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
   list: { paddingHorizontal: 16, paddingTop: 4 },
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 10,
-    gap: 10,
+  card: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 10 },
+  center: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    padding: 24, gap: 8, minHeight: 300,
   },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  cardLeft: { flex: 1, gap: 4 },
-  tickerRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  ticker: { fontSize: 18, fontWeight: "800" },
-  accBadge: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
-  accBadgeText: { fontSize: 10, fontWeight: "700" },
-  phaseDot: { width: 7, height: 7, borderRadius: 4 },
-  phaseLabel: { fontSize: 11, fontWeight: "600" },
-  metaRow: { flexDirection: "row", gap: 12, alignItems: "center" },
-  metaText: { fontSize: 12 },
-  trendIcon: { fontSize: 12, fontWeight: "600" },
-  scoreBadge: {
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignItems: "center",
-    minWidth: 52,
-  },
-  scoreNum: { fontSize: 22, fontWeight: "900" },
-  scoreLabel: { fontSize: 9, fontWeight: "600", marginTop: -2 },
-  cardBody: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  sparklineWrap: { flex: 1 },
-  brokerBarTrack: {
-    flexDirection: "row",
-    height: 5,
-    borderRadius: 3,
-    overflow: "hidden",
-    width: 80,
-  },
-  brokerBarBuy:  { backgroundColor: "#34d399" },
-  brokerBarSell: { backgroundColor: "#f87171" },
-  brokerBarLabels: { flexDirection: "row", justifyContent: "space-between", width: 80 },
-  brokerBuyLabel:  { color: "#34d399", fontSize: 9, fontWeight: "600" },
-  brokerSellLabel: { color: "#f87171", fontSize: 9, fontWeight: "600" },
-  cardFooter: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
-  topLabel: { fontSize: 11 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 8, minHeight: 300 },
   loadingText: { fontSize: 13, marginTop: 8, textAlign: "center" },
-  errorText: { fontSize: 14, textAlign: "center" },
+  errorText:   { fontSize: 14, textAlign: "center" },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
 });

@@ -1,0 +1,601 @@
+Radar Market — Panduan Implementasi Mobile
+Data Smart Money & Net Buy/Sell per Saham IDX
+Sumber utama Bandar Detector screen di mobile app
+
+GAMBARAN UMUM
+Radar Market adalah database aktivitas bandar per saham yang dihasilkan AFL Scanner dari data broker setiap hari. Berbeda dengan Master Stock yang berisi harga & FA ratios, Radar berisi aliran dana institusi (smart money) — siapa yang beli/jual dan berapa banyak dalam miliar Rp.
+
+Perbedaan Master Stock vs Radar:
+
+Master Stock	Radar Market
+Isi	Harga, Volume, FA Ratios	NBS 1D/5D/10D, VWAP, FlowState
+Sumber	AFL Scanner harian	AFL Scanner dari data broker
+Jumlah saham	~800+ saham	~500-600 saham (yang ada data broker)
+Dipakai di	Semua screen	Bandar Detector, Sector Rotation, Screener Smart Money
+Dipakai oleh:
+
+Screen	Data Radar yang dipakai
+Bandar Detector	NBS 1D/5D/10D · VWAP · FlowState · Signal
+StockTools: Smart Money In	nbs1d > 0 AND nbs5d > 0 AND nbs10d > 0
+Sector Rotation	avgBandarScore · avgTrendScore · accRatio per sektor
+Screener	filter flow_state · nbs_1d_pos/neg
+Stock Detail Smart Money tab	bandarScore · trendScore · flowState
+ENDPOINT RADAR
+GET https://stockbotpro.replit.app/api/radar
+Auth: Bearer <JWT_TOKEN>
+
+Response:
+
+{
+  "data": [
+    {
+      "symbol": "BBCA",
+      "name": "Bank Central Asia Tbk",
+      "close": 10100,
+      "nbs1d": 15.5,
+      "nbs5d": 45.2,
+      "nbs10d": 120.8,
+      "vwapD1": 10080,
+      "vwap5dAvg": 9950,
+      "flowState": "Strong Accumulation",
+      "vwapContext": "Accumulation",
+      "trendContext": "Accumulation",
+      "perf10d": 3.2,
+      "bandarScore": 82,
+      "trendScore": 78,
+      "rsMom": 12.5,
+      "changePct": 0.50,
+      "rsi": 58
+    },
+    ...
+  ],
+  "meta": {
+    "rows": 547,
+    "fileName": "RadarMarket_20260407.csv",
+    "uploadedAt": "2026-04-07T08:35:00Z"
+  }
+}
+
+FIELD LENGKAP RADAR MARKET
+Net Buy/Sell (NBS) — Core Data
+Field	Contoh	Keterangan
+nbs1d	15.5	Net Buy/Sell 1 hari dalam Miliar Rp
+nbs5d	45.2	Net Buy/Sell 5 hari (1 minggu) dalam Miliar Rp
+nbs10d	120.8	Net Buy/Sell 10 hari (2 minggu) dalam Miliar Rp
+Interpretasi NBS:
+
+Positif (+) = Net Buy → bandar lebih banyak beli dari jual → Accumulation
+Negatif (-) = Net Sell → bandar lebih banyak jual dari beli → Distribution
+Magnitude = semakin besar absolutnya, semakin besar aktivitas bandar
+NBS 1D: +15.5B → bandar net beli 15.5 miliar Rp hari ini
+NBS 5D: -45.2B → dalam 5 hari terakhir, net jual 45.2 miliar Rp
+NBS 10D: +120.8B → 10 hari terakhir masih net beli kuat
+
+VWAP Bandar
+Field	Contoh	Keterangan
+vwapD1	10080	Harga rata-rata bandar bertransaksi hari ini
+vwap5dAvg	9950	Harga rata-rata bandar bertransaksi 5 hari
+Penggunaan VWAP:
+
+Jika harga sekarang > vwapD1 → bandar lagi untung
+Jika harga sekarang < vwapD1 → bandar lagi rugi (potensi cut atau hold)
+Selisih harga vs vwapD1 = estimasi P/L posisi bandar
+Flow State — Sinyal Arah Dana
+Field	Nilai yang mungkin	Keterangan
+flowState	"Strong Accumulation"	Akumulasi kuat (1D)
+"Accumulation"	Akumulasi (1D)
+"Neutral"	Sideways / belum jelas
+"Distribution"	Distribusi (1D)
+"Strong Distribution"	Distribusi kuat (1D)
+vwapContext	sama di atas	Context 5 hari
+trendContext	sama di atas	Context 10 hari / trend
+Mapping ke Signal di Bandar Detector:
+
+function flowToSignal(flowState) {
+  const s = (flowState ?? "").toUpperCase();
+  if (s.includes("STRONG ACCUMULATION")) return "Accumulation";
+  if (s.includes("ACCUMULATION"))        return "Accumulation";
+  if (s.includes("STRONG DISTRIBUTION")) return "Distribution";
+  if (s.includes("DISTRIBUTION"))        return "Distribution";
+  return "Neutral";
+}
+// signal1d  = flowToSignal(flowState)    → sinyal hari ini
+// signal5d  = flowToSignal(vwapContext)  → sinyal 5 hari
+// signal10d = flowToSignal(trendContext) → sinyal 10 hari / trend
+
+Score & Momentum
+Field	Range	Keterangan
+bandarScore	0–100	Kekuatan akumulasi bandar (AFL-computed)
+trendScore	0–100	Kekuatan trend teknikal
+rsMom	-∞ ~ +∞	Relative Strength Momentum vs IHSG
+changePct	%	Perubahan harga hari ini dari radar AFL
+rsi	0–100	RSI dari radar AFL
+perf10d	%	Performa 10 hari terakhir
+ENDPOINT BANDAR DETECTOR
+Ini endpoint yang langsung dipakai mobile untuk tampilan Bandar Detector screen.
+
+GET https://stockbotpro.replit.app/api/analysis/bandar-detector?index=LQ45
+Auth: Bearer <JWT_TOKEN>
+Query params:
+  index = "LQ45" | "COMPOSITE" | "JII"
+  (default: LQ45)
+
+Response — Top 40 saham dengan aktivitas bandar tertinggi:
+
+[
+  {
+    "symbol": "BBCA",
+    "name": "Bank Central Asia Tbk",
+    "oneDayBillion": 15.5,
+    "fiveDayBillion": 45.2,
+    "tenDayBillion": 120.8,
+    "bandarAvg1d": 10080,
+    "bandarAvg5d": 9950,
+    "bandarAvg10d": 9750,
+    "signal1d": "Accumulation",
+    "signal5d": "Accumulation",
+    "signal10d": "Accumulation"
+  },
+  {
+    "symbol": "ANTM",
+    "name": "Aneka Tambang Tbk",
+    "oneDayBillion": -8.3,
+    "fiveDayBillion": 12.5,
+    "tenDayBillion": -35.2,
+    "bandarAvg1d": 1590,
+    "bandarAvg5d": 1550,
+    "bandarAvg10d": 1620,
+    "signal1d": "Distribution",
+    "signal5d": "Accumulation",
+    "signal10d": "Distribution"
+  }
+]
+
+Logika sorting server: diurutkan by Math.abs(nbs1d) descending — yang paling aktif (baik beli maupun jual) muncul di atas.
+
+BANDAR DETECTOR SCREEN — IMPLEMENTASI MOBILE
+Fetch Data
+const { data: bandarData, isLoading } = useQuery({
+  queryKey: ["bandar-detector", selectedIndex],
+  queryFn: async () => {
+    const r = await fetch(
+      `${API}/api/analysis/bandar-detector?index=${selectedIndex}`,
+      { headers: { Authorization: `Bearer ${jwt}` } }
+    );
+    return r.json();  // array of BandarRow
+  },
+  staleTime: 5 * 60 * 1000,  // 5 menit
+});
+
+Filter Tabs
+// Tab selector: Semua | Akumulasi | Distribusi
+const [activeTab, setActiveTab] = useState("ALL");
+// Filter index: LQ45 | COMPOSITE | JII
+const [selectedIndex, setSelectedIndex] = useState("LQ45");
+const filtered = useMemo(() => {
+  if (!bandarData) return [];
+  if (activeTab === "ACC")  return bandarData.filter(r => r.signal1d === "Accumulation");
+  if (activeTab === "DIST") return bandarData.filter(r => r.signal1d === "Distribution");
+  return bandarData;
+}, [bandarData, activeTab]);
+
+Tampilan Card Bandar Detector
+┌─────────────────────────────────────────────────┐
+│  BBCA   Bank Central Asia Tbk          🟢 ACC   │
+│                                                 │
+│  Harga: 10.100    VWAP: 10.080                  │
+│  Bandar lebih tinggi 20 poin (untung)            │
+│                                                 │
+│  ┌─────────┬─────────┬─────────┐                │
+│  │   1D    │   5D    │   10D   │                │
+│  │ +15.5B  │ +45.2B  │ +120.8B │                │
+│  │  🟢 ACC │  🟢 ACC │  🟢 ACC │                │
+│  └─────────┴─────────┴─────────┘                │
+└─────────────────────────────────────────────────┘
+
+function BandarCard({ item, onPress }) {
+  const { symbol, name, oneDayBillion, fiveDayBillion, tenDayBillion,
+          bandarAvg1d, signal1d, signal5d, signal10d } = item;
+  
+  // Harga saham saat ini — dari masterData cache
+  const stockInfo = stockMap.get(symbol);
+  const currentPrice = stockInfo?.close ?? 0;
+  
+  // P/L posisi bandar vs VWAP hari ini
+  const vwapDiff    = currentPrice - bandarAvg1d;
+  const vwapDiffPct = bandarAvg1d > 0 ? ((vwapDiff / bandarAvg1d) * 100).toFixed(2) : null;
+  
+  const signalColor = (sig) => {
+    if (sig === "Accumulation")  return "#34d399";  // hijau
+    if (sig === "Distribution")  return "#f87171";  // merah
+    return "#94a3b8";                               // abu
+  };
+  
+  const signalIcon = (sig) => {
+    if (sig === "Accumulation")  return "🟢";
+    if (sig === "Distribution")  return "🔴";
+    return "⚪";
+  };
+  
+  const formatBn = (val) => {
+    const v = val ?? 0;
+    const sign = v >= 0 ? "+" : "";
+    return `${sign}${v.toFixed(1)}B`;
+  };
+  
+  return (
+    <TouchableOpacity onPress={() => onPress(symbol)}
+      style={{ backgroundColor: "#1e2433", borderRadius: 12, padding: 14, marginBottom: 10 }}>
+      
+      {/* Header: Ticker + Signal Badge */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <View>
+          <Text style={{ color: "white", fontWeight: "900", fontSize: 16 }}>{symbol}</Text>
+          <Text style={{ color: "#94a3b8", fontSize: 11 }} numberOfLines={1}>{name}</Text>
+        </View>
+        <View style={{ backgroundColor: signalColor(signal1d) + "20",
+          borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+          <Text style={{ color: signalColor(signal1d), fontWeight: "700", fontSize: 12 }}>
+            {signalIcon(signal1d)} {signal1d}
+          </Text>
+        </View>
+      </View>
+      
+      {/* Harga & VWAP bandar */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 10 }}>
+        <Text style={{ color: "#60a5fa", fontSize: 12 }}>
+          Harga: {currentPrice.toLocaleString("id-ID")}
+        </Text>
+        {vwapDiffPct && (
+          <Text style={{ color: parseFloat(vwapDiffPct) >= 0 ? "#34d399" : "#f87171", fontSize: 11 }}>
+            Bandar VWAP: {bandarAvg1d.toLocaleString("id-ID")}
+            {" "}({vwapDiffPct}%)
+          </Text>
+        )}
+      </View>
+      
+      {/* NBS Multi-Timeframe Grid */}
+      <View style={{ flexDirection: "row", marginTop: 10, gap: 8 }}>
+        {[
+          { label: "1D", value: oneDayBillion, signal: signal1d },
+          { label: "5D", value: fiveDayBillion, signal: signal5d },
+          { label: "10D", value: tenDayBillion, signal: signal10d },
+        ].map((tf) => (
+          <View key={tf.label} style={{ flex: 1, backgroundColor: "#0f1629",
+            borderRadius: 8, padding: 8, alignItems: "center" }}>
+            <Text style={{ color: "#64748b", fontSize: 10 }}>{tf.label}</Text>
+            <Text style={{
+              color: (tf.value ?? 0) >= 0 ? "#34d399" : "#f87171",
+              fontWeight: "700", fontSize: 13, marginTop: 2
+            }}>
+              {formatBn(tf.value)}
+            </Text>
+            <Text style={{ color: signalColor(tf.signal), fontSize: 9, marginTop: 2 }}>
+              {signalIcon(tf.signal)} {tf.signal === "Accumulation" ? "ACC" :
+                tf.signal === "Distribution" ? "DIST" : "NEU"}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+BAGIAN 2: KONSISTENSI MULTI-TIMEFRAME
+Ini cara menilai kekuatan sinyal bandar berdasarkan konsistensi 3 timeframe:
+
+function getBandarStrength(signal1d, signal5d, signal10d) {
+  const signals = [signal1d, signal5d, signal10d];
+  const accCount  = signals.filter(s => s === "Accumulation").length;
+  const distCount = signals.filter(s => s === "Distribution").length;
+  
+  if (accCount === 3) return { label: "ACC KUAT", color: "#10b981", icon: "🟩🟩🟩" };
+  if (accCount === 2) return { label: "ACC",      color: "#34d399", icon: "🟩🟩⬜" };
+  if (distCount === 3) return { label: "DIST KUAT", color: "#dc2626", icon: "🟥🟥🟥" };
+  if (distCount === 2) return { label: "DIST",     color: "#f87171", icon: "🟥🟥⬜" };
+  return { label: "MIXED",   color: "#94a3b8", icon: "⬜⬜⬜" };
+}
+// Contoh: tampil di atas NBS grid
+const strength = getBandarStrength(item.signal1d, item.signal5d, item.signal10d);
+<Text style={{ color: strength.color }}>
+  {strength.icon} {strength.label}
+</Text>
+
+BAGIAN 3: STOCKTOOLS — SMART MONEY IN
+Endpoint untuk tab Smart Money In di StockTools:
+
+GET https://stockbotpro.replit.app/api/analysis/stockpick/nbs-multi-tf
+Auth: Bearer <JWT_TOKEN>
+
+Filter server: hanya saham yang nbs1d > 0 AND nbs5d > 0 AND nbs10d > 0 (semua 3 timeframe positif = bandar beli konsisten)
+
+[
+  {
+    "symbol": "BBCA",
+    "name": "Bank Central Asia Tbk",
+    "price": 10100,
+    "change": 50,
+    "changePercent": 0.50,
+    "volume": 24500000,
+    "signal": "Smart Money In",
+    "strength": 87,
+    "reason": "NBS 1D: 15.5B · 5D: 45.2B · 10D: 120.8B",
+    "sector": "Finance"
+  }
+]
+
+Score formula:
+
+score = Math.min(99, Math.round(
+  (Math.abs(nbs1d) + Math.abs(nbs5d) + Math.abs(nbs10d)) * 3 + 50
+))
+// Semakin besar total NBS, semakin tinggi score (max 99)
+
+BAGIAN 4: FLOW STATE DI SCREENER
+Radar data dipakai di Screener untuk filter smart money:
+
+// Filter yang tersedia di screener menggunakan radar:
+const RADAR_FILTERS = [
+  { key: "flow_state",  value: "accumulation", label: "Akumulasi (1D)" },
+  { key: "flow_state",  value: "distribution", label: "Distribusi (1D)" },
+  { key: "nbs_1d_pos",  label: "Net Buy 1D" },
+  { key: "nbs_1d_neg",  label: "Net Sell 1D" },
+  { key: "nbs_5d_pos",  label: "Net Buy 5D" },
+  { key: "nbs_5d_neg",  label: "Net Sell 5D" },
+  { key: "nbs_10d_pos", label: "Net Buy 10D" },
+  { key: "nbs_10d_neg", label: "Net Sell 10D" },
+];
+// Kombinasi powerful: Akumulasi 3 TF sekaligus
+const smartMoneyFilters = [
+  { key: "nbs_1d_pos" },   // Net buy hari ini
+  { key: "nbs_5d_pos" },   // Net buy 5 hari
+  { key: "nbs_10d_pos" },  // Net buy 10 hari
+];
+// → sama dengan endpoint nbs-multi-tf
+
+BAGIAN 5: RADAR DI STOCK DETAIL (Smart Money Tab)
+Ketika user buka Stock Detail → tab Smart Money, data radar per saham:
+
+// Fetch data radar untuk 1 saham dari cache
+const radarInfo = radarMap.get(symbol);  // dari GET /api/radar yang sudah di-cache
+const smartMoneyData = {
+  bandarScore: radarInfo?.bandarScore ?? null,
+  trendScore:  radarInfo?.trendScore  ?? null,
+  flowState:   radarInfo?.flowState   ?? null,
+  nbs1d:       radarInfo?.nbs1d       ?? null,
+  nbs5d:       radarInfo?.nbs5d       ?? null,
+  nbs10d:      radarInfo?.nbs10d      ?? null,
+  vwapD1:      radarInfo?.vwapD1      ?? null,
+  vwap5dAvg:   radarInfo?.vwap5dAvg   ?? null,
+  rsMom:       radarInfo?.rsMom       ?? null,
+};
+
+Tampilan Smart Money Tab di Stock Detail
+┌─────────────────────────────────────────┐
+│  Smart Money Activity                   │
+│                                         │
+│  Bandar Score   ████████░░  82/100      │
+│  Trend Score    ███████░░░  78/100      │
+│                                         │
+│  Flow State: 🟢 Strong Accumulation     │
+│                                         │
+│  Net Buy/Sell                           │
+│  ┌──────────┬──────────┬──────────┐     │
+│  │    1D    │    5D    │   10D    │     │
+│  │  +15.5B  │  +45.2B  │ +120.8B  │     │
+│  └──────────┴──────────┴──────────┘     │
+│                                         │
+│  VWAP Bandar Hari Ini: 10.080           │
+│  Harga sekarang 20 poin di atas VWAP    │
+│  → Bandar sedang untung                 │
+│                                         │
+│  RS Momentum: +12.5 (Outperform IHSG)   │
+└─────────────────────────────────────────┘
+
+function SmartMoneyTab({ symbol, currentPrice }) {
+  const radarInfo = radarMap.get(symbol);
+  if (!radarInfo) return <NoDataPlaceholder label="Data Smart Money belum tersedia" />;
+  
+  const flowSignal = flowToSignal(radarInfo.flowState ?? "");
+  const flowColor = flowSignal === "Accumulation" ? "#34d399"
+                  : flowSignal === "Distribution" ? "#f87171" : "#94a3b8";
+  
+  const vwapDiff = currentPrice && radarInfo.vwapD1
+    ? currentPrice - radarInfo.vwapD1 : null;
+  
+  return (
+    <ScrollView>
+      {/* Score Bars */}
+      <View style={{ backgroundColor: "#1e2433", borderRadius: 12, padding: 14, marginBottom: 10 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>Kekuatan Bandar</Text>
+        <ScoreBar label="Bandar Score" value={radarInfo.bandarScore ?? 0} color="#60a5fa" />
+        <ScoreBar label="Trend Score"  value={radarInfo.trendScore  ?? 0} color="#a78bfa" />
+      </View>
+      
+      {/* Flow State */}
+      <View style={{ backgroundColor: "#1e2433", borderRadius: 12, padding: 14, marginBottom: 10 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 12 }}>Flow State</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: flowColor, marginRight: 8 }} />
+          <Text style={{ color: flowColor, fontWeight: "700", fontSize: 14 }}>
+            {radarInfo.flowState ?? "N/A"}
+          </Text>
+        </View>
+      </View>
+      
+      {/* NBS Grid */}
+      <View style={{ backgroundColor: "#1e2433", borderRadius: 12, padding: 14, marginBottom: 10 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>Net Buy/Sell (Miliar Rp)</Text>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {[
+            { label: "1D",  value: radarInfo.nbs1d },
+            { label: "5D",  value: radarInfo.nbs5d },
+            { label: "10D", value: radarInfo.nbs10d },
+          ].map(tf => (
+            <View key={tf.label} style={{ flex: 1, backgroundColor: "#0f1629",
+              borderRadius: 8, padding: 10, alignItems: "center" }}>
+              <Text style={{ color: "#64748b", fontSize: 10 }}>{tf.label}</Text>
+              <Text style={{
+                color: (tf.value ?? 0) >= 0 ? "#34d399" : "#f87171",
+                fontWeight: "700", fontSize: 14, marginTop: 4
+              }}>
+                {tf.value != null ? `${tf.value >= 0 ? "+" : ""}${tf.value.toFixed(1)}B` : "N/A"}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+      
+      {/* VWAP Analysis */}
+      {radarInfo.vwapD1 != null && (
+        <View style={{ backgroundColor: "#1e2433", borderRadius: 12, padding: 14, marginBottom: 10 }}>
+          <Text style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>VWAP Bandar</Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <View>
+              <Text style={{ color: "#64748b", fontSize: 10 }}>VWAP 1D</Text>
+              <Text style={{ color: "white", fontWeight: "700" }}>
+                {radarInfo.vwapD1.toLocaleString("id-ID")}
+              </Text>
+            </View>
+            {radarInfo.vwap5dAvg != null && (
+              <View>
+                <Text style={{ color: "#64748b", fontSize: 10 }}>VWAP 5D</Text>
+                <Text style={{ color: "white", fontWeight: "700" }}>
+                  {radarInfo.vwap5dAvg.toLocaleString("id-ID")}
+                </Text>
+              </View>
+            )}
+          </View>
+          {vwapDiff != null && (
+            <Text style={{ color: vwapDiff >= 0 ? "#34d399" : "#f87171", fontSize: 12, marginTop: 8 }}>
+              Harga {vwapDiff >= 0 ? "di atas" : "di bawah"} VWAP bandar: {Math.abs(vwapDiff).toLocaleString("id-ID")} poin
+              {" → Bandar sedang {vwapDiff >= 0 ? "untung" : "rugi"}"}
+            </Text>
+          )}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+BAGIAN 6: SECTOR ROTATION — ENRICHMENT DARI RADAR
+Server menggabungkan radar + master untuk sector rotation:
+
+// Response dari GET /api/analysis/sector-rotation
+{
+  "sector": "Finance",
+  "performance1d": 0.45,
+  "performance1w": 1.2,
+  "phase": "Leading",          // Leading | Weakening | Improving | Lagging
+  "stockCount": 68,
+  "topStock": "BBCA",
+  "topStockChange": 0.50,
+  "avgBandarScore": 72.5,     // rata-rata bandarScore saham di sektor ini
+  "avgTrendScore": 68.3,      // rata-rata trendScore
+  "accRatio": 65,              // % saham yang sedang Accumulation di sektor ini
+}
+
+Penggunaan di Sector Card:
+
+function SectorCard({ sector }) {
+  const phaseColor = {
+    Leading: "#34d399", Improving: "#60a5fa",
+    Weakening: "#fbbf24", Lagging: "#f87171"
+  }[sector.phase] ?? "#94a3b8";
+  return (
+    <View>
+      <Text>{sector.sector}</Text>
+      <View>
+        <Text style={{ color: phaseColor }}>{sector.phase}</Text>
+        <Text>{sector.performance1d >= 0 ? "+" : ""}{sector.performance1d.toFixed(2)}%</Text>
+      </View>
+      {sector.accRatio != null && (
+        <Text style={{ color: "#34d399", fontSize: 10 }}>
+          Acc Ratio: {sector.accRatio}% | Bandar Score: {sector.avgBandarScore}
+        </Text>
+      )}
+      <Text style={{ color: "#64748b", fontSize: 10 }}>
+        Top: {sector.topStock} ({sector.topStockChange >= 0 ? "+" : ""}{sector.topStockChange.toFixed(2)}%)
+      </Text>
+    </View>
+  );
+}
+
+BAGIAN 7: CACHING STRATEGY — RADAR DI MOBILE
+// Radar data lebih ringan dari master (500-600 baris vs 800+)
+// Cache strategy berbeda karena dipakai di screen tertentu saja
+// Option 1: Fetch sekaligus saat launch (recommended)
+const { data: radarData } = useQuery({
+  queryKey: ["radar"],
+  queryFn: async () => {
+    const r = await fetch(`${API}/api/radar`, {
+      headers: { Authorization: `Bearer ${jwt}` }
+    });
+    return r.json();
+  },
+  staleTime: 60 * 60 * 1000,  // 1 jam
+});
+// Buat radarMap untuk lookup cepat per symbol
+const radarMap = useMemo(
+  () => new Map((radarData?.data ?? []).map(r => [r.symbol, r])),
+  [radarData]
+);
+// Option 2: Lazy load hanya saat buka Bandar Detector
+// (untuk hemat bandwidth jika app besar)
+const { data: bandarData } = useQuery({
+  queryKey: ["bandar-detector", index],
+  queryFn: () => fetchBandarDetector(index),
+  enabled: isOnBandarDetectorScreen,
+  staleTime: 5 * 60 * 1000,
+});
+
+HELPER FUNCTIONS RADAR
+// Konversi flowState ke display yang ramah user
+function getFlowLabel(flowState) {
+  const s = (flowState ?? "").toUpperCase();
+  if (s.includes("STRONG ACCUMULATION")) return { label: "Akumulasi Kuat", color: "#10b981", short: "ACC ✦" };
+  if (s.includes("ACCUMULATION"))        return { label: "Akumulasi",      color: "#34d399", short: "ACC" };
+  if (s.includes("STRONG DISTRIBUTION")) return { label: "Distribusi Kuat", color: "#dc2626", short: "DIST ✦" };
+  if (s.includes("DISTRIBUTION"))        return { label: "Distribusi",     color: "#f87171", short: "DIST" };
+  return { label: "Netral", color: "#94a3b8", short: "NEU" };
+}
+// NBS bar width untuk visualisasi
+function nbsBarWidth(value, maxValue) {
+  if (maxValue === 0) return 0;
+  return Math.min(100, (Math.abs(value) / Math.max(maxValue, 1)) * 100);
+}
+// Interpretasi VWAP vs harga sekarang
+function vwapInterpretation(currentPrice, vwap) {
+  if (!vwap || !currentPrice) return null;
+  const diffPct = ((currentPrice - vwap) / vwap) * 100;
+  if (diffPct > 2)   return { text: "Harga jauh di atas VWAP bandar (bandar untung besar)", color: "#34d399" };
+  if (diffPct > 0)   return { text: "Harga di atas VWAP bandar (bandar untung)", color: "#6ee7b7" };
+  if (diffPct > -2)  return { text: "Harga di bawah VWAP bandar (bandar sedikit rugi)", color: "#fca5a5" };
+  return { text: "Harga jauh di bawah VWAP bandar (bandar rugi — potensi cut loss)", color: "#f87171" };
+}
+// Format NBS dengan warna
+function formatNBS(value) {
+  if (value == null) return { text: "N/A", color: "#64748b" };
+  const sign  = value >= 0 ? "+" : "";
+  const color = value >= 0 ? "#34d399" : "#f87171";
+  const text  = `${sign}${value.toFixed(1)}B`;
+  return { text, color };
+}
+
+RINGKASAN
+// 1. Cache radar data saat launch
+useQuery({ queryKey: ["radar"], staleTime: 3600000 })
+const radarMap = new Map(radarData.map(r => [r.symbol, r]))
+// 2. Bandar Detector screen → pakai endpoint khusus
+GET /api/analysis/bandar-detector?index=LQ45
+// 3. Smart Money In di StockTools → pakai endpoint
+GET /api/analysis/stockpick/nbs-multi-tf
+// 4. Stock Detail Smart Money tab → lookup dari radarMap
+radarMap.get(symbol) → { nbs1d, nbs5d, nbs10d, vwapD1, flowState, bandarScore, trendScore }
+// 5. Key interpretasi:
+// nbs positif + flowState "Accumulation" → bandar beli → BULLISH
+// nbs negatif + flowState "Distribution" → bandar jual → BEARISH
+// Harga > vwapD1 → bandar lagi untung
+// 3 timeframe semua ACC → konfirmasi terkuat (Smart Money In)
+
+Radar Market adalah lapisan "X-ray" yang melihat ke balik pergerakan harga — bukan hanya berapa harganya, tapi siapa yang menggerakkan dan ke mana arahnya.

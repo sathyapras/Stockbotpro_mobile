@@ -18,7 +18,8 @@ const UPSTREAM: Record<string, { host: string; path: string; ttl?: number }> = {
   BuyOnStrenght_Signal:    { host: "103.190.28.248", path: "/stockbotprodata/BuyOnStrenght_Signal" },
   BuyOnWeakness_Signal:    { host: "103.190.28.248", path: "/stockbotprodata/BuyOnWeakness_Signal" },
   STOCKTOOLS_SCREENER:     { host: "103.190.28.248", path: "/stockbotprodata/STOCKTOOLS_SCREENER" },
-  MASTER_STOCK_DB:         { host: "103.190.28.248", path: "/stockbotprodata/MASTER_STOCK_DB", ttl: CACHE_TTL_LONG_MS },
+  MASTER_STOCK_DB:         { host: "103.190.28.248", path: "/stockbotprodata/MASTER_STOCK_DB",  ttl: CACHE_TTL_LONG_MS },
+  RADAR_MARKET:            { host: "103.190.28.248", path: "/stockbotprodata/RADAR_MARKET",     ttl: CACHE_TTL_LONG_MS },
 };
 
 function fetchUpstream(cfg: { host: string; path: string }): Promise<unknown> {
