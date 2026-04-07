@@ -1,0 +1,339 @@
+# Sector Rotation — Panduan Implementasi Mobile
+## Rotasi sektor berdasarkan Smart Money + RRG Phase
+
+---
+
+## SATU ENDPOINT — Semua Yang Dibutuhkan
+
+```javascript
+GET /api/analysis/sector-sm-ranking
+// Auth: headers { Authorization: "Bearer <token>" }
+```
+
+### Response (array, sudah di-sort by avgBandarScore descending)
+
+```json
+[
+  {
+    "sector":          "Basic Materials",
+    "idxCode":         "IDXBASIC",
+    "phase":           "Leading",
+    "avgBandarScore":  68.4,
+    "avgTrendScore":   61.2,
+    "accPct":          54.3,
+    "accCount":        19,
+    "totalCount":      35,
+    "radarCount":      31,
+    "rsRatioCurrent":  102.1,
+    "rsChange2w":      +1.4,
+    "topStocks": [
+      { "symbol": "ESSA", "bandarScore": 89, "trendScore": 72, "flowState": "★ ACCUMULATION", "isAccum": true },
+      { "symbol": "BRPT", "bandarScore": 85, "trendScore": 68, "flowState": "ACCUMULATION",   "isAccum": true },
+      { "symbol": "TPIA", "bandarScore": 79, "trendScore": 60, "flowState": "NEUTRAL",         "isAccum": false }
+    ]
+  },
+  ...
+]
+```
+
+---
+
+## FIELD YANG DIPAKAI (fokus yang penting)
+
+| Field | Arti | Dipakai untuk |
+|-------|------|--------------|
+| `sector` | Nama sektor | Label kartu |
+| `phase` | Leading/Improving/Weakening/Lagging | Badge warna |
+| `avgBandarScore` | Rata-rata bandar score sektor (0-100) | Bar horizontal + sort |
+| `accPct` | % saham dalam akumulasi | Angka sub-label |
+| `rsChange2w` | Perubahan RS ratio 2 minggu | Momentum arrow ↑↓ |
+| `topStocks[0..2]` | Top 3 saham per sektor | Chip di bawah kartu |
+
+---
+
+## PHASE — 4 Kuadran RRG
+
+| Phase | Arti | Warna | Emoji | Action |
+|-------|------|-------|-------|--------|
+| **Leading** | RS kuat + momentum naik | `#34d399` hijau | 🟢 | Masuk / hold |
+| **Improving** | RS lemah tapi momentum mulai naik | `#60a5fa` biru | 🔵 | Antisipasi entry |
+| **Weakening** | RS kuat tapi momentum mulai turun | `#f97316` oranye | 🟠 | Mulai waspada |
+| **Lagging** | RS lemah + momentum turun | `#f87171` merah | 🔴 | Hindari / exit |
+
+```javascript
+const PHASE_CONFIG = {
+  Leading:   { color: "#34d399", bg: "#052e16", emoji: "🟢", label: "Leading",   action: "Masuk" },
+  Improving: { color: "#60a5fa", bg: "#0c1629", emoji: "🔵", label: "Improving", action: "Antisipasi" },
+  Weakening: { color: "#f97316", bg: "#1c0e05", emoji: "🟠", label: "Weakening", action: "Waspada" },
+  Lagging:   { color: "#f87171", bg: "#2d0a0a", emoji: "🔴", label: "Lagging",   action: "Hindari" },
+};
+```
+
+---
+
+## LAYOUT SCREEN
+
+```
+┌─────────────────────────────────────────────┐
+│  🔄 Sektor          Diurutkan: SM Score ▼   │
+│                                             │
+│  [🟢 Leading 3] [🔵 Improving 2]            │
+│  [🟠 Weakening 4] [🔴 Lagging 2]           │
+├─────────────────────────────────────────────┤
+│  1. Basic Materials               68/100    │
+│     [🟢 Leading] ↑ RS +1.4        54% Acc  │
+│     ● ESSA 89  ● BRPT 85  ● TPIA 79        │
+├─────────────────────────────────────────────┤
+│  2. Energy                        61/100    │
+│     [🔵 Improving] ↑ RS +0.8      47% Acc  │
+│     ● MEDC 82  ● ELSA 77  ● AKRA 71        │
+├─────────────────────────────────────────────┤
+│     ... dst                                 │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## KOMPONEN: SectorRotationScreen
+
+```javascript
+export function SectorRotationScreen({ navigation }) {
+  const [sortBy, setSortBy] = useState("sm");    // "sm" | "phase"
+  const [filterPhase, setFilterPhase] = useState(null); // null = semua
+
+  const { data: sectors = [], isLoading } = useQuery({
+    queryKey: ["sector-sm-ranking"],
+    queryFn:  () => fetchWithAuth("/api/analysis/sector-sm-ranking"),
+    staleTime: 15 * 60 * 1000,
+  });
+
+  // Sort
+  const sorted = useMemo(() => {
+    let list = filterPhase
+      ? sectors.filter(s => s.phase === filterPhase)
+      : [...sectors];
+    if (sortBy === "sm")    return list.sort((a, b) => b.avgBandarScore - a.avgBandarScore);
+    if (sortBy === "phase") return list.sort((a, b) => PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]);
+    return list;
+  }, [sectors, sortBy, filterPhase]);
+
+  // Phase counts untuk filter pill
+  const phaseCounts = useMemo(() => {
+    const c = { Leading: 0, Improving: 0, Weakening: 0, Lagging: 0 };
+    sectors.forEach(s => { if (c[s.phase] !== undefined) c[s.phase]++; });
+    return c;
+  }, [sectors]);
+
+  if (isLoading) return <LoadingState />;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8,
+        flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 18 }}>🔄 Sektor</Text>
+        <TouchableOpacity onPress={() => setSortBy(s => s === "sm" ? "phase" : "sm")}>
+          <Text style={{ color: "#64748b", fontSize: 12 }}>
+            Diurutkan: {sortBy === "sm" ? "SM Score" : "Phase"} ▼
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Phase Filter Pills */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 10 }}>
+        <TouchableOpacity
+          onPress={() => setFilterPhase(null)}
+          style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16,
+            backgroundColor: filterPhase === null ? "#1e2433" : "transparent",
+            borderWidth: 1, borderColor: filterPhase === null ? "#475569" : "#1e293b" }}>
+          <Text style={{ color: "#94a3b8", fontSize: 12 }}>Semua {sectors.length}</Text>
+        </TouchableOpacity>
+
+        {Object.keys(PHASE_CONFIG).map(phase => {
+          const cfg = PHASE_CONFIG[phase];
+          const active = filterPhase === phase;
+          return (
+            <TouchableOpacity key={phase}
+              onPress={() => setFilterPhase(f => f === phase ? null : phase)}
+              style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16,
+                backgroundColor: active ? cfg.bg : "transparent",
+                borderWidth: 1, borderColor: active ? cfg.color : "#1e293b" }}>
+              <Text style={{ color: active ? cfg.color : "#64748b", fontSize: 12 }}>
+                {cfg.emoji} {phase} {phaseCounts[phase]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Sector List */}
+      <FlatList
+        data={sorted}
+        keyExtractor={item => item.sector}
+        renderItem={({ item, index }) => (
+          <SectorCard
+            sector={item}
+            rank={index + 1}
+            onPressStock={sym => navigation.navigate("StockDetail", { symbol: sym })}
+          />
+        )}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+}
+
+// Phase order untuk sort: Leading → Improving → Weakening → Lagging
+const PHASE_ORDER = { Leading: 0, Improving: 1, Weakening: 2, Lagging: 3 };
+```
+
+---
+
+## KOMPONEN: SectorCard
+
+```javascript
+function SectorCard({ sector, rank, onPressStock }) {
+  const cfg = PHASE_CONFIG[sector.phase] ?? PHASE_CONFIG.Lagging;
+  const rsUp = (sector.rsChange2w ?? 0) >= 0;
+
+  return (
+    <View style={{
+      backgroundColor: "#1e2433", borderRadius: 14, padding: 14,
+      borderLeftWidth: 3, borderLeftColor: cfg.color,
+    }}>
+      {/* Row 1: Rank + Sector Name + SM Score */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+        <Text style={{ color: "#475569", fontSize: 12, width: 20 }}>{rank}.</Text>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 15, flex: 1 }}>
+          {sector.sector}
+        </Text>
+        {/* SM Score bar */}
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ color: "#a78bfa", fontWeight: "900", fontSize: 18 }}>
+            {Math.round(sector.avgBandarScore)}
+          </Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>/100</Text>
+        </View>
+      </View>
+
+      {/* Row 2: Phase Badge + RS Change + Acc% */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        {/* Phase badge */}
+        <View style={{ backgroundColor: cfg.bg, borderRadius: 6, borderWidth: 1,
+          borderColor: cfg.color + "60", paddingHorizontal: 8, paddingVertical: 3 }}>
+          <Text style={{ color: cfg.color, fontSize: 10, fontWeight: "700" }}>
+            {cfg.emoji} {sector.phase}
+          </Text>
+        </View>
+
+        {/* RS momentum */}
+        <Text style={{ color: rsUp ? "#34d399" : "#f87171", fontSize: 11 }}>
+          {rsUp ? "↑" : "↓"} RS {rsUp ? "+" : ""}{sector.rsChange2w?.toFixed(1)}
+        </Text>
+
+        {/* Acc% */}
+        <Text style={{ color: "#64748b", fontSize: 11, marginLeft: "auto" }}>
+          {sector.accPct?.toFixed(0)}% Acc
+          <Text style={{ color: "#475569" }}> ({sector.accCount}/{sector.radarCount})</Text>
+        </Text>
+      </View>
+
+      {/* SM Score bar */}
+      <View style={{ height: 4, backgroundColor: "#0f1629",
+        borderRadius: 2, overflow: "hidden", marginBottom: 10 }}>
+        <View style={{
+          height: "100%", borderRadius: 2,
+          width: `${Math.min(100, sector.avgBandarScore)}%`,
+          backgroundColor: cfg.color,
+        }} />
+      </View>
+
+      {/* Top 3 Stocks */}
+      {sector.topStocks?.length > 0 && (
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {sector.topStocks.map(s => (
+            <TouchableOpacity key={s.symbol}
+              onPress={() => onPressStock(s.symbol)}
+              style={{
+                backgroundColor: s.isAccum ? "#052e1680" : "#0f162980",
+                borderRadius: 8, borderWidth: 1,
+                borderColor: s.isAccum ? "#16a34a50" : "#33415550",
+                paddingHorizontal: 8, paddingVertical: 5,
+              }}>
+              <Text style={{ color: "white", fontWeight: "700", fontSize: 11 }}>
+                {s.symbol}
+              </Text>
+              <Text style={{
+                fontSize: 9,
+                color: s.isAccum ? "#34d399" : "#64748b",
+              }}>
+                {Math.round(s.bandarScore)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+```
+
+---
+
+## TAMPILAN FINAL PER KARTU
+
+```
+┌─────────────────────────────────────────────┐
+│ 1. Basic Materials                      68  │ ← SM Score besar + biru/ungu
+│    [🟢 Leading]  ↑ RS +1.4   54% Acc       │ ← phase + RS + acc%
+│    [████████████████████░░░░░░░░]           │ ← progress bar SM score
+│    [ESSA 89] [BRPT 85] [TPIA 79]           │ ← top 3 saham (tap → detail)
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│ 2. Energy                               61  │
+│    [🔵 Improving] ↑ RS +0.8   47% Acc      │
+│    [████████████████░░░░░░░░░░░░]           │
+│    [MEDC 82] [ELSA 77] [AKRA 71]           │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## CARA BACA — HINT UNTUK USER
+
+Tampilkan tooltip/info kecil di atas list, bisa dihilangkan setelah user tap:
+
+```javascript
+const PHASE_HINTS = {
+  Leading:   "RS kuat & momentum positif — sektor terbaik untuk entry",
+  Improving: "Momentum mulai membaik — antisipasi rotasi masuk",
+  Weakening: "RS masih kuat tapi melambat — mulai waspada",
+  Lagging:   "RS lemah & momentum turun — hindari atau exit",
+};
+```
+
+```
+ℹ️  🟢 Leading = sektor terkuat saat ini
+    🔵 Improving = mulai berputar ke atas
+    🟠 Weakening = mulai melemah
+    🔴 Lagging = hindari
+```
+
+---
+
+## RINGKASAN
+
+| Item | Detail |
+|------|--------|
+| Endpoint | `GET /api/analysis/sector-sm-ranking` |
+| Auth | Bearer token (required) |
+| Stale time | 15 menit |
+| Sort default | avgBandarScore descending |
+| Total sektor | 11 (IDX sector index) |
+| Per kartu | Phase badge · RS momentum · Acc% · SM bar · Top 3 saham |
+| Tap stock | Navigasi ke StockDetail |
+
+*Tidak butuh endpoint lain — satu call sudah cukup untuk seluruh screen.*

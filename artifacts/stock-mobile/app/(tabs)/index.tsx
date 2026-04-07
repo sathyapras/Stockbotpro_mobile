@@ -224,7 +224,8 @@ const TRENDING_TOOLS = [
   { icon: "📡", label: "Radar",    sublabel: "Market Intel", color: "#34d399", bg: "#0d2618", border: "#16a34a40", path: "/market-intel" },
   { icon: "🎯", label: "Stockpick",sublabel: "BOW & BOS",   color: "#fbbf24", bg: "#1c1500", border: "#d9770640", path: "/(tabs)/stockpick" },
   { icon: "🔽", label: "Screener", sublabel: "Filter Saham",color: "#60a5fa", bg: "#0c1629", border: "#1d4ed840", path: "/(tabs)/screener" },
-  { icon: "🔍", label: "Watchlist",sublabel: "Pantau",      color: "#fb923c", bg: "#1c0e05", border: "#c2410c40", path: "/(tabs)/watchlist" },
+  { icon: "🔄", label: "Sektor",   sublabel: "Rotasi",      color: "#fb923c", bg: "#1c0e05", border: "#c2410c40", path: "/sector-rotation" },
+  { icon: "🔍", label: "Watchlist",sublabel: "Pantau",      color: "#94a3b8", bg: "#131d2b", border: "#33415540", path: "/(tabs)/watchlist" },
 ] as const;
 
 function TrendingToolsSection() {
