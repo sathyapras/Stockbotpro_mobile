@@ -74,136 +74,147 @@ function PickCard({ item }: { item: StockPickItem }) {
       onPress={() => router.push(`/stock/${item.ticker}`)}
       activeOpacity={0.75}
     >
-      {/* Header row */}
-      <View style={styles.cardHeader}>
-        <View style={styles.headerLeft}>
-          <Text style={[styles.ticker, { color: colors.foreground }]}>{item.ticker}</Text>
-          <Badge label={item.type} color={item.type === "BOW" ? "#34d399" : "#a78bfa"} />
-          <Badge label={statusCfg.label} color={statusCfg.color} />
-          {item.grade !== "–" && (
-            <Badge label={`Grade ${item.grade}`} color={gradeColor} />
+      {/* 2-column layout: left=content, right=score panel */}
+      <View style={{ flexDirection: "row", gap: 10 }}>
+
+        {/* ── Left column: all content ── */}
+        <View style={{ flex: 1, minWidth: 0 }}>
+
+          {/* Ticker + badges */}
+          <View style={[styles.headerLeft, { marginBottom: 6 }]}>
+            <Text style={[styles.ticker, { color: colors.foreground }]}>{item.ticker}</Text>
+            <Badge label={item.type} color={item.type === "BOW" ? "#34d399" : "#a78bfa"} />
+            <Badge label={statusCfg.label} color={statusCfg.color} />
+            {item.grade !== "–" && (
+              <Badge label={`Grade ${item.grade}`} color={gradeColor} />
+            )}
+          </View>
+
+          {/* Price + hold */}
+          <View style={[styles.priceRow, { marginBottom: 8 }]}>
+            <Text style={[styles.closePrice, { color: colors.foreground }]}>
+              Rp {formatRp(item.close)}
+            </Text>
+            {hasGL && (
+              <Text style={[styles.glPct, { color: isProfit ? "#34d399" : "#f87171" }]}>
+                {isProfit ? "+" : ""}{item.glPct.toFixed(2)}%
+              </Text>
+            )}
+            <Text style={[styles.holdDays, { color: colors.mutedForeground }]}>{item.holdDays}</Text>
+          </View>
+
+          {/* Entry / SL / TP grid */}
+          <View style={[styles.priceBlocks, { marginBottom: 8 }]}>
+            <InfoBlock
+              label="Entry"
+              value={
+                item.entryHigh
+                  ? `${formatRp(item.entry)}–${formatRp(item.entryHigh)}`
+                  : `Rp ${formatRp(item.entry)}`
+              }
+              color="#fbbf24"
+            />
+            <InfoBlock
+              label="Stop Loss"
+              value={`Rp ${formatRp(item.stopLoss)}\n${item.slPct.toFixed(1)}%`}
+              color="#f87171"
+            />
+            <InfoBlock
+              label="TP1"
+              value={`Rp ${formatRp(item.tp1)}\n+${item.tp1Pct.toFixed(1)}%`}
+              color="#34d399"
+            />
+            <InfoBlock
+              label="TP2"
+              value={`Rp ${formatRp(item.tp2)}`}
+              color="#a78bfa"
+            />
+          </View>
+
+          {/* RR + meta */}
+          <View style={[styles.metaRow, { marginBottom: 6 }]}>
+            {item.rr > 0 && (
+              <View style={[styles.rrChip, { backgroundColor: "#60a5fa22", borderColor: "#60a5fa44" }]}>
+                <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700" }}>
+                  RR 1:{item.rr.toFixed(1)}
+                </Text>
+              </View>
+            )}
+            {item.conf > 0 && (
+              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                Conf: {item.conf}%
+              </Text>
+            )}
+            {item.vwap !== null && (
+              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                VWAP {formatRp(item.vwap)}
+                {item.vwapPct !== null ? ` (${item.vwapPct > 0 ? "+" : ""}${item.vwapPct.toFixed(1)}%)` : ""}
+              </Text>
+            )}
+          </View>
+
+          {/* Signal chips */}
+          {item.signals.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={[styles.chipRow, { marginBottom: 4 }]}>
+                {item.signals.map((s, i) => <SignalChip key={i} label={s} />)}
+              </View>
+            </ScrollView>
           )}
+
+          {/* Commentary snippet */}
+          {item.commentary ? (
+            <Text style={[styles.commentary, { color: "#94a3b8" }]} numberOfLines={2}>
+              {item.commentary}
+            </Text>
+          ) : null}
         </View>
-        <View style={styles.scoreBox}>
-          <Text style={[styles.scoreNum, { color: colors.primary }]}>
+
+        {/* ── Right column: Score + RSI + StochK ── */}
+        <View style={{ alignItems: "center", width: 54 }}>
+          {/* Score */}
+          <Text style={[styles.scoreNum, { color: colors.primary, lineHeight: 28 }]}>
             {Math.round(item.score)}
           </Text>
           <Text style={[styles.scoreUnit, { color: colors.mutedForeground }]}>score</Text>
+
+          {/* Divider */}
+          <View style={{ width: 40, height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
+
+          {/* RSI */}
           {item.rsi !== null && (
-            <View style={{ alignItems: "center", marginTop: 6,
-              backgroundColor: colors.background, borderRadius: 6,
+            <View style={{ alignItems: "center", width: 54,
+              backgroundColor: colors.background, borderRadius: 8,
               borderWidth: 1, borderColor: colors.border,
-              paddingHorizontal: 6, paddingVertical: 2, width: 52 }}>
+              paddingVertical: 5, marginBottom: 6 }}>
               <Text style={{ color: item.rsi < 30 ? "#34d399"
-                : item.rsi > 70 ? "#f87171" : "#94a3b8",
-                fontSize: 12, fontWeight: "900" }}>
+                : item.rsi > 70 ? "#f87171" : "#e2e8f0",
+                fontSize: 16, fontWeight: "900", lineHeight: 20 }}>
                 {item.rsi.toFixed(0)}
               </Text>
-              <Text style={{ color: "#475569", fontSize: 7, fontWeight: "600" }}>RSI</Text>
+              <Text style={{ color: "#64748b", fontSize: 8, fontWeight: "700",
+                letterSpacing: 0.5 }}>RSI</Text>
             </View>
           )}
+
+          {/* StochK */}
           {item.stochK !== null && item.stochK !== undefined && (
-            <View style={{ alignItems: "center", marginTop: 3,
-              backgroundColor: colors.background, borderRadius: 6,
+            <View style={{ alignItems: "center", width: 54,
+              backgroundColor: colors.background, borderRadius: 8,
               borderWidth: 1, borderColor: colors.border,
-              paddingHorizontal: 6, paddingVertical: 2, width: 52 }}>
+              paddingVertical: 5 }}>
               <Text style={{ color: item.stochK < 20 ? "#34d399"
-                : item.stochK < 40 ? "#fbbf24" : "#94a3b8",
-                fontSize: 12, fontWeight: "900" }}>
+                : item.stochK < 40 ? "#fbbf24" : "#e2e8f0",
+                fontSize: 16, fontWeight: "900", lineHeight: 20 }}>
                 {item.stochK.toFixed(0)}
               </Text>
-              <Text style={{ color: "#475569", fontSize: 7, fontWeight: "600" }}>StochK</Text>
+              <Text style={{ color: "#64748b", fontSize: 8, fontWeight: "700",
+                letterSpacing: 0.5 }}>StochK</Text>
             </View>
           )}
         </View>
+
       </View>
-
-      {/* Price + hold row */}
-      <View style={styles.priceRow}>
-        <Text style={[styles.closePrice, { color: colors.foreground }]}>
-          Rp {formatRp(item.close)}
-        </Text>
-        {hasGL && (
-          <Text style={[styles.glPct, { color: isProfit ? "#34d399" : "#f87171" }]}>
-            {isProfit ? "+" : ""}{item.glPct.toFixed(2)}%
-          </Text>
-        )}
-        <Text style={[styles.holdDays, { color: colors.mutedForeground }]}>{item.holdDays}</Text>
-      </View>
-
-      {/* Entry / SL / TP row */}
-      <View style={styles.priceBlocks}>
-        <InfoBlock
-          label="Entry"
-          value={
-            item.entryHigh
-              ? `${formatRp(item.entry)}–${formatRp(item.entryHigh)}`
-              : `Rp ${formatRp(item.entry)}`
-          }
-          color="#fbbf24"
-        />
-        <InfoBlock
-          label="Stop Loss"
-          value={`Rp ${formatRp(item.stopLoss)}\n${item.slPct.toFixed(1)}%`}
-          color="#f87171"
-        />
-        <InfoBlock
-          label="TP1"
-          value={`Rp ${formatRp(item.tp1)}\n+${item.tp1Pct.toFixed(1)}%`}
-          color="#34d399"
-        />
-        <InfoBlock
-          label="TP2"
-          value={`Rp ${formatRp(item.tp2)}`}
-          color="#a78bfa"
-        />
-      </View>
-
-      {/* RR + extra info */}
-      <View style={styles.metaRow}>
-        {item.rr > 0 && (
-          <View style={[styles.rrChip, { backgroundColor: "#60a5fa22", borderColor: "#60a5fa44" }]}>
-            <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700" }}>
-              RR 1:{item.rr.toFixed(1)}
-            </Text>
-          </View>
-        )}
-        {item.conf > 0 && (
-          <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-            Conf: {item.conf}%
-          </Text>
-        )}
-        {item.rsi !== null && (
-          <Text style={[styles.metaText, { color: item.rsi < 30 ? "#34d399" : colors.mutedForeground }]}>
-            RSI {item.rsi.toFixed(0)}
-          </Text>
-        )}
-        {item.vwap !== null && (
-          <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-            VWAP {formatRp(item.vwap)}
-            {item.vwapPct !== null ? ` (${item.vwapPct > 0 ? "+" : ""}${item.vwapPct.toFixed(1)}%)` : ""}
-          </Text>
-        )}
-      </View>
-
-      {/* Signal chips */}
-      {item.signals.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.chipRow}>
-            {item.signals.map((s, i) => <SignalChip key={i} label={s} />)}
-          </View>
-        </ScrollView>
-      )}
-
-      {/* Commentary snippet */}
-      {item.commentary ? (
-        <Text
-          style={[styles.commentary, { color: "#94a3b8" }]}
-          numberOfLines={2}
-        >
-          {item.commentary}
-        </Text>
-      ) : null}
     </TouchableOpacity>
   );
 }
