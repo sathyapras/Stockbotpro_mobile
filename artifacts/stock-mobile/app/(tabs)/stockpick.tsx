@@ -74,100 +74,127 @@ function PickCard({ item }: { item: StockPickItem }) {
       onPress={() => router.push(`/stock/${item.ticker}`)}
       activeOpacity={0.75}
     >
-      {/* 2-column layout: left=content, right=score panel */}
-      <View style={{ flexDirection: "row", gap: 10 }}>
+      {/* ── 2-column: left=content | right=score panel ── */}
+      <View style={{ flexDirection: "row", gap: 12 }}>
 
-        {/* ── Left column: all content ── */}
-        <View style={{ flex: 1, minWidth: 0 }}>
+        {/* ── Left column ── */}
+        <View style={{ flex: 1, minWidth: 0, gap: 10 }}>
 
-          {/* Ticker + badges */}
-          <View style={[styles.headerLeft, { marginBottom: 6 }]}>
-            <Text style={[styles.ticker, { color: colors.foreground }]}>{item.ticker}</Text>
+          {/* Row 1: Ticker + Price inline */}
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10 }}>
+            <Text style={{ fontSize: 26, fontWeight: "900", color: colors.foreground }}>
+              {item.ticker}
+            </Text>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}>
+              Rp {formatRp(item.close)}
+            </Text>
+          </View>
+
+          {/* Row 2: Badges + change% + holdDays */}
+          <View style={{ flexDirection: "row", alignItems: "center",
+            gap: 6, flexWrap: "wrap" }}>
             <Badge label={item.type} color={item.type === "BOW" ? "#34d399" : "#a78bfa"} />
             <Badge label={statusCfg.label} color={statusCfg.color} />
             {item.grade !== "–" && (
               <Badge label={`Grade ${item.grade}`} color={gradeColor} />
             )}
-          </View>
-
-          {/* Price + hold */}
-          <View style={[styles.priceRow, { marginBottom: 8 }]}>
-            <Text style={[styles.closePrice, { color: colors.foreground }]}>
-              Rp {formatRp(item.close)}
-            </Text>
             {hasGL && (
-              <Text style={[styles.glPct, { color: isProfit ? "#34d399" : "#f87171" }]}>
+              <Text style={{ fontSize: 13, fontWeight: "700",
+                color: isProfit ? "#34d399" : "#f87171" }}>
                 {isProfit ? "+" : ""}{item.glPct.toFixed(2)}%
               </Text>
             )}
-            <Text style={[styles.holdDays, { color: colors.mutedForeground }]}>{item.holdDays}</Text>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
+              {item.holdDays}
+            </Text>
           </View>
 
-          {/* Entry / SL / TP grid */}
-          <View style={[styles.priceBlocks, { marginBottom: 8 }]}>
-            <InfoBlock
-              label="Entry"
-              value={
-                item.entryHigh
+          {/* Grid box: ENTRY | STOP LOSS | TP 1 | TP 2 */}
+          <View style={{ flexDirection: "row", backgroundColor: colors.background,
+            borderRadius: 10, borderWidth: 1, borderColor: colors.border,
+            paddingHorizontal: 10, paddingVertical: 10, gap: 0 }}>
+            {[
+              {
+                label: "ENTRY",
+                value: item.entryHigh
                   ? `${formatRp(item.entry)}–${formatRp(item.entryHigh)}`
-                  : `Rp ${formatRp(item.entry)}`
-              }
-              color="#fbbf24"
-            />
-            <InfoBlock
-              label="Stop Loss"
-              value={`Rp ${formatRp(item.stopLoss)}\n${item.slPct.toFixed(1)}%`}
-              color="#f87171"
-            />
-            <InfoBlock
-              label="TP1"
-              value={`Rp ${formatRp(item.tp1)}\n+${item.tp1Pct.toFixed(1)}%`}
-              color="#34d399"
-            />
-            <InfoBlock
-              label="TP2"
-              value={(() => {
+                  : formatRp(item.entry),
+                sub: null,
+                color: "#fbbf24",
+              },
+              {
+                label: "STOP LOSS",
+                value: `Rp ${formatRp(item.stopLoss)}`,
+                sub: `${item.slPct.toFixed(1)}%`,
+                color: "#f87171",
+              },
+              {
+                label: "TP 1",
+                value: `Rp ${formatRp(item.tp1)}`,
+                sub: `+${item.tp1Pct.toFixed(1)}%`,
+                color: "#34d399",
+              },
+              (() => {
                 const pct = item.entry > 0
-                  ? ((item.tp2 - item.entry) / item.entry) * 100
-                  : 0;
-                return `Rp ${formatRp(item.tp2)}${pct > 0 ? `\n+${pct.toFixed(1)}%` : ""}`;
-              })()}
-              color="#a78bfa"
-            />
-          </View>
-
-          {/* RR + meta */}
-          <View style={[styles.metaRow, { marginBottom: 6 }]}>
-            {item.rr > 0 && (
-              <View style={[styles.rrChip, { backgroundColor: "#60a5fa22", borderColor: "#60a5fa44" }]}>
-                <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700" }}>
-                  RR 1:{item.rr.toFixed(1)}
+                  ? ((item.tp2 - item.entry) / item.entry) * 100 : 0;
+                return {
+                  label: "TP 2",
+                  value: `Rp ${formatRp(item.tp2)}`,
+                  sub: pct > 0 ? `+${pct.toFixed(1)}%` : null,
+                  color: "#a78bfa",
+                };
+              })(),
+            ].map((col, i) => (
+              <View key={col.label} style={{ flex: 1, alignItems: "flex-start",
+                paddingLeft: i === 0 ? 0 : 8,
+                borderLeftWidth: i > 0 ? 1 : 0,
+                borderLeftColor: colors.border }}>
+                <Text style={{ fontSize: 8, fontWeight: "700",
+                  color: colors.mutedForeground, letterSpacing: 0.4,
+                  textTransform: "uppercase", marginBottom: 4 }}>
+                  {col.label}
                 </Text>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: col.color }}>
+                  {col.value}
+                </Text>
+                {col.sub && (
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: col.color,
+                    opacity: 0.85 }}>
+                    {col.sub}
+                  </Text>
+                )}
               </View>
-            )}
-            {item.conf > 0 && (
-              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                Conf: {item.conf}%
-              </Text>
-            )}
-            {item.vwap !== null && (
-              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                VWAP {formatRp(item.vwap)}
-                {item.vwapPct !== null ? ` (${item.vwapPct > 0 ? "+" : ""}${item.vwapPct.toFixed(1)}%)` : ""}
-              </Text>
-            )}
+            ))}
           </View>
 
-          {/* Signal chips */}
-          {item.signals.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={[styles.chipRow, { marginBottom: 4 }]}>
-                {item.signals.map((s, i) => <SignalChip key={i} label={s} />)}
-              </View>
-            </ScrollView>
-          )}
+          {/* Meta + signal chips — single merged scrollable row */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {item.conf > 0 && (
+                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontWeight: "600" }}>
+                  Conf: {item.conf}%
+                </Text>
+              )}
+              {item.rr > 0 && (
+                <View style={[styles.rrChip,
+                  { backgroundColor: "#60a5fa22", borderColor: "#60a5fa44" }]}>
+                  <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700" }}>
+                    RR 1:{item.rr.toFixed(1)}
+                  </Text>
+                </View>
+              )}
+              {item.vwap !== null && (
+                <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
+                  VWAP {formatRp(item.vwap)}
+                  {item.vwapPct !== null
+                    ? ` (${item.vwapPct > 0 ? "+" : ""}${item.vwapPct.toFixed(1)}%)` : ""}
+                </Text>
+              )}
+              {item.signals.map((s, i) => <SignalChip key={i} label={s} />)}
+            </View>
+          </ScrollView>
 
-          {/* Commentary snippet */}
+          {/* Commentary */}
           {item.commentary ? (
             <Text style={[styles.commentary, { color: "#94a3b8" }]} numberOfLines={2}>
               {item.commentary}
@@ -176,45 +203,43 @@ function PickCard({ item }: { item: StockPickItem }) {
         </View>
 
         {/* ── Right column: Score + RSI + StochK ── */}
-        <View style={{ alignItems: "center", width: 54 }}>
-          {/* Score */}
-          <Text style={[styles.scoreNum, { color: colors.primary, lineHeight: 28 }]}>
+        <View style={{ alignItems: "center", width: 62 }}>
+          <Text style={{ fontSize: 38, fontWeight: "900", color: colors.primary,
+            lineHeight: 42 }}>
             {Math.round(item.score)}
           </Text>
-          <Text style={[styles.scoreUnit, { color: colors.mutedForeground }]}>score</Text>
+          <Text style={{ fontSize: 9, fontWeight: "700", letterSpacing: 1,
+            color: colors.mutedForeground, textTransform: "uppercase", marginBottom: 10 }}>
+            SCORE
+          </Text>
 
-          {/* Divider */}
-          <View style={{ width: 40, height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
-
-          {/* RSI */}
           {item.rsi !== null && (
-            <View style={{ alignItems: "center", width: 54,
+            <View style={{ alignItems: "center", width: 62,
               backgroundColor: colors.background, borderRadius: 8,
               borderWidth: 1, borderColor: colors.border,
-              paddingVertical: 5, marginBottom: 6 }}>
-              <Text style={{ color: item.rsi < 30 ? "#34d399"
-                : item.rsi > 70 ? "#f87171" : "#e2e8f0",
-                fontSize: 16, fontWeight: "900", lineHeight: 20 }}>
+              paddingVertical: 6, marginBottom: 6 }}>
+              <Text style={{ fontSize: 18, fontWeight: "900", lineHeight: 22,
+                color: item.rsi < 30 ? "#34d399"
+                  : item.rsi > 70 ? "#f87171" : "#e2e8f0" }}>
                 {item.rsi.toFixed(0)}
               </Text>
-              <Text style={{ color: "#64748b", fontSize: 8, fontWeight: "700",
-                letterSpacing: 0.5 }}>RSI</Text>
+              <Text style={{ fontSize: 8, fontWeight: "700", letterSpacing: 0.8,
+                color: "#64748b" }}>RSI</Text>
             </View>
           )}
 
-          {/* StochK */}
           {item.stochK !== null && item.stochK !== undefined && (
-            <View style={{ alignItems: "center", width: 54,
+            <View style={{ alignItems: "center", width: 62,
               backgroundColor: colors.background, borderRadius: 8,
               borderWidth: 1, borderColor: colors.border,
-              paddingVertical: 5 }}>
-              <Text style={{ color: item.stochK < 20 ? "#34d399"
-                : item.stochK < 40 ? "#fbbf24" : "#e2e8f0",
-                fontSize: 16, fontWeight: "900", lineHeight: 20 }}>
+              paddingVertical: 6 }}>
+              <Text style={{ fontSize: 18, fontWeight: "900", lineHeight: 22,
+                color: item.stochK < 20 ? "#34d399"
+                  : item.stochK < 40 ? "#fbbf24" : "#e2e8f0" }}>
                 {item.stochK.toFixed(0)}
               </Text>
-              <Text style={{ color: "#64748b", fontSize: 8, fontWeight: "700",
-                letterSpacing: 0.5 }}>StochK</Text>
+              <Text style={{ fontSize: 8, fontWeight: "700", letterSpacing: 0.8,
+                color: "#64748b" }}>STOCHK</Text>
             </View>
           )}
         </View>
