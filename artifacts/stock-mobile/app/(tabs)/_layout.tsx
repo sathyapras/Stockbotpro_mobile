@@ -30,7 +30,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="screener">
         <Icon sf={{ default: "line.3.horizontal.decrease.circle", selected: "line.3.horizontal.decrease.circle.fill" }} />
-        <Label>Screener</Label>
+        <Label>Stock Tools</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -129,7 +129,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="screener"
         options={{
-          title: "Screener",
+          title: "Stock Tools",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="line.3.horizontal.decrease.circle" tintColor={color} size={24} />
