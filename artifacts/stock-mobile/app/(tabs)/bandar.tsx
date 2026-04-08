@@ -17,277 +17,190 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import {
+  type MasterStock,
+  fetchMasterStock,
+} from "@/services/masterStockService";
+import {
   type RadarMarket,
-  bandarDetector,
   fetchRadarMarket,
-  formatNBS,
-  getBandarStrength,
-  getFlowLabel,
-  smartMoneyIn,
-  vwapInterpretation,
 } from "@/services/radarMarketService";
 
-// ─── Filter tabs ──────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────
 
-type FilterTab = "ALL" | "ACC" | "DIST" | "SMI";
+type IndexFilter = "LQ45" | "IDX30" | "COMPOSITE";
+type FilterTab   = "all" | "acc" | "dist" | "smart";
 
-const FILTER_TABS: { key: FilterTab; icon: string; label: string; color: string }[] = [
-  { key: "ALL",  icon: "📊", label: "Semua",       color: "#60a5fa" },
-  { key: "ACC",  icon: "🟢", label: "Akumulasi",   color: "#34d399" },
-  { key: "DIST", icon: "🔴", label: "Distribusi",  color: "#f87171" },
-  { key: "SMI",  icon: "💎", label: "Smart Money", color: "#a78bfa" },
-];
+// ─── Flow config ──────────────────────────────────────────────
 
-// ─── Signal helpers ───────────────────────────────────────────
-
-function signalColor(sig: string) {
-  if (sig === "Accumulation")  return "#34d399";
-  if (sig === "Distribution")  return "#f87171";
-  return "#475569";
+function getFlowConfig(flowState: string): {
+  label: string; color: string; bg: string; dot: string;
+} {
+  const fs = (flowState ?? "").toUpperCase();
+  if (fs.includes("STRONG") && fs.includes("ACCUM")) return { label: "★ ACC",  color: "#10b981", bg: "#052e16", dot: "#10b981" };
+  if (fs.includes("ACCUM"))                           return { label: "ACC",    color: "#34d399", bg: "#0a1f15", dot: "#34d399" };
+  if (fs.includes("STRONG") && fs.includes("DIST"))  return { label: "★ DIST", color: "#dc2626", bg: "#2d0a0a", dot: "#dc2626" };
+  if (fs.includes("DIST"))                            return { label: "DIST",   color: "#f87171", bg: "#1a0808", dot: "#f87171" };
+  return                                               { label: "NEU",          color: "#64748b", bg: "#0f1629", dot: "#475569" };
 }
 
-// ─── Fix 5: Colored TF indicator boxes ───────────────────────
+function nbsSignal(val: number): { label: string; color: string } {
+  if (val > 1)  return { label: "ACC",  color: "#34d399" };
+  if (val < -1) return { label: "DIST", color: "#f87171" };
+  return              { label: "NEU",  color: "#475569" };
+}
 
-function TimeframeDots({ signal1d, signal5d, signal10d }: {
-  signal1d: string; signal5d: string; signal10d: string;
-}) {
-  const strength = getBandarStrength(signal1d, signal5d, signal10d);
-  const tfs = [
-    { label: "1D", signal: signal1d },
-    { label: "5D", signal: signal5d },
-    { label: "10D", signal: signal10d },
-  ];
+// ─── Index filter helper ───────────────────────────────────────
+// Since MASTER_STOCK_DB & RADAR_MARKET have no index membership field,
+// approximate LQ45/IDX30 by top N stocks by daily turnover (TO_Rp_Bn)
+
+function filterByIndex(radar: RadarMarket[], _stocks: MasterStock[], idx: IndexFilter): RadarMarket[] {
+  // Remove index symbols (COMPOSITE, IDXENERGY, etc.)
+  const stockOnly = radar.filter(r =>
+    r.ticker !== "COMPOSITE" && !r.ticker.startsWith("IDX")
+  );
+
+  if (idx === "COMPOSITE") return stockOnly;
+
+  // Sort by turnover descending, take top N as proxy for index membership
+  const sorted = [...stockOnly].sort((a, b) => b.toRpBn - a.toRpBn);
+  return sorted.slice(0, idx === "LQ45" ? 45 : 30);
+}
+
+// ─── Summary bar ─────────────────────────────────────────────
+
+function SummaryBar({ data }: { data: RadarMarket[] }) {
+  const acc  = data.filter(r => (r.flowState ?? "").toUpperCase().includes("ACCUM")).length;
+  const dist = data.filter(r => (r.flowState ?? "").toUpperCase().includes("DIST")).length;
+  const neu  = data.length - acc - dist;
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-      {tfs.map(tf => (
-        <View key={tf.label} style={{ alignItems: "center", gap: 2 }}>
-          <View style={{
-            width: 14, height: 14, borderRadius: 3,
-            backgroundColor: signalColor(tf.signal),
-          }} />
-          <Text style={{ color: "#475569", fontSize: 8 }}>{tf.label}</Text>
+    <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+      {[
+        { label: "Akumulasi", count: acc,  bg: "#052e16", border: "#16a34a", color: "#4ade80" },
+        { label: "Distribusi",count: dist, bg: "#2d0a0a", border: "#dc2626", color: "#f87171" },
+        { label: "Netral",    count: neu,  bg: "#0f1629", border: "#475569", color: "#94a3b8" },
+      ].map(s => (
+        <View key={s.label} style={{
+          flex: 1, backgroundColor: s.bg, borderRadius: 10, padding: 10,
+          borderWidth: 1, borderColor: s.border, alignItems: "center",
+        }}>
+          <Text style={{ color: s.color, fontWeight: "900", fontSize: 20 }}>{s.count}</Text>
+          <Text style={{ color: s.color + "cc", fontSize: 9, marginTop: 2 }}>{s.label}</Text>
         </View>
       ))}
-      <Text style={{ color: strength.color, fontSize: 10, fontWeight: "700", marginLeft: 4 }}>
-        {strength.label}
-      </Text>
     </View>
   );
 }
 
-// ─── Score bar ────────────────────────────────────────────────
+// ─── Flow Stock Card ──────────────────────────────────────────
 
-function ScoreBar({ label, value, color, colors }: {
-  label: string; value: number; color: string;
-  colors: ReturnType<typeof useColors>;
-}) {
-  const w = Math.min(100, Math.max(0, value));
-  return (
-    <View style={{ marginBottom: 6 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
-        <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{label}</Text>
-        <Text style={{ color, fontWeight: "700", fontSize: 11 }}>{value.toFixed(0)}/100</Text>
-      </View>
-      <View style={{ height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: "hidden" }}>
-        <View style={{ height: 5, width: `${w}%` as any, backgroundColor: color, borderRadius: 3 }} />
-      </View>
-    </View>
-  );
-}
-
-// ─── NBS mini grid ────────────────────────────────────────────
-
-function NBSGrid({ item, colors }: { item: RadarMarket; colors: ReturnType<typeof useColors> }) {
-  const periods = [
-    { label: "1D",  value: item.nbs1d,  signal: item.signal1d },
-    { label: "5D",  value: item.nbs5d,  signal: item.signal5d },
-    { label: "10D", value: item.nbs10d, signal: item.signal10d },
-  ];
-  return (
-    <View style={{ flexDirection: "row", gap: 6, marginTop: 8 }}>
-      {periods.map(tf => {
-        const fmt = formatNBS(tf.value);
-        const sigColor = signalColor(tf.signal);
-        return (
-          <View key={tf.label} style={{ flex: 1, backgroundColor: colors.background,
-            borderRadius: 8, padding: 7, alignItems: "center",
-            borderWidth: 1, borderColor: colors.border }}>
-            <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "600" }}>{tf.label}</Text>
-            <Text style={{ color: fmt.color, fontWeight: "800", fontSize: 12, marginTop: 2 }}>
-              {fmt.text}
-            </Text>
-            <Text style={{ color: sigColor, fontSize: 9, marginTop: 2 }}>
-              {tf.signal === "Accumulation" ? "ACC" : tf.signal === "Distribution" ? "DIST" : "NEU"}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-// ─── Bandar Card ──────────────────────────────────────────────
-
-function BandarCard({ item }: { item: RadarMarket }) {
-  const colors = useColors();
+function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
   const router = useRouter();
-  const [expanded, setExpanded] = useState(false);
+  const flow   = getFlowConfig(item.flowState);
+  const isUp   = item.chgPct >= 0;
+  const chgColor = isUp ? "#34d399" : "#f87171";
 
-  const flow     = getFlowLabel(item.flowState);
-  const vwapInfo = vwapInterpretation(item.close, item.vwapD1);
+  // VWAP gap
+  const vwapGap   = item.vwapD1 > 0 && item.close > 0
+    ? ((item.close - item.vwapD1) / item.vwapD1 * 100)
+    : null;
+  const aboveVwap = vwapGap !== null && vwapGap >= 0;
+
+  // NBS timeframes
+  const TF = [
+    { label: "1D",  val: item.nbs1d  },
+    { label: "5D",  val: item.nbs5d  },
+    { label: "10D", val: item.nbs10d },
+  ];
 
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
       onPress={() => router.push(`/stock/${item.ticker}` as any)}
-      onLongPress={() => setExpanded(e => !e)}
-      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      activeOpacity={0.8}
+      style={{
+        backgroundColor: "#1e2433", borderRadius: 12, padding: 14,
+        borderLeftWidth: 3, borderLeftColor: flow.color,
+      }}>
 
-      {/* Header row */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+      {/* Row 1: Rank + Dot + Ticker + Badge + Change + NBS1D + Score */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+        <Text style={{ color: "#475569", fontSize: 11, width: 20 }}>{rank}</Text>
+        <View style={{ width: 8, height: 8, borderRadius: 4,
+          backgroundColor: flow.dot, marginRight: 8 }} />
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 16 }}>
-              {item.ticker}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{item.ticker}</Text>
+            <View style={{ backgroundColor: flow.bg, borderRadius: 4,
+              paddingHorizontal: 6, paddingVertical: 1,
+              borderWidth: 1, borderColor: flow.color + "50" }}>
+              <Text style={{ color: flow.color, fontSize: 9, fontWeight: "700" }}>{flow.label}</Text>
+            </View>
+            <Text style={{ color: chgColor, fontSize: 11 }}>
+              {isUp ? "▲" : "▼"}{Math.abs(item.chgPct).toFixed(2)}%
             </Text>
-            {item.chgPct !== 0 && (
-              <Text style={{ color: item.chgPct > 0 ? "#34d399" : "#f87171",
-                fontSize: 11, fontWeight: "700" }}>
-                {item.chgPct > 0 ? "▲" : "▼"}{Math.abs(item.chgPct).toFixed(2)}%
-              </Text>
-            )}
           </View>
-          <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}
-            numberOfLines={1}>{item.company}</Text>
+          <Text style={{ color: "#475569", fontSize: 10 }} numberOfLines={1}>{item.company}</Text>
         </View>
-
-        {/* Flow State badge */}
-        <View style={{ backgroundColor: flow.color + "22", borderRadius: 8,
-          paddingHorizontal: 10, paddingVertical: 5, alignItems: "center",
-          borderWidth: 1, borderColor: flow.color + "40", minWidth: 64 }}>
-          <Text style={{ color: flow.color, fontWeight: "800", fontSize: 11 }}>{flow.short}</Text>
-          <Text style={{ color: flow.color + "cc", fontSize: 8, marginTop: 1 }}>{item.flowState}</Text>
-        </View>
-      </View>
-
-      {/* Price + VWAP row */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
-        <Text style={{ color: "#60a5fa", fontSize: 12, fontWeight: "600" }}>
-          Harga: {item.close.toLocaleString("id-ID")}
-        </Text>
-        {item.vwapD1 > 0 && (
-          <Text style={{ color: "#94a3b8", fontSize: 11 }}>
-            VWAP 1D: <Text style={{ color: colors.foreground, fontWeight: "600" }}>
-              {item.vwapD1.toLocaleString("id-ID")}
-            </Text>
+        {/* NBS 1D (right) */}
+        <View style={{ alignItems: "flex-end", marginRight: 10 }}>
+          <Text style={{ color: item.nbs1d >= 0 ? "#34d399" : "#f87171",
+            fontWeight: "700", fontSize: 14 }}>
+            {item.nbs1d >= 0 ? "+" : ""}{item.nbs1d.toFixed(1)}B
           </Text>
-        )}
+          <Text style={{ color: "#475569", fontSize: 9 }}>NBS 1D</Text>
+        </View>
+        {/* Score */}
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ color: "#a78bfa", fontWeight: "900", fontSize: 18 }}>
+            {Math.round(item.bandarScore)}
+          </Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>score</Text>
+        </View>
       </View>
 
-      {/* Fix 3: VWAP interpretation — bold + icon + diff amount */}
-      {vwapInfo && (
-        <Text style={{ color: vwapInfo.color, fontSize: 11, fontWeight: "600", marginTop: 4 }}>
-          {vwapInfo.icon} {vwapInfo.text}
+      {/* Row 2: VWAP interpretation */}
+      {vwapGap !== null && (
+        <Text style={{
+          color: aboveVwap ? "#34d399" : "#f87171",
+          fontSize: 11, fontWeight: "600", marginBottom: 8,
+        }}>
+          {aboveVwap ? "📈" : "📉"} Harga di {aboveVwap ? "ATAS" : "BAWAH"} VWAP bandar
+          {" "}({vwapGap >= 0 ? "+" : ""}{vwapGap.toFixed(1)}%)
         </Text>
       )}
 
-      {/* NBS 3-timeframe grid */}
-      <NBSGrid item={item} colors={colors} />
-
-      {/* Fix 5: Colored TF dots + strength label */}
-      <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <TimeframeDots signal1d={item.signal1d} signal5d={item.signal5d} signal10d={item.signal10d} />
-        {item.rsMom !== 0 && (
-          <Text style={{ color: "#64748b", fontSize: 10 }}>
-            RS Mom: <Text style={{ color: item.rsMom > 0 ? "#34d399" : "#f87171",
-              fontWeight: "600" }}>
-              {item.rsMom > 0 ? "+" : ""}{item.rsMom.toFixed(1)}
-            </Text>
-          </Text>
-        )}
+      {/* Row 3: NBS 1D / 5D / 10D boxes */}
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        {TF.map(tf => {
+          const sig = nbsSignal(tf.val);
+          const up  = tf.val >= 0;
+          return (
+            <View key={tf.label} style={{
+              flex: 1, alignItems: "center",
+              backgroundColor: "#0f1629", borderRadius: 8, padding: 8,
+            }}>
+              <Text style={{ color: up ? "#34d399" : "#f87171",
+                fontWeight: "700", fontSize: 13 }}>
+                {up ? "+" : ""}{tf.val.toFixed(1)}B
+              </Text>
+              <Text style={{ color: "#475569", fontSize: 9 }}>{tf.label}</Text>
+              <View style={{ width: 14, height: 14, borderRadius: 3,
+                backgroundColor: sig.color, marginTop: 4 }} />
+              <Text style={{ color: sig.color, fontSize: 8, marginTop: 2 }}>{sig.label}</Text>
+            </View>
+          );
+        })}
       </View>
-
-      {/* Expanded section (long-press) */}
-      {expanded && (
-        <View style={{ marginTop: 8, gap: 6, borderTopWidth: 1,
-          borderTopColor: colors.border, paddingTop: 8 }}>
-          <ScoreBar label="Bandar Score" value={item.bandarScore} color="#60a5fa" colors={colors} />
-          <ScoreBar label="Trend Score"  value={item.trendScore}  color="#a78bfa" colors={colors} />
-          {item.harmonyStr > 0 && (
-            <ScoreBar label="Harmony Str" value={item.harmonyStr} color="#fbbf24" colors={colors} />
-          )}
-          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-            {item.vwap5dAvg > 0 && (
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: "#64748b", fontSize: 9 }}>VWAP 5D Avg</Text>
-                <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 12 }}>
-                  {item.vwap5dAvg.toLocaleString("id-ID")}
-                </Text>
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: "#64748b", fontSize: 9 }}>Volume (Miliar)</Text>
-              <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 12 }}>
-                {item.toRpBn.toFixed(1)}B
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: "#64748b", fontSize: 9 }}>Perf 10D</Text>
-              <Text style={{ color: item.perf10d >= 0 ? "#34d399" : "#f87171",
-                fontWeight: "700", fontSize: 12 }}>
-                {item.perf10d >= 0 ? "+" : ""}{item.perf10d.toFixed(1)}%
-              </Text>
-            </View>
-          </View>
-          {item.narrative ? (
-            <Text style={{ color: colors.mutedForeground, fontSize: 10, fontStyle: "italic" }}>
-              {item.narrative}
-            </Text>
-          ) : null}
-        </View>
-      )}
-
-      {/* Tap hint */}
-      <Text style={{ color: "#334155", fontSize: 9, marginTop: 4, textAlign: "right" }}>
-        Tap → detail · Long press → detail bandar
-      </Text>
     </TouchableOpacity>
   );
 }
 
-// ─── Fix 2: Summary bar with better colors ────────────────────
+// ─── Index selector ────────────────────────────────────────────
 
-const SUMMARY_CARDS = [
-  { key: "acc",  label: "Akumulasi", bgColor: "#052e16", borderColor: "#16a34a", textColor: "#4ade80" },
-  { key: "dist", label: "Distribusi", bgColor: "#2d0a0a", borderColor: "#dc2626", textColor: "#f87171" },
-  { key: "neu",  label: "Netral", bgColor: "#0f1629", borderColor: "#475569", textColor: "#94a3b8" },
-] as const;
-
-function SummaryBar({ data }: { data: RadarMarket[] }) {
-  const acc  = data.filter(r => r.signal1d === "Accumulation").length;
-  const dist = data.filter(r => r.signal1d === "Distribution").length;
-  const neu  = data.length - acc - dist;
-  const counts = { acc, dist, neu };
-  return (
-    <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-      {SUMMARY_CARDS.map(card => (
-        <View key={card.key} style={{
-          flex: 1, padding: 10, borderRadius: 10,
-          backgroundColor: card.bgColor,
-          borderWidth: 1, borderColor: card.borderColor,
-          alignItems: "center",
-        }}>
-          <Text style={{ color: card.textColor, fontSize: 22, fontWeight: "900" }}>
-            {counts[card.key]}
-          </Text>
-          <Text style={{ color: card.textColor + "cc", fontSize: 9, marginTop: 2 }}>
-            {card.label}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-}
+const INDEX_OPTIONS: { key: IndexFilter; label: string }[] = [
+  { key: "LQ45",      label: "LQ45" },
+  { key: "IDX30",     label: "IDX30" },
+  { key: "COMPOSITE", label: "Semua IDX" },
+];
 
 // ─── Main screen ──────────────────────────────────────────────
 
@@ -297,143 +210,187 @@ export default function BandarScreen() {
   const router = useRouter();
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
-  const [filterTab, setFilterTab] = useState<FilterTab>("ALL");
-  const [search, setSearch]       = useState("");
+  const [indexFilter, setIndexFilter] = useState<IndexFilter>("LQ45");
+  const [filterTab,   setFilterTab]   = useState<FilterTab>("all");
+  const [search,      setSearch]      = useState("");
 
-  const { data: radarAll = [], isLoading, isError, refetch, isFetching } = useQuery({
+  // ── Data ──
+  const { data: radarAll = [], isLoading: loadingRadar, isError,
+          refetch, isFetching } = useQuery({
     queryKey: ["radar-market"],
     queryFn:  fetchRadarMarket,
     staleTime: 60 * 60 * 1000,
     gcTime:    2 * 60 * 60 * 1000,
   });
 
-  const top40   = useMemo(() => bandarDetector(radarAll, 40), [radarAll]);
-  const smiList = useMemo(() => smartMoneyIn(radarAll), [radarAll]);
+  const { data: stocks = [], isLoading: loadingStocks } = useQuery({
+    queryKey: ["master-stock"],
+    queryFn:  fetchMasterStock,
+    staleTime: 60 * 60 * 1000,
+  });
 
+  const isLoading = loadingRadar;
+
+  // ── Apply index filter then sort by |nbs1d| ──
+  const indexFiltered = useMemo(() => {
+    // If master stock not loaded yet, use all radar stocks (no index filter)
+    const base = stocks.length > 0
+      ? filterByIndex(radarAll, stocks, indexFilter)
+      : radarAll.filter(r => r.ticker !== "COMPOSITE" && !r.ticker.startsWith("IDX"));
+    return base.sort((a, b) => Math.abs(b.nbs1d) - Math.abs(a.nbs1d));
+  }, [radarAll, stocks, indexFilter]);
+
+  // ── Smart Money = all 3 TF positive ──
+  const smartList = useMemo(
+    () => indexFiltered.filter(r => r.nbs1d > 0 && r.nbs5d > 0 && r.nbs10d > 0),
+    [indexFiltered]
+  );
+
+  // ── Counts for filter tabs ──
+  const counts = useMemo(() => ({
+    all:   indexFiltered.length,
+    acc:   indexFiltered.filter(r => (r.flowState ?? "").toUpperCase().includes("ACCUM")).length,
+    dist:  indexFiltered.filter(r => (r.flowState ?? "").toUpperCase().includes("DIST")).length,
+    smart: smartList.length,
+  }), [indexFiltered, smartList]);
+
+  const FILTER_TABS: { key: FilterTab; icon: string; label: string; color: string }[] = [
+    { key: "all",   icon: "📊", label: "Semua",    color: "#94a3b8" },
+    { key: "acc",   icon: "🟢", label: "Akumulasi",color: "#34d399" },
+    { key: "dist",  icon: "🔴", label: "Distribusi",color: "#f87171"},
+    { key: "smart", icon: "💎", label: "Smart",    color: "#a78bfa" },
+  ];
+
+  // ── Final filtered list ──
   const filtered = useMemo(() => {
     let base: RadarMarket[];
-    if (filterTab === "ACC")  base = top40.filter(r => r.signal1d === "Accumulation");
-    else if (filterTab === "DIST") base = top40.filter(r => r.signal1d === "Distribution");
-    else if (filterTab === "SMI")  base = smiList;
-    else                           base = top40;
-
+    switch (filterTab) {
+      case "acc":   base = indexFiltered.filter(r => (r.flowState ?? "").toUpperCase().includes("ACCUM")); break;
+      case "dist":  base = indexFiltered.filter(r => (r.flowState ?? "").toUpperCase().includes("DIST")); break;
+      case "smart": base = smartList; break;
+      default:      base = indexFiltered;
+    }
     if (!search.trim()) return base;
-    const q = search.toLowerCase();
+    const q = search.toUpperCase();
     return base.filter(r =>
-      r.ticker.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)
+      r.ticker.includes(q) || r.company.toUpperCase().includes(q)
     );
-  }, [top40, smiList, filterTab, search]);
-
-  const counts = useMemo(() => ({
-    ALL:  top40.length,
-    ACC:  top40.filter(r => r.signal1d === "Accumulation").length,
-    DIST: top40.filter(r => r.signal1d === "Distribution").length,
-    SMI:  smiList.length,
-  }), [top40, smiList]);
+  }, [indexFiltered, smartList, filterTab, search]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
       {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPadding, backgroundColor: colors.background }]}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 2 }}>
+      <View style={{ paddingTop: topPadding, paddingHorizontal: 16, paddingBottom: 8 }}>
+        {/* Title row */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between",
+          alignItems: "flex-start", marginBottom: 10 }}>
           <View>
-            <Text style={[styles.title, { color: colors.foreground }]}>Bandar Detector</Text>
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              Net Buy/Sell · VWAP Bandar · Smart Money Flow
+            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}>📊 Buy/Sell Flow</Text>
+            <Text style={{ color: "#475569", fontSize: 11, marginTop: 1 }}>
+              Net Buy/Sell · VWAP · Flow Signal
             </Text>
           </View>
-          {/* Market Intel button */}
           <TouchableOpacity
             onPress={() => router.push("/market-intel" as any)}
-            style={styles.intelBtn}>
-            <Text style={styles.intelBtnText}>🔭 Intel</Text>
+            style={{ backgroundColor: "#1e2433", borderRadius: 8,
+              borderWidth: 1, borderColor: "#334155",
+              paddingHorizontal: 10, paddingVertical: 6,
+              flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Text style={{ fontSize: 12 }}>🔭</Text>
+            <Text style={{ color: "#94a3b8", fontSize: 11 }}>Intel</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Fix 2: Summary bar */}
-        {radarAll.length > 0 && !isLoading && (
-          <SummaryBar data={radarAll} />
-        )}
-
-        {/* Search */}
-        <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={{ color: colors.mutedForeground, marginRight: 6 }}>🔍</Text>
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Cari ticker atau nama..."
-            placeholderTextColor={colors.mutedForeground}
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="characters"
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")}>
-              <Text style={{ color: colors.mutedForeground, fontSize: 16, paddingLeft: 6 }}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Fix 1: Filter tabs with icon + label text + count */}
+        {/* Index selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 10 }} contentContainerStyle={{ gap: 6 }}>
-          {FILTER_TABS.map(t => {
-            const active = filterTab === t.key;
+          contentContainerStyle={{ gap: 6, marginBottom: 10 }}>
+          {INDEX_OPTIONS.map(opt => {
+            const active = indexFilter === opt.key;
             return (
-              <TouchableOpacity
-                key={t.key}
-                onPress={() => setFilterTab(t.key)}
+              <TouchableOpacity key={opt.key}
+                onPress={() => setIndexFilter(opt.key)}
                 style={{
-                  paddingHorizontal: 12, paddingVertical: 7,
-                  borderRadius: 20,
-                  backgroundColor: active ? t.color + "25" : colors.card,
-                  borderWidth: 1,
-                  borderColor: active ? t.color : colors.border,
-                  flexDirection: "row", alignItems: "center", gap: 4,
+                  paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16,
+                  backgroundColor: active ? "#60a5fa25" : "#1e2433",
+                  borderWidth: 1, borderColor: active ? "#60a5fa" : "#334155",
                 }}>
-                <Text style={{ fontSize: 12 }}>{t.icon}</Text>
-                <Text style={{ color: active ? t.color : colors.mutedForeground,
-                  fontSize: 11, fontWeight: "600" }}>
-                  {t.label} {counts[t.key]}
+                <Text style={{ color: active ? "#60a5fa" : "#64748b",
+                  fontSize: 12, fontWeight: active ? "700" : "400" }}>
+                  {opt.label}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
-        {/* Section title */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            {FILTER_TABS.find(t => t.key === filterTab)?.icon}{" "}
-            {FILTER_TABS.find(t => t.key === filterTab)?.label}
-            {"  "}<Text style={{ color: colors.mutedForeground, fontSize: 12, fontWeight: "400" }}>
-              {filtered.length} saham
-            </Text>
-          </Text>
-          {filterTab === "SMI" && (
-            <Text style={{ color: "#a78bfa", fontSize: 10 }}>NBS 1D+5D+10D positif</Text>
-          )}
-          {filterTab === "ALL" && (
-            <Text style={{ color: "#64748b", fontSize: 10 }}>Top 40 by aktivitas</Text>
+        {/* Summary bar */}
+        {!isLoading && indexFiltered.length > 0 && (
+          <SummaryBar data={indexFiltered} />
+        )}
+
+        {/* Search */}
+        <View style={{ flexDirection: "row", alignItems: "center",
+          backgroundColor: "#1e2433", borderRadius: 10,
+          borderWidth: 1, borderColor: "#334155",
+          paddingHorizontal: 12, marginBottom: 10 }}>
+          <Text style={{ color: "#475569", marginRight: 8 }}>🔍</Text>
+          <TextInput
+            placeholder="Cari ticker atau nama..."
+            placeholderTextColor="#475569"
+            value={search}
+            onChangeText={setSearch}
+            style={{ flex: 1, color: "#fff", fontSize: 13, paddingVertical: 10 }}
+            autoCapitalize="characters"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch("")}>
+              <Text style={{ color: "#475569", fontSize: 16, paddingLeft: 6 }}>✕</Text>
+            </TouchableOpacity>
           )}
         </View>
+
+        {/* Filter tabs */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 6, paddingBottom: 6 }}>
+          {FILTER_TABS.map(tab => {
+            const active = filterTab === tab.key;
+            return (
+              <TouchableOpacity key={tab.key}
+                onPress={() => setFilterTab(tab.key)}
+                style={{
+                  flexDirection: "row", alignItems: "center", gap: 4,
+                  paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
+                  backgroundColor: active ? tab.color + "25" : "#1e2433",
+                  borderWidth: 1, borderColor: active ? tab.color : "#334155",
+                }}>
+                <Text style={{ fontSize: 12 }}>{tab.icon}</Text>
+                <Text style={{ color: active ? tab.color : "#64748b",
+                  fontSize: 11, fontWeight: active ? "700" : "400" }}>
+                  {tab.label} {counts[tab.key]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* ── Content ── */}
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-            Memuat data Bandar Detector...
+          <ActivityIndicator size="large" color="#60a5fa" />
+          <Text style={{ color: "#64748b", fontSize: 13, marginTop: 8 }}>
+            Memuat Buy/Sell Flow…
           </Text>
         </View>
       ) : isError ? (
         <View style={styles.center}>
           <Text style={{ fontSize: 32 }}>⚠️</Text>
-          <Text style={[styles.errorText, { color: colors.mutedForeground }]}>
+          <Text style={{ color: "#64748b", fontSize: 14, textAlign: "center" }}>
             Gagal memuat data. Periksa koneksi.
           </Text>
           <TouchableOpacity
-            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+            style={{ backgroundColor: "#60a5fa", borderRadius: 10,
+              paddingHorizontal: 24, paddingVertical: 10, marginTop: 8 }}
             onPress={() => refetch()}>
             <Text style={{ color: "#fff", fontWeight: "600" }}>Coba Lagi</Text>
           </TouchableOpacity>
@@ -442,24 +399,47 @@ export default function BandarScreen() {
         <FlatList
           data={filtered}
           keyExtractor={r => r.ticker}
-          renderItem={({ item }) => <BandarCard item={item} />}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
+          renderItem={({ item, index }) => (
+            <FlowStockCard item={item} rank={index + 1} />
+          )}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4,
+            paddingBottom: insets.bottom + 80, gap: 8 }}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={isFetching && !isLoading}
               onRefresh={() => refetch()}
-              tintColor={colors.primary}
+              tintColor="#60a5fa"
             />
+          }
+          ListHeaderComponent={
+            <View style={{ flexDirection: "row", justifyContent: "space-between",
+              alignItems: "center", marginBottom: 6 }}>
+              <Text style={{ color: "#64748b", fontSize: 12 }}>
+                {FILTER_TABS.find(t => t.key === filterTab)?.icon}{" "}
+                {FILTER_TABS.find(t => t.key === filterTab)?.label}
+                {" · "}{filtered.length} saham
+              </Text>
+              {filterTab === "all" && (
+                <Text style={{ color: "#475569", fontSize: 10 }}>
+                  Diurutkan: |NBS| terbesar
+                </Text>
+              )}
+              {filterTab === "smart" && (
+                <Text style={{ color: "#a78bfa", fontSize: 10 }}>
+                  NBS 1D+5D+10D positif
+                </Text>
+              )}
+            </View>
           }
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={{ fontSize: 32, marginBottom: 8 }}>🔍</Text>
-              <Text style={{ color: colors.mutedForeground, textAlign: "center" }}>
-                Tidak ada saham ditemukan
+              <Text style={{ color: "#64748b", textAlign: "center" }}>
+                {search ? `Tidak ditemukan: "${search}"` : "Tidak ada data"}
               </Text>
             </View>
           }
-          showsVerticalScrollIndicator={false}
         />
       )}
     </View>
@@ -469,29 +449,8 @@ export default function BandarScreen() {
 // ─── Styles ───────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingBottom: 8 },
-  title: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5, marginBottom: 2 },
-  subtitle: { fontSize: 12, marginBottom: 10 },
-  intelBtn: {
-    backgroundColor: "#1e293b", borderRadius: 12, borderWidth: 1, borderColor: "#334155",
-    paddingHorizontal: 10, paddingVertical: 6, marginTop: 2,
-  },
-  intelBtnText: { color: "#94a3b8", fontSize: 11, fontWeight: "600" },
-  searchBox: {
-    flexDirection: "row", alignItems: "center",
-    borderRadius: 10, borderWidth: 1,
-    paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10,
-  },
-  searchInput: { flex: 1, fontSize: 14 },
-  sectionTitle: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
-  list: { paddingHorizontal: 16, paddingTop: 4 },
-  card: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 10 },
   center: {
     flex: 1, alignItems: "center", justifyContent: "center",
     padding: 24, gap: 8, minHeight: 300,
   },
-  loadingText: { fontSize: 13, marginTop: 8, textAlign: "center" },
-  errorText:   { fontSize: 14, textAlign: "center" },
-  retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
 });

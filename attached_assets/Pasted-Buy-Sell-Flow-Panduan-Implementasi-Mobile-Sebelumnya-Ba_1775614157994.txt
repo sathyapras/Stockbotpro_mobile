@@ -1,0 +1,298 @@
+Buy/Sell Flow — Panduan Implementasi Mobile
+(Sebelumnya: Bandar Detector) — Net Buy/Sell real-time per saham
+Data live dari AFL — delay ~5 menit dari market. Tersedia sepanjang jam market.
+
+ENDPOINT
+GET /api/analysis/bandar-detector?index=LQ45
+Authorization: Bearer <token>
+
+Parameter index
+Nilai	Deskripsi
+LQ45	Default — 45 saham likuid (recommended)
+COMPOSITE	Semua saham IDX (filtered: index symbols dibuang)
+IDX30	30 saham blue chip
+COMPOSITE dan IDX* symbols (IDXENERGY, IDXFINANCE, dll) otomatis difilter — tidak muncul di hasil.
+
+RESPONSE — Field Utama (dari AFL)
+[
+  {
+    "symbol":       "JPFA",
+    "name":         "Japfa Comfeed Indonesia Tbk.",
+    "nbs1d":        2.0,
+    "nbs5d":        8.4,
+    "nbs10d":       14.2,
+    "vwapD1":       1285,
+    "vwap5dAvg":    1270,
+    "flowState":    "★ ACCUMULATION",
+    "vwapContext":  "ACCUMULATION",
+    "trendContext": "ACCUMULATION",
+    "bandarScore":  100,
+    "trendScore":   87,
+    "rsMom":        1.2,
+    "perf10d":      4.5,
+    "rsi":          62.3,
+    "changePct":    1.8
+  }
+]
+
+Field yang Dipakai di Mobile
+Field	Label Display	Arti
+nbs1d	NBS 1D	Net Buy/Sell hari ini (Miliar Rp)
+nbs5d	NBS 5D	Akumulasi 5 hari terakhir (Miliar Rp)
+nbs10d	NBS 10D	Akumulasi 10 hari terakhir (Miliar Rp)
+vwapD1	VWAP 1D	VWAP bandar hari ini
+flowState	Signal utama	★ ACCUMULATION / ACCUMULATION / NEUTRAL / DISTRIBUTION / ★ DISTRIBUTION
+bandarScore	Score	0-100, makin tinggi makin kuat
+changePct	% hari ini	Pergerakan harga hari ini
+FLOWSTATE — Mapping ke Tampilan
+function getFlowConfig(flowState) {
+  const fs = (flowState ?? "").toUpperCase();
+  if (fs.includes("★") && fs.includes("ACCUM"))  return { label: "★ ACC",  color: "#10b981", bg: "#052e16", dot: "#10b981" };
+  if (fs.includes("ACCUM"))                        return { label: "ACC",    color: "#34d399", bg: "#0a1f15", dot: "#34d399" };
+  if (fs.includes("★") && fs.includes("DIST"))    return { label: "★ DIST", color: "#dc2626", bg: "#2d0a0a", dot: "#dc2626" };
+  if (fs.includes("DIST"))                         return { label: "DIST",   color: "#f87171", bg: "#1a0808", dot: "#f87171" };
+  return                                            { label: "NEU",          color: "#64748b", bg: "#0f1629", dot: "#475569" };
+}
+
+LAYOUT SCREEN
+┌─────────────────────────────────────────────────┐
+│  📊 Buy/Sell Flow                    [🔭 Intel]  │
+│  Net Buy/Sell · VWAP · Flow Signal              │
+│                                                 │
+│  [72 Akumulasi] [202 Distribusi] [13 Netral]    │
+│                                                 │
+│  🔍 Cari ticker atau nama...                    │
+│                                                 │
+│  [Semua 40] [● Akumulasi 6] [● Distribusi 34]  │
+│  [💎 Smart Money]                               │
+│                                                 │
+│  JPFA  [★ ACC]  ↑1.8%          +2.0B    100    │
+│        Japfa Comfeed            NBS 1D  score   │
+│   📈 Harga di ATAS VWAP bandar (+0.5%)          │
+│   1D [██] 5D [██] 10D [██]                      │
+│   -1228B  -4326B  -6247B                        │
+│   DIST    DIST    DIST                          │
+│─────────────────────────────────────────────────│
+│  LSIP  [ACC]    ↓0.2%          -1.7B    100    │
+│  ...                                           │
+└─────────────────────────────────────────────────┘
+
+KOMPONEN: BuySellFlowScreen
+export function BuySellFlowScreen({ navigation }) {
+  const [index, setIndex]       = useState("LQ45");
+  const [search, setSearch]     = useState("");
+  const [filterTab, setFilter]  = useState("all");  // all | acc | dist | smart
+  const { data = [], isLoading, refetch } = useQuery({
+    queryKey: ["buy-sell-flow", index],
+    queryFn:  () => fetchWithAuth(`/api/analysis/bandar-detector?index=${index}`),
+    staleTime: 5 * 60 * 1000,   // 5 menit — sesuai delay data AFL
+  });
+  // Filter + search
+  const filtered = useMemo(() => {
+    let list = [...data];
+    // Search
+    if (search) {
+      const q = search.toUpperCase();
+      list = list.filter(s =>
+        s.symbol?.includes(q) || s.name?.toUpperCase().includes(q)
+      );
+    }
+    // Tab filter
+    if (filterTab === "acc") {
+      list = list.filter(s => (s.flowState ?? "").toUpperCase().includes("ACCUM"));
+    } else if (filterTab === "dist") {
+      list = list.filter(s => (s.flowState ?? "").toUpperCase().includes("DIST"));
+    } else if (filterTab === "smart") {
+      // Smart Money = bandarScore >= 80
+      list = list.filter(s => (s.bandarScore ?? 0) >= 80);
+    }
+    return list;
+  }, [data, search, filterTab]);
+  // Summary counts
+  const counts = useMemo(() => ({
+    acc:   data.filter(s => (s.flowState ?? "").toUpperCase().includes("ACCUM")).length,
+    dist:  data.filter(s => (s.flowState ?? "").toUpperCase().includes("DIST")).length,
+    neu:   data.filter(s => !(s.flowState ?? "").toUpperCase().includes("ACCUM") && !(s.flowState ?? "").toUpperCase().includes("DIST")).length,
+    smart: data.filter(s => (s.bandarScore ?? 0) >= 80).length,
+  }), [data]);
+  const FILTER_TABS = [
+    { key: "all",   label: `Semua ${data.length}`,         color: "#94a3b8" },
+    { key: "acc",   label: `● Akumulasi ${counts.acc}`,    color: "#34d399" },
+    { key: "dist",  label: `● Distribusi ${counts.dist}`,  color: "#f87171" },
+    { key: "smart", label: `💎 Smart ${counts.smart}`,     color: "#a78bfa" },
+  ];
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8,
+        flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <View>
+          <Text style={{ color: "white", fontWeight: "900", fontSize: 20 }}>📊 Buy/Sell Flow</Text>
+          <Text style={{ color: "#475569", fontSize: 11 }}>Net Buy/Sell · VWAP · Flow Signal</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("MarketIntelligence")}
+          style={{ backgroundColor: "#1e2433", borderRadius: 8,
+            paddingHorizontal: 10, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Text style={{ fontSize: 12 }}>🔭</Text>
+          <Text style={{ color: "#94a3b8", fontSize: 11 }}>Intel</Text>
+        </TouchableOpacity>
+      </View>
+      {/* Summary Bar */}
+      <View style={{ flexDirection: "row", paddingHorizontal: 16, gap: 8, marginBottom: 10 }}>
+        {[
+          { label: "Akumulasi", count: counts.acc,  bg: "#052e16", color: "#34d399" },
+          { label: "Distribusi", count: counts.dist, bg: "#2d0a0a", color: "#f87171" },
+          { label: "Netral",    count: counts.neu,  bg: "#1e2433", color: "#94a3b8" },
+        ].map(s => (
+          <View key={s.label} style={{ flex: 1, backgroundColor: s.bg,
+            borderRadius: 10, padding: 10, alignItems: "center" }}>
+            <Text style={{ color: s.color, fontWeight: "900", fontSize: 20 }}>{s.count}</Text>
+            <Text style={{ color: s.color, fontSize: 10 }}>{s.label}</Text>
+          </View>
+        ))}
+      </View>
+      {/* Search */}
+      <View style={{ marginHorizontal: 16, marginBottom: 8,
+        backgroundColor: "#1e2433", borderRadius: 10, flexDirection: "row",
+        alignItems: "center", paddingHorizontal: 12 }}>
+        <Text style={{ color: "#475569", marginRight: 8 }}>🔍</Text>
+        <TextInput
+          placeholder="Cari ticker atau nama..."
+          placeholderTextColor="#475569"
+          value={search}
+          onChangeText={setSearch}
+          style={{ flex: 1, color: "white", fontSize: 13, paddingVertical: 10 }}
+          autoCapitalize="characters"
+        />
+      </View>
+      {/* Filter Tabs */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 6, paddingBottom: 8 }}>
+        {FILTER_TABS.map(tab => {
+          const active = filterTab === tab.key;
+          return (
+            <TouchableOpacity key={tab.key}
+              onPress={() => setFilter(tab.key)}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+                backgroundColor: active ? "#1e2433" : "transparent",
+                borderWidth: 1, borderColor: active ? tab.color : "#1e293b" }}>
+              <Text style={{ color: active ? tab.color : "#64748b", fontSize: 12,
+                fontWeight: active ? "700" : "400" }}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      {/* List */}
+      <FlatList
+        data={filtered}
+        keyExtractor={item => item.symbol}
+        renderItem={({ item, index: idx }) => (
+          <FlowStockCard
+            stock={item}
+            rank={idx + 1}
+            onPress={() => navigation.navigate("StockDetail", { symbol: item.symbol })}
+          />
+        )}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}
+        showsVerticalScrollIndicator={false}
+        refreshing={isLoading}
+        onRefresh={refetch}
+      />
+    </View>
+  );
+}
+
+KOMPONEN: FlowStockCard
+function FlowStockCard({ stock, rank, onPress }) {
+  const flow    = getFlowConfig(stock.flowState);
+  const isUp    = (stock.changePct ?? 0) >= 0;
+  const chgColor = isUp ? "#34d399" : "#f87171";
+  // VWAP interpretation
+  const price   = stock.vwapD1 ? (stock.close ?? 0) : 0;
+  const vwapGap = stock.vwapD1 ? ((price - stock.vwapD1) / stock.vwapD1 * 100) : 0;
+  const aboveVwap = vwapGap >= 0;
+  // NBS per timeframe
+  const TF = [
+    { label: "1D",  val: stock.nbs1d  ?? stock.oneDayBillion  ?? 0 },
+    { label: "5D",  val: stock.nbs5d  ?? stock.fiveDayBillion ?? 0 },
+    { label: "10D", val: stock.nbs10d ?? stock.tenDayBillion  ?? 0 },
+  ];
+  function nbsSignal(val) {
+    if (val > 1)   return { label: "ACC",  color: "#34d399" };
+    if (val < -1)  return { label: "DIST", color: "#f87171" };
+    return              { label: "NEU",  color: "#475569" };
+  }
+  return (
+    <TouchableOpacity onPress={onPress}
+      style={{ backgroundColor: "#1e2433", borderRadius: 12, padding: 14,
+        borderLeftWidth: 3, borderLeftColor: flow.color }}>
+      {/* Row 1: Rank + Ticker + Badge + Change + Score */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+        <Text style={{ color: "#475569", fontSize: 11, width: 20 }}>{rank}</Text>
+        <View style={{ width: 8, height: 8, borderRadius: 4,
+          backgroundColor: flow.dot, marginRight: 8 }} />
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>{stock.symbol}</Text>
+            <View style={{ backgroundColor: flow.bg, borderRadius: 4,
+              paddingHorizontal: 6, paddingVertical: 1 }}>
+              <Text style={{ color: flow.color, fontSize: 9, fontWeight: "700" }}>{flow.label}</Text>
+            </View>
+            <Text style={{ color: chgColor, fontSize: 11 }}>
+              {isUp ? "▲" : "▼"}{Math.abs(stock.changePct ?? 0).toFixed(2)}%
+            </Text>
+          </View>
+          <Text style={{ color: "#475569", fontSize: 10 }} numberOfLines={1}>{stock.name}</Text>
+        </View>
+        {/* Score */}
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ color: "#a78bfa", fontWeight: "900", fontSize: 18 }}>
+            {stock.bandarScore ?? 0}
+          </Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>score</Text>
+        </View>
+      </View>
+      {/* Row 2: VWAP interpretation */}
+      {stock.vwapD1 > 0 && (
+        <Text style={{ color: aboveVwap ? "#34d399" : "#f87171",
+          fontSize: 11, fontWeight: "600", marginBottom: 8 }}>
+          {aboveVwap ? "📈" : "📉"} Harga di {aboveVwap ? "ATAS" : "BAWAH"} VWAP bandar
+          {" "}({vwapGap >= 0 ? "+" : ""}{vwapGap.toFixed(1)}%)
+        </Text>
+      )}
+      {/* Row 3: NBS 1D / 5D / 10D */}
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        {TF.map(tf => {
+          const sig = nbsSignal(tf.val);
+          const up  = tf.val >= 0;
+          return (
+            <View key={tf.label} style={{ flex: 1, alignItems: "center",
+              backgroundColor: "#0f1629", borderRadius: 8, padding: 8 }}>
+              <Text style={{ color: up ? "#34d399" : "#f87171",
+                fontWeight: "700", fontSize: 13 }}>
+                {up ? "+" : ""}{tf.val.toFixed(1)}B
+              </Text>
+              <Text style={{ color: "#475569", fontSize: 9 }}>{tf.label}</Text>
+              <View style={{ width: 14, height: 14, borderRadius: 3,
+                backgroundColor: sig.color, marginTop: 4 }} />
+              <Text style={{ color: sig.color, fontSize: 8 }}>{sig.label}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+RINGKASAN
+Item	Detail
+Endpoint	GET /api/analysis/bandar-detector?index=LQ45
+Data	AFL radar — NBS 1D/5D/10D, VWAP, FlowState, bandarScore
+Update	Live, delay ~5 menit dari market
+Stale time	5 menit
+Jam tersedia	Sepanjang jam market (09:00–16:00)
+Nama lama	Bandar Detector
+Screen ini menunjukkan ARUS uang masuk/keluar secara real-time — bukan analisis siapa bandarnya.
