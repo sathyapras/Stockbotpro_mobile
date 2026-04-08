@@ -220,7 +220,7 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
 // ─── [2] Trending Tools ───────────────────────────────────────
 
 const TRENDING_TOOLS = [
-  { icon: "💎", label: "Bandar",   sublabel: "Smart Money",  color: "#a78bfa", bg: "#1e1433", border: "#7c3aed40", path: "/(tabs)/bandar" },
+  { icon: "💎", label: "Flow",     sublabel: "Buy/Sell",     color: "#a78bfa", bg: "#1e1433", border: "#7c3aed40", path: "/(tabs)/bandar" },
   { icon: "📡", label: "Radar",    sublabel: "Market Intel", color: "#34d399", bg: "#0d2618", border: "#16a34a40", path: "/market-intel" },
   { icon: "🎯", label: "Stockpick",sublabel: "BOW & BOS",   color: "#fbbf24", bg: "#1c1500", border: "#d9770640", path: "/(tabs)/stockpick" },
   { icon: "🔽", label: "Screener", sublabel: "Filter Saham",color: "#60a5fa", bg: "#0c1629", border: "#1d4ed840", path: "/(tabs)/screener" },

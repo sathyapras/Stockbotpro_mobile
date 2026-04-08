@@ -22,7 +22,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="bandar">
         <Icon sf={{ default: "waveform.path.ecg", selected: "waveform.path.ecg.rectangle.fill" }} />
-        <Label>Bandar</Label>
+        <Label>Flow</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="stockpick">
         <Icon sf={{ default: "target", selected: "target" }} />
@@ -101,7 +101,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="bandar"
         options={{
-          title: "Bandar",
+          title: "Flow",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="waveform.path.ecg" tintColor={color} size={24} />
