@@ -39,7 +39,15 @@ export async function fetchHistorical(symbol: string): Promise<Candle[]> {
   if (!res.ok) return [];
   const data = await res.json();
   if (!Array.isArray(data)) return [];
-  return data as Candle[];
+  // API returns numeric fields as strings — parse them
+  return (data as any[]).map(r => ({
+    date:   r.date,
+    open:   parseFloat(r.open),
+    high:   parseFloat(r.high),
+    low:    parseFloat(r.low),
+    close:  parseFloat(r.close),
+    volume: parseFloat(r.volume),
+  })) as Candle[];
 }
 
 // ─── Filter by period ──────────────────────────────────────────

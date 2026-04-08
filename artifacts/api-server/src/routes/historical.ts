@@ -3,7 +3,6 @@ import { Router, type Request, type Response } from "express";
 const router = Router();
 
 const BASE_URL = "https://stockbotpro.replit.app";
-const TOKEN = process.env.STOCKBOT_TOKEN ?? "";
 
 // Simple in-memory cache: symbol → { data, cachedAt }
 const _cache = new Map<string, { data: unknown; cachedAt: number }>();
@@ -24,10 +23,7 @@ router.get("/historical/:symbol", async (req: Request, res: Response) => {
 
   try {
     const upstream = await fetch(`${BASE_URL}/api/historical/${symbol}`, {
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        Accept: "application/json",
-      },
+      headers: { Accept: "application/json" },
     });
 
     if (!upstream.ok) {
