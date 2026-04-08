@@ -938,15 +938,18 @@ const SORT_OPTS: { label: string; val: SortKey }[] = [
 
 // ─── Main screen ──────────────────────────────────────────────
 
+const PAGE_SIZE = 30;
+
 export default function MarketScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
-  const [query, setQuery]           = useState("");
+  const [query, setQuery]             = useState("");
   const [indexFilter, setIndexFilter] = useState<StockFilter["index"]>("");
-  const [sortBy, setSortBy]         = useState<SortKey>("change_desc");
-  const [showSort, setShowSort]     = useState(false);
+  const [sortBy, setSortBy]           = useState<SortKey>("change_desc");
+  const [showSort, setShowSort]       = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const { data: stocks = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["master-stock"],
@@ -971,6 +974,18 @@ export default function MarketScreen() {
     return sortStocks(f, sortBy);
   }, [stocks, query, indexFilter, sortBy]);
 
+  // Reset pagination when filter/sort/search changes
+  React.useEffect(() => { setVisibleCount(PAGE_SIZE); }, [query, indexFilter, sortBy]);
+
+  const visibleStocks = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+
+  const loadMore = React.useCallback(() => {
+    setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length));
+  }, [filtered.length]);
+
   const sortLabel   = SORT_OPTS.find(o => o.val === sortBy)?.label ?? "Sort";
   const radarReady  = radar.length > 0;
 
@@ -979,10 +994,34 @@ export default function MarketScreen() {
       <View style={{ height: topPadding, backgroundColor: colors.background }} />
 
       <FlatList
-        data={filtered}
+        data={visibleStocks}
         keyExtractor={item => item.symbol}
         renderItem={({ item }) => <StockCard ms={item} colors={colors} />}
         contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 100 : 90 }}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          visibleCount < filtered.length ? (
+            <TouchableOpacity
+              onPress={loadMore}
+              style={{
+                marginHorizontal: 16, marginVertical: 12,
+                paddingVertical: 12, borderRadius: 12,
+                backgroundColor: colors.card,
+                borderWidth: 1, borderColor: colors.border,
+                alignItems: "center",
+              }}>
+              <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>
+                Muat lebih banyak ({filtered.length - visibleCount} saham lagi)
+              </Text>
+            </TouchableOpacity>
+          ) : filtered.length > 0 ? (
+            <Text style={{ color: "#475569", fontSize: 11, textAlign: "center",
+              paddingVertical: 16, paddingBottom: 24 }}>
+              ✓ Semua {filtered.length} saham ditampilkan
+            </Text>
+          ) : null
+        }
         ListHeaderComponent={
           <>
             {/* [1] Header */}
@@ -1131,7 +1170,9 @@ export default function MarketScreen() {
 
                   <Text style={{ color: colors.mutedForeground, fontSize: 10,
                     marginTop: 8, textAlign: "right" }}>
-                    {filtered.length.toLocaleString("id-ID")} saham ditampilkan
+                    {visibleCount < filtered.length
+                      ? `${visibleCount} dari ${filtered.length.toLocaleString("id-ID")} saham`
+                      : `${filtered.length.toLocaleString("id-ID")} saham`}
                   </Text>
                 </>
               )}
