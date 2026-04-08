@@ -356,6 +356,13 @@ function CommandCenter({ radar, loading }: { radar: RadarMarket[]; loading: bool
       detail: stats?.topNbs ? `↑ ${stats.topNbs.ticker}  +${stats.topNbs.nbs1d.toFixed(1)}B` : loading ? "Loading…" : "Belum ada data",
     },
     {
+      icon: "🎯", label: "STOCKPICK", sub: "BOW & BOS",
+      color: "#fbbf24", bg: "#160f00", border: "#d9770625",
+      path: "/(tabs)/stockpick",
+      metric: stats ? `${stats.bowCount} Entry` : "—",
+      detail: stats?.topEntry ? `Hot: ${stats.topEntry.ticker}  ${stats.topEntry.trendScore}/100` : loading ? "Loading…" : "Belum ada data",
+    },
+    {
       icon: "💎", label: "SMART MONEY", sub: "Broker Intel",
       color: "#10b981", bg: "#041f10", border: "#10b98125",
       path: "/(tabs)/smartmoney",
@@ -368,13 +375,6 @@ function CommandCenter({ radar, loading }: { radar: RadarMarket[]; loading: bool
       path: "/(tabs)/screener",
       metric: stats ? `${stats.bowCount} Ignition` : "—",
       detail: stats?.topEntry ? `↑ ${stats.topEntry.ticker}  Score ${stats.topEntry.bandarScore}` : loading ? "Loading…" : "Belum ada data",
-    },
-    {
-      icon: "🎯", label: "STOCKPICK", sub: "BOW & BOS",
-      color: "#fbbf24", bg: "#160f00", border: "#d9770625",
-      path: "/(tabs)/stockpick",
-      metric: stats ? `${stats.bowCount} Entry` : "—",
-      detail: stats?.topEntry ? `Hot: ${stats.topEntry.ticker}  ${stats.topEntry.trendScore}/100` : loading ? "Loading…" : "Belum ada data",
     },
   ];
 

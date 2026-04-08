@@ -277,7 +277,7 @@ export default function StockpickScreen() {
             <Text style={[styles.title, { color: colors.foreground }]}>Stockpick Signal</Text>
             {date ? (
               <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
-                AFL · {date}
+                Signal · {date}
               </Text>
             ) : null}
           </View>
@@ -336,7 +336,7 @@ export default function StockpickScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-            Mengambil sinyal AFL...
+            Mengambil data sinyal...
           </Text>
         </View>
       ) : isError ? (

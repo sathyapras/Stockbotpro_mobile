@@ -192,7 +192,7 @@ export default function ScreenerScreen() {
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-              Menghitung sinyal AFL...
+              Menganalisis data sinyal...
             </Text>
           </View>
         ) : isError ? (
