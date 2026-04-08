@@ -947,7 +947,7 @@ export default function MarketScreen() {
 
   const [query, setQuery]             = useState("");
   const [indexFilter, setIndexFilter] = useState<StockFilter["index"]>("");
-  const [sortBy, setSortBy]           = useState<SortKey>("change_desc");
+  const [sortBy, setSortBy]           = useState<SortKey>("ret10d");
   const [showSort, setShowSort]       = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
