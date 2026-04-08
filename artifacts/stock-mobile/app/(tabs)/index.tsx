@@ -693,10 +693,6 @@ function SentimenGlobalCard() {
 
   const s        = data?.sentiment;
   const fearInfo = fearLabelDisplay(s?.fearLabel ?? "NEUTRAL");
-  const ihsg     = data?.domestic?.find(d => d.name === "IHSG");
-  const sp       = data?.indices?.find(d => d.name === "S&P 500");
-  const nasdaq   = data?.indices?.find(d => d.name === "NASDAQ");
-  const wti      = data?.commodities?.find(d => d.name === "WTI Crude Oil");
 
   const cardBg     = s ? fearInfo.bg     : "#1e2433";
   const borderCol  = s ? fearInfo.color + "55" : "#2d3748";
@@ -706,20 +702,6 @@ function SentimenGlobalCard() {
     s?.globalBias === "RISK_ON"  ? { text: "RISK ON",  color: "#34d399", bg: "#052e16" } :
                                    { text: "MIXED",    color: "#fbbf24", bg: "#1c1500" };
 
-  function pctStr(pct: number | null | undefined, decimals = 2) {
-    if (pct == null) return "—";
-    return `${pct >= 0 ? "▲" : "▼"}${Math.abs(pct).toFixed(decimals)}%`;
-  }
-  function pctColor(pct: number | null | undefined) {
-    return (pct ?? 0) >= 0 ? "#34d399" : "#f87171";
-  }
-
-  const indicators = [
-    { label: "S&P 500", value: pctStr(sp?.changePct),     color: pctColor(sp?.changePct) },
-    { label: "NASDAQ",  value: pctStr(nasdaq?.changePct),  color: pctColor(nasdaq?.changePct) },
-    { label: "IHSG",    value: pctStr(ihsg?.changePct),    color: pctColor(ihsg?.changePct) },
-    { label: "WTI Oil", value: pctStr(wti?.changePct),     color: pctColor(wti?.changePct) },
-  ];
 
   return (
     <TouchableOpacity
@@ -757,7 +739,7 @@ function SentimenGlobalCard() {
           <Text style={{ color: "#64748b", fontSize: 12 }}>Memuat data global…</Text>
         </View>
       ) : (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <Text style={{ color: fearInfo.color, fontWeight: "900", fontSize: 32 }}>
             {s?.vix?.toFixed(1) ?? "—"}
           </Text>
@@ -780,25 +762,6 @@ function SentimenGlobalCard() {
           )}
         </View>
       )}
-
-      {/* 4 Market Indicators */}
-      {!isLoading && (
-        <View style={{ flexDirection: "row", justifyContent: "space-between",
-          backgroundColor: "#0f162960", borderRadius: 10, padding: 10 }}>
-          {indicators.map(ind => (
-            <View key={ind.label} style={{ alignItems: "center" }}>
-              <Text style={{ color: "#475569", fontSize: 9 }}>{ind.label}</Text>
-              <Text style={{ color: ind.color, fontWeight: "700", fontSize: 12 }}>{ind.value}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Tap hint */}
-      <Text style={{ color: fearInfo.color + "80", fontSize: 10,
-        textAlign: "center", marginTop: 8 }}>
-        Tap untuk analisa narasi lengkap →
-      </Text>
     </TouchableOpacity>
   );
 }
