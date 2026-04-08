@@ -28,10 +28,6 @@ function NativeTabLayout() {
         <Icon sf={{ default: "dollarsign.circle", selected: "dollarsign.circle.fill" }} />
         <Label>Smart</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="stockpick">
-        <Icon sf={{ default: "target", selected: "target" }} />
-        <Label>Stockpick</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="screener">
         <Icon sf={{ default: "line.3.horizontal.decrease.circle", selected: "line.3.horizontal.decrease.circle.fill" }} />
         <Label>Screener</Label>
@@ -128,15 +124,7 @@ function ClassicTabLayout() {
       />
       <Tabs.Screen
         name="stockpick"
-        options={{
-          title: "Stockpick",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="target" tintColor={color} size={24} />
-            ) : (
-              <Feather name="crosshair" size={22} color={color} />
-            ),
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="screener"

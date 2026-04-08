@@ -294,42 +294,106 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
   );
 }
 
-// ─── [2] Trending Tools ───────────────────────────────────────
+// ─── [2] Command Center ───────────────────────────────────────
 
-const TRENDING_TOOLS = [
-  { icon: "📊", label: "Flow",       sublabel: "Buy/Sell",     color: "#a78bfa", bg: "#1e1433", border: "#7c3aed40", path: "/(tabs)/bandar" },
-  { icon: "💎", label: "Smart",      sublabel: "Broker Data",  color: "#10b981", bg: "#052e16", border: "#10b98140", path: "/(tabs)/smartmoney" },
-  { icon: "📡", label: "Radar",      sublabel: "Market Intel", color: "#34d399", bg: "#0d2618", border: "#16a34a40", path: "/market-intel" },
-  { icon: "🎯", label: "Stockpick",  sublabel: "BOW & BOS",    color: "#fbbf24", bg: "#1c1500", border: "#d9770640", path: "/(tabs)/stockpick" },
-  { icon: "🔽", label: "Screener",   sublabel: "Filter Saham", color: "#60a5fa", bg: "#0c1629", border: "#1d4ed840", path: "/(tabs)/screener" },
-  { icon: "🔄", label: "Sektor",     sublabel: "Rotasi",       color: "#fb923c", bg: "#1c0e05", border: "#c2410c40", path: "/sector-rotation" },
-  { icon: "🔍", label: "Watchlist",  sublabel: "Pantau",       color: "#94a3b8", bg: "#131d2b", border: "#33415540", path: "/(tabs)/watchlist" },
-] as const;
+interface CCCard {
+  icon: string; label: string; sub: string;
+  color: string; bg: string; border: string;
+  path: string;
+  metric: string; detail: string;
+}
 
-function TrendingToolsSection() {
+function CommandMiniCard({ card }: { card: CCCard }) {
   return (
-    <View style={{ marginBottom: 4 }}>
+    <TouchableOpacity
+      onPress={() => router.push(card.path as any)}
+      activeOpacity={0.8}
+      style={{
+        flex: 1, borderRadius: 14, padding: 13,
+        backgroundColor: card.bg, borderWidth: 1, borderColor: card.border,
+      }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <Text style={{ fontSize: 16 }}>{card.icon}</Text>
+        <View>
+          <Text style={{ color: card.color, fontSize: 10, fontWeight: "800",
+            letterSpacing: 0.5 }}>{card.label}</Text>
+          <Text style={{ color: "#475569", fontSize: 8 }}>{card.sub}</Text>
+        </View>
+      </View>
+      <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16,
+        lineHeight: 20 }}>{card.metric}</Text>
+      <Text style={{ color: card.color, fontSize: 11, marginTop: 3,
+        fontWeight: "600" }}>{card.detail}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function CommandCenter({ radar, loading }: { radar: RadarMarket[]; loading: boolean }) {
+  const stocksOnly = useMemo(
+    () => radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE"),
+    [radar]
+  );
+
+  const stats = useMemo(() => {
+    if (stocksOnly.length === 0) return null;
+    const wp = stocksOnly.map(r => ({ ...r, _phase: derivePhaseLabel(r) }));
+    const acc      = wp.filter(r => ["IGNITION","EARLY_ACC","STRONG_TREND"].includes(r._phase));
+    const dist     = wp.filter(r => ["EXHAUSTION","DISTRIBUTION"].includes(r._phase));
+    const ignition = wp.filter(r => r._phase === "IGNITION");
+    const topNbs   = [...stocksOnly].sort((a, b) => b.nbs1d - a.nbs1d)[0];
+    const topScore = [...stocksOnly].sort((a, b) => b.bandarScore - a.bandarScore)[0];
+    const topEntry = ignition.sort((a, b) => b.nbs1d - a.nbs1d)[0];
+    const bowCount = ignition.length;
+    return { accCount: acc.length, distCount: dist.length, topNbs, topScore, topEntry, bowCount };
+  }, [stocksOnly]);
+
+  const cards: CCCard[] = [
+    {
+      icon: "📊", label: "FLOW", sub: "Bandar Activity",
+      color: "#a78bfa", bg: "#1a1030", border: "#7c3aed25",
+      path: "/(tabs)/bandar",
+      metric: stats ? `${stats.accCount} ACC  ·  ${stats.distCount} DIST` : "—",
+      detail: stats?.topNbs ? `↑ ${stats.topNbs.ticker}  +${stats.topNbs.nbs1d.toFixed(1)}B` : loading ? "Loading…" : "Belum ada data",
+    },
+    {
+      icon: "💎", label: "SMART MONEY", sub: "Broker Intel",
+      color: "#10b981", bg: "#041f10", border: "#10b98125",
+      path: "/(tabs)/smartmoney",
+      metric: stats?.topScore ? `⭐ ${stats.topScore.ticker}` : "—",
+      detail: stats?.topScore ? `Bandar Score ${stats.topScore.bandarScore}/100` : loading ? "Loading…" : "Belum ada data",
+    },
+    {
+      icon: "📡", label: "RADAR", sub: "Market Intel",
+      color: "#38bdf8", bg: "#071624", border: "#0ea5e925",
+      path: "/(tabs)/screener",
+      metric: stats ? `${stats.bowCount} Ignition` : "—",
+      detail: stats?.topEntry ? `↑ ${stats.topEntry.ticker}  Score ${stats.topEntry.bandarScore}` : loading ? "Loading…" : "Belum ada data",
+    },
+    {
+      icon: "🎯", label: "STOCKPICK", sub: "BOW & BOS",
+      color: "#fbbf24", bg: "#160f00", border: "#d9770625",
+      path: "/(tabs)/stockpick",
+      metric: stats ? `${stats.bowCount} Entry` : "—",
+      detail: stats?.topEntry ? `Hot: ${stats.topEntry.ticker}  ${stats.topEntry.trendScore}/100` : loading ? "Loading…" : "Belum ada data",
+    },
+  ];
+
+  return (
+    <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
       <Text style={{ color: "#64748b", fontSize: 10, fontWeight: "700",
-        letterSpacing: 1, paddingHorizontal: 16, marginBottom: 8 }}>
-        FITUR UTAMA
+        letterSpacing: 1.5, marginBottom: 10 }}>
+        COMMAND CENTER
       </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-        {TRENDING_TOOLS.map(tool => (
-          <TouchableOpacity key={tool.label}
-            onPress={() => router.push(tool.path as any)}
-            style={{
-              backgroundColor: tool.bg, borderRadius: 14,
-              borderWidth: 1, borderColor: tool.border,
-              paddingVertical: 12, paddingHorizontal: 14,
-              alignItems: "center", minWidth: 76,
-            }}>
-            <Text style={{ fontSize: 22, marginBottom: 4 }}>{tool.icon}</Text>
-            <Text style={{ color: tool.color, fontWeight: "700", fontSize: 12 }}>{tool.label}</Text>
-            <Text style={{ color: "#475569", fontSize: 9, marginTop: 2 }}>{tool.sublabel}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={{ gap: 10 }}>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <CommandMiniCard card={cards[0]} />
+          <CommandMiniCard card={cards[1]} />
+        </View>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <CommandMiniCard card={cards[2]} />
+          <CommandMiniCard card={cards[3]} />
+        </View>
+      </View>
     </View>
   );
 }
@@ -1027,9 +1091,9 @@ export default function MarketScreen() {
             {/* [1] Header */}
             <HomeHeader stocks={stocks} radar={radar} />
 
-            {/* [2] Trending Tools — always visible, no loading dep */}
+            {/* [2] Command Center — live market intel */}
             <View style={{ backgroundColor: "#0f1629", paddingTop: 16, paddingBottom: 8 }}>
-              <TrendingToolsSection />
+              <CommandCenter radar={radar} loading={loadingRadar} />
             </View>
 
             {/* [3]-[6] Smart sections — from radar */}
