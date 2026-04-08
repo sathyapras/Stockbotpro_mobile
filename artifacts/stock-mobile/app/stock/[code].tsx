@@ -202,54 +202,55 @@ function TradingPlanContent({ plan, colors }: {
       contentContainerStyle={{ padding: 16, gap: 12 }}>
       <SignalSourceBadge plan={plan} colors={colors} />
 
-      {/* TP1 + SL boxes */}
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <View style={{ flex: 1, padding: 16, borderRadius: 16,
-          backgroundColor: "#34d39910", borderWidth: 2, borderColor: "#34d39940" }}>
-          <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "700" }}>🎯 TARGET (TP1)</Text>
-          <Text style={{ color: "#34d399", fontWeight: "900", fontSize: 28, marginTop: 4 }}>
-            {fRp(plan.tp1)}
-          </Text>
-          {tp1Pct > 0 && (
-            <Text style={{ color: "#34d399", fontSize: 13, fontWeight: "700" }}>
-              +{tp1Pct.toFixed(1)}%
-            </Text>
-          )}
+      {/* Unified price grid — all cells equal size */}
+      <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border,
+        backgroundColor: colors.card, overflow: "hidden" }}>
+        {/* Row 1: Entry · TP1 · Stop Loss */}
+        <View style={{ flexDirection: "row" }}>
+          {[
+            { label: "ENTRY",     value: plan.entryHigh ? `${fRp(plan.entry)}–${fRp(plan.entryHigh)}` : fRp(plan.entry), sub: null,                      color: "#fbbf24" },
+            { label: "TARGET TP1",value: fRp(plan.tp1),  sub: tp1Pct > 0 ? `+${tp1Pct.toFixed(1)}%` : null,            color: "#34d399" },
+            { label: "STOP LOSS", value: fRp(plan.stopLoss), sub: slPct > 0 ? `-${slPct.toFixed(1)}%` : null,           color: "#f87171" },
+          ].map((cell, i) => (
+            <View key={cell.label} style={{
+              flex: 1, padding: 12, alignItems: "center",
+              borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: colors.border,
+              backgroundColor: i === 1 ? "#34d39908" : i === 2 ? "#f8717108" : "transparent",
+            }}>
+              <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700",
+                marginBottom: 4, textAlign: "center" }}>{cell.label}</Text>
+              <Text style={{ color: cell.color, fontWeight: "800", fontSize: 15,
+                textAlign: "center" }}>{cell.value}</Text>
+              {cell.sub && (
+                <Text style={{ color: cell.color, fontSize: 11, fontWeight: "600",
+                  marginTop: 2 }}>{cell.sub}</Text>
+              )}
+            </View>
+          ))}
         </View>
-        <View style={{ flex: 1, padding: 16, borderRadius: 16,
-          backgroundColor: "#f8717110", borderWidth: 2, borderColor: "#f8717140" }}>
-          <Text style={{ color: "#94a3b8", fontSize: 9, fontWeight: "700" }}>🔴 STOP LOSS</Text>
-          <Text style={{ color: "#f87171", fontWeight: "900", fontSize: 28, marginTop: 4 }}>
-            {fRp(plan.stopLoss)}
-          </Text>
-          {slPct > 0 && (
-            <Text style={{ color: "#f87171", fontSize: 13, fontWeight: "700" }}>
-              -{slPct.toFixed(1)}%
-            </Text>
-          )}
-        </View>
-      </View>
 
-      {/* ENTRY · TP2 · RSI · STOCHK row */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between",
-        padding: 12, borderRadius: 12, backgroundColor: colors.card,
-        borderWidth: 1, borderColor: colors.border }}>
-        <InfoCell label="ENTRY" colors={colors}
-          value={plan.entryHigh ? `${fRp(plan.entry)}–${fRp(plan.entryHigh)}` : fRp(plan.entry)}
-          color="#fbbf24" />
-        {plan.tp2 > 0 && (
-          <InfoCell label="TP2" value={fRp(plan.tp2)} color="#60a5fa" colors={colors} />
-        )}
-        {plan.rsi !== null && (
-          <InfoCell label="RSI" colors={colors}
-            value={plan.rsi.toFixed(0)}
-            color={plan.rsi < 35 ? "#34d399" : plan.rsi > 65 ? "#f87171" : "white"} />
-        )}
-        {plan.stochK !== null && (
-          <InfoCell label="STOCHK" colors={colors}
-            value={plan.stochK.toFixed(0)}
-            color={plan.stochK < 20 ? "#34d399" : "white"} />
-        )}
+        {/* Divider */}
+        <View style={{ height: 1, backgroundColor: colors.border }} />
+
+        {/* Row 2: TP2 · R/R · StochK */}
+        <View style={{ flexDirection: "row" }}>
+          {[
+            { label: "TP2",    value: plan.tp2 > 0 ? fRp(plan.tp2) : "–",  color: "#60a5fa" },
+            { label: "R / R",  value: hasRR ? `1 : ${plan.rr.toFixed(1)}` : "–",
+              color: plan.rr >= 2 ? "#34d399" : plan.rr >= 1 ? "#fbbf24" : "#f87171" },
+            { label: "STOCHK", value: plan.stochK !== null ? plan.stochK.toFixed(0) : "–",
+              color: plan.stochK !== null && plan.stochK < 20 ? "#34d399" : "#94a3b8" },
+          ].map((cell, i) => (
+            <View key={cell.label} style={{
+              flex: 1, padding: 12, alignItems: "center",
+              borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: colors.border,
+            }}>
+              <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700",
+                marginBottom: 4 }}>{cell.label}</Text>
+              <Text style={{ color: cell.color, fontWeight: "800", fontSize: 15 }}>{cell.value}</Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       {/* RR Bar */}
