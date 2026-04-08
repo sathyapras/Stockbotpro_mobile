@@ -108,9 +108,9 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
   const decPct  = (breadth.decliners / total) * 100;
   const neuPct  = Math.max(0, 100 - advPct - decPct);
 
-  // Separate full-width from half-width index cards
-  const availableIndices = useMemo(() =>
-    INDICES.map(idx => {
+  // Half-width index cards only (COMPOSITE is already shown above)
+  const halfWidthCards = useMemo(() =>
+    INDICES.filter(i => !i.fullWidth).map(idx => {
       const ms = stockMap.get(idx.key);
       const rd = radarMap.get(idx.key);
       const val = ms?.close || rd?.close || 0;
@@ -120,8 +120,37 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
     }).filter(Boolean) as Array<typeof INDICES[number] & { val: number; chg: number }>,
   [stockMap, radarMap]);
 
-  const fullWidthCards = availableIndices.filter(i => i.fullWidth);
-  const halfWidthCards = availableIndices.filter(i => !i.fullWidth);
+  // ── Market Context: inline risk + bias computation ──────────
+  const marketCtx = useMemo(() => {
+    const radarStocks = radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE");
+    const n      = radarStocks.length || 1;
+    const accCnt = radarStocks.filter(r => r.signal1d === "Accumulation").length;
+    const dstCnt = radarStocks.filter(r => r.signal1d === "Distribution").length;
+    const accPct = Math.round((accCnt / n) * 100);
+    const dstPct = Math.round((dstCnt / n) * 100);
+    const avgBandar = Math.round(radarStocks.reduce((s, r) => s + (r.bandarScore ?? 0), 0) / n);
+
+    // simple risk score 0–10
+    const decPctV = breadth.declinerPct;
+    let score = 0;
+    if (decPctV >= 65) score += 3; else if (decPctV >= 50) score += 2; else if (decPctV >= 40) score += 1;
+    if (dstPct  >= 65) score += 4; else if (dstPct  >= 50) score += 3; else if (dstPct  >= 40) score += 2; else if (dstPct >= 30) score += 1;
+    if (ihsgChg < -1.5) score += 2; else if (ihsgChg < 0) score += 1;
+    if (avgBandar < 30) score += 1;
+    const finalScore = Math.min(10, score);
+
+    let riskLabel: string, riskColor: string, riskBg: string;
+    if      (finalScore >= 8) { riskLabel = "HIGH RISK";    riskColor = "#f87171"; riskBg = "#3b0a0a"; }
+    else if (finalScore >= 6) { riskLabel = "MED-HIGH";     riskColor = "#f97316"; riskBg = "#2d1400"; }
+    else if (finalScore >= 4) { riskLabel = "MEDIUM RISK";  riskColor = "#fbbf24"; riskBg = "#2d2000"; }
+    else                      { riskLabel = "LOW RISK";     riskColor = "#34d399"; riskBg = "#0a2218"; }
+
+    const bias = accPct >= 50 && breadth.advancerPct >= 45 ? "RISK ON"
+      : dstPct >= 60 || breadth.declinerPct >= 60 ? "RISK OFF" : "MIXED";
+    const biasColor = bias === "RISK ON" ? "#34d399" : bias === "RISK OFF" ? "#f87171" : "#fbbf24";
+
+    return { finalScore, riskLabel, riskColor, riskBg, bias, biasColor, accPct, dstPct, avgBandar };
+  }, [radar, breadth, ihsgChg]);
 
   return (
     <View style={{ backgroundColor: "#0f1629", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
@@ -169,50 +198,98 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
         </View>
       )}
 
-      {/* Index Cards */}
-      <View style={{ gap: 8 }}>
-        {/* Full-width cards (COMPOSITE) */}
-        {fullWidthCards.map(idx => {
-          const up = idx.chg >= 0;
-          const col = up ? "#34d399" : "#f87171";
-          return (
-            <View key={idx.key} style={{
-              backgroundColor: "#1e2433", borderRadius: 12, padding: 12,
+      {/* ── Market Context Card (replaces redundant IDX COMPOSITE card) ── */}
+      <View style={{
+        backgroundColor: "#131d2e", borderRadius: 14,
+        borderWidth: 1, borderColor: marketCtx.riskColor + "30",
+        padding: 12, marginBottom: 8,
+      }}>
+        {/* Top row: Risk badge + score gauge + Bias badge */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          {/* Left: Risk level */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{
+              backgroundColor: marketCtx.riskBg, borderRadius: 8,
+              borderWidth: 1, borderColor: marketCtx.riskColor + "50",
+              paddingHorizontal: 10, paddingVertical: 4,
             }}>
-              <Text style={{ color: "#64748b", fontSize: 9, marginBottom: 2 }}>{idx.label}</Text>
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 18 }}>
-                {idx.val.toLocaleString("id-ID", { maximumFractionDigits: 1 })}
-              </Text>
-              <Text style={{ color: col, fontSize: 12, fontWeight: "600" }}>
-                {up ? "+" : ""}{idx.chg.toFixed(2)}%
+              <Text style={{ color: marketCtx.riskColor, fontSize: 11, fontWeight: "800" }}>
+                {marketCtx.riskLabel}
               </Text>
             </View>
-          );
-        })}
-        {/* Half-width cards (LQ45, JII, IDX30) — 2 per row */}
-        {halfWidthCards.length > 0 && (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {halfWidthCards.map(idx => {
-              const up = idx.chg >= 0;
-              const col = up ? "#34d399" : "#f87171";
-              return (
-                <View key={idx.key} style={{
-                  flex: 1, minWidth: "45%",
-                  backgroundColor: "#1e2433", borderRadius: 12, padding: 12,
-                }}>
-                  <Text style={{ color: "#64748b", fontSize: 9, marginBottom: 2 }}>{idx.label}</Text>
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
-                    {idx.val.toLocaleString("id-ID", { maximumFractionDigits: 1 })}
-                  </Text>
-                  <Text style={{ color: col, fontSize: 11, fontWeight: "600" }}>
-                    {up ? "+" : ""}{idx.chg.toFixed(2)}%
-                  </Text>
-                </View>
-              );
-            })}
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: 2 }}>
+              <Text style={{ color: marketCtx.riskColor, fontWeight: "900", fontSize: 20 }}>
+                {marketCtx.finalScore}
+              </Text>
+              <Text style={{ color: "#475569", fontSize: 11 }}>/10</Text>
+            </View>
           </View>
-        )}
+
+          {/* Right: Bias badge */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: marketCtx.biasColor }} />
+            <Text style={{ color: marketCtx.biasColor, fontWeight: "700", fontSize: 12 }}>
+              {marketCtx.bias}
+            </Text>
+          </View>
+        </View>
+
+        {/* Score bar */}
+        <View style={{ height: 4, backgroundColor: "#0f1629", borderRadius: 2,
+          overflow: "hidden", marginBottom: 10 }}>
+          <View style={{ position: "absolute", flexDirection: "row", width: "100%", height: "100%" }}>
+            <View style={{ flex: 4, backgroundColor: "#34d399" }} />
+            <View style={{ flex: 3, backgroundColor: "#f97316" }} />
+            <View style={{ flex: 3, backgroundColor: "#dc2626" }} />
+          </View>
+          <View style={{ position: "absolute", right: 0, top: 0, bottom: 0,
+            width: `${100 - (marketCtx.finalScore / 10 * 100)}%` as any,
+            backgroundColor: "#131d2e" }} />
+        </View>
+
+        {/* Bottom row: 3 stats */}
+        <View style={{ flexDirection: "row" }}>
+          {[
+            { label: "SM Akumulasi", value: `${marketCtx.accPct}%`,     color: "#34d399" },
+            { label: "SM Distribusi", value: `${marketCtx.dstPct}%`,     color: "#f87171" },
+            { label: "Avg Bandar",    value: `${marketCtx.avgBandar}`,    color: "#a78bfa" },
+          ].map((stat, i) => (
+            <View key={stat.label} style={{
+              flex: 1, alignItems: "center",
+              borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: "#1e293b",
+            }}>
+              <Text style={{ color: "#475569", fontSize: 9, marginBottom: 2 }}>{stat.label}</Text>
+              <Text style={{ color: stat.color, fontWeight: "700", fontSize: 14 }}>{stat.value}</Text>
+            </View>
+          ))}
+        </View>
       </View>
+
+      {/* Half-width index cards (LQ45, IDX30, JII) */}
+      {halfWidthCards.length > 0 && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {halfWidthCards.map(idx => {
+            const up = idx.chg >= 0;
+            const col = up ? "#34d399" : "#f87171";
+            return (
+              <View key={idx.key} style={{
+                flex: 1, minWidth: "45%",
+                backgroundColor: "#1a2233", borderRadius: 12,
+                borderWidth: 1, borderColor: "#1e293b",
+                padding: 10,
+              }}>
+                <Text style={{ color: "#475569", fontSize: 9, marginBottom: 2 }}>{idx.label}</Text>
+                <Text style={{ color: "#e2e8f0", fontWeight: "700", fontSize: 14 }}>
+                  {idx.val.toLocaleString("id-ID", { maximumFractionDigits: 1 })}
+                </Text>
+                <Text style={{ color: col, fontSize: 11, fontWeight: "600" }}>
+                  {up ? "+" : ""}{idx.chg.toFixed(2)}%
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
