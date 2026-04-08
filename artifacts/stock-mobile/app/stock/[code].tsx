@@ -1640,43 +1640,124 @@ export default function StockDetailScreen() {
               borderBottomWidth: 1, borderBottomColor: colors.border,
               backgroundColor: colors.background }}>
 
-              {/* Ticker + Score ring */}
-              <View style={{ flexDirection: "row", justifyContent: "space-between",
-                alignItems: "flex-start", marginBottom: 8 }}>
-                <View>
-                  <Text style={{ fontSize: 22, fontWeight: "900", color: colors.foreground }}>
-                    {ticker}
-                  </Text>
+              {/* Ticker + Price (left) | Score + Key stats (right) */}
+              <View style={{ flexDirection: "row", alignItems: "flex-start",
+                marginBottom: 8, gap: 10 }}>
+
+                {/* Left column */}
+                <View style={{ flex: 1 }}>
+                  {/* Ticker + signal badges */}
+                  <View style={{ flexDirection: "row", alignItems: "center",
+                    gap: 5, flexWrap: "wrap", marginBottom: 5 }}>
+                    <Text style={{ fontSize: 22, fontWeight: "900",
+                      color: colors.foreground }}>
+                      {ticker}
+                    </Text>
+                    {plan?.type && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2,
+                        borderRadius: 6, backgroundColor: "#34d39920",
+                        borderWidth: 1, borderColor: "#34d39950" }}>
+                        <Text style={{ color: "#34d399", fontSize: 10,
+                          fontWeight: "700" }}>{plan.type}</Text>
+                      </View>
+                    )}
+                    {plan?.status && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2,
+                        borderRadius: 6,
+                        backgroundColor: (isHold ? "#fbbf24" : "#34d399") + "20",
+                        borderWidth: 1,
+                        borderColor: (isHold ? "#fbbf24" : "#34d399") + "50" }}>
+                        <Text style={{ color: isHold ? "#fbbf24" : "#34d399",
+                          fontSize: 10, fontWeight: "700" }}>
+                          {isHold ? "HOLD" : plan.status}
+                        </Text>
+                      </View>
+                    )}
+                    {plan?.grade && plan.grade !== "–" && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2,
+                        borderRadius: 6,
+                        backgroundColor: (GRADE_COLOR[plan.grade] ?? "#94a3b8") + "20",
+                        borderWidth: 1,
+                        borderColor: (GRADE_COLOR[plan.grade] ?? "#94a3b8") + "50" }}>
+                        <Text style={{ color: GRADE_COLOR[plan.grade] ?? "#94a3b8",
+                          fontSize: 10, fontWeight: "700" }}>
+                          Grade {plan.grade}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Price + change */}
                   {quote && (
-                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                      <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
+                      <Text style={{ fontSize: 20, fontWeight: "800",
+                        color: colors.foreground }}>
                         {fRp(quote.price)}
                       </Text>
                       <Text style={{ fontSize: 14, fontWeight: "700",
                         color: isUp ? "#34d399" : "#f87171" }}>
                         {isUp ? "▲" : "▼"} {Math.abs(quote.chgPct).toFixed(2)}%
                       </Text>
+                      {plan?.holdDays && (
+                        <Text style={{ color: "#64748b", fontSize: 11 }}>
+                          {plan.holdDays}
+                        </Text>
+                      )}
                     </View>
                   )}
                 </View>
-                {verdict && <ScoreRing score={verdict.score} color={verdict.color} />}
+
+                {/* Right column: Score ring + RSI + StochK */}
+                {verdict && (
+                  <View style={{ alignItems: "center", gap: 2 }}>
+                    <ScoreRing score={verdict.score} color={verdict.color} />
+                    <Text style={{ color: colors.mutedForeground, fontSize: 7,
+                      fontWeight: "700", letterSpacing: 0.5 }}>SCORE</Text>
+                    {plan?.rsi !== null && plan?.rsi !== undefined && (
+                      <View style={{ alignItems: "center", marginTop: 4,
+                        paddingHorizontal: 8, paddingVertical: 3,
+                        borderRadius: 6, backgroundColor: colors.card,
+                        borderWidth: 1, borderColor: colors.border, width: 60 }}>
+                        <Text style={{ color: plan.rsi < 30 ? "#34d399"
+                          : plan.rsi > 70 ? "#f87171" : "#94a3b8",
+                          fontSize: 13, fontWeight: "900" }}>
+                          {plan.rsi.toFixed(0)}
+                        </Text>
+                        <Text style={{ color: "#475569", fontSize: 7,
+                          fontWeight: "600" }}>RSI</Text>
+                      </View>
+                    )}
+                    {plan?.stochK !== null && plan?.stochK !== undefined && (
+                      <View style={{ alignItems: "center",
+                        paddingHorizontal: 8, paddingVertical: 3,
+                        borderRadius: 6, backgroundColor: colors.card,
+                        borderWidth: 1, borderColor: colors.border, width: 60 }}>
+                        <Text style={{ color: plan.stochK < 20 ? "#34d399"
+                          : plan.stochK < 40 ? "#fbbf24" : "#94a3b8",
+                          fontSize: 13, fontWeight: "900" }}>
+                          {plan.stochK.toFixed(0)}
+                        </Text>
+                        <Text style={{ color: "#475569", fontSize: 7,
+                          fontWeight: "600" }}>StochK</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
 
-              {/* Verdict card */}
+              {/* Verdict banner — compact single row */}
               {verdict && (
-                <View style={{ flexDirection: "row", borderRadius: 12, borderWidth: 1,
+                <View style={{ flexDirection: "row", borderRadius: 10, borderWidth: 1,
                   borderColor: verdict.color + "40", backgroundColor: verdict.color + "15",
-                  padding: 10, gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
-                  <Text style={{ fontSize: 22 }}>{verdict.emoji}</Text>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={{ color: verdict.color, fontSize: 14, fontWeight: "900" }}>
-                      {verdict.label}
-                    </Text>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{verdict.sub}</Text>
-                    <Text style={{ color: verdict.color, fontSize: 11, fontWeight: "700" }}>
-                      → {verdict.action}
-                    </Text>
-                  </View>
+                  paddingHorizontal: 10, paddingVertical: 7,
+                  gap: 8, alignItems: "center", marginBottom: 8 }}>
+                  <Text style={{ fontSize: 18 }}>{verdict.emoji}</Text>
+                  <Text style={{ color: verdict.color, fontSize: 13,
+                    fontWeight: "900" }}>{verdict.label}</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 10,
+                    flex: 1 }} numberOfLines={1}>{verdict.sub}</Text>
+                  <Text style={{ color: verdict.color, fontSize: 10,
+                    fontWeight: "700" }}>→ {verdict.action}</Text>
                 </View>
               )}
 
