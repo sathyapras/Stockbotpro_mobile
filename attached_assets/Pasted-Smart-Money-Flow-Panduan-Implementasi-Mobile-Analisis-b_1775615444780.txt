@@ -1,0 +1,352 @@
+Smart Money Flow — Panduan Implementasi Mobile
+Analisis broker-level: siapa yang BENAR-BENAR akumulasi atau distribusi
+Data dari broker summary — tersedia setelah jam 17:30 WIB (setelah market tutup & data diproses)
+
+PERBEDAAN DENGAN BUY/SELL FLOW
+Buy/Sell Flow	Smart Money Flow
+Sumber	AFL radar (NBS)	Broker summary (pola broker)
+Mengukur	Arus uang masuk/keluar	Siapa (broker mana) yang beli/jual
+Tersedia	Live, delay 5 menit	Setelah 17:30 WIB
+Insight	"Berapa besar uang masuk?"	"Apakah bandar nyata sedang beli?"
+ENDPOINT
+GET /api/broker-summary/smart-money
+Authorization: Bearer <token>
+
+Tidak ada parameter — return semua saham yang punya data broker.
+
+RESPONSE
+{
+  "data": [
+    {
+      "ticker":        "JPFA",
+      "name":          "Japfa Comfeed Indonesia Tbk.",
+      "sector":        "Consumer Non-Cyclicals",
+      "indexCategory": "LQ45",
+      "date":          "2026-04-07",
+      "phase":         "IGNITION",
+      "flowScore":     88,
+      "avg3d":         16.6,
+      "avg5d":         12.3,
+      "mom3d":         4.3,
+      "brokerNet":     -2.1,
+      "dominance":     0.62,
+      "dominanceLabel":"Mid Concentration",
+      "fuel":          8.4,
+      "accDays":       18,
+      "distDays":      4,
+      "sparkline":     [12.1, 14.3, 16.6, 15.2, 18.8],
+      "flowTrend":     "up",
+      "deltaNetVal":   2.3,
+      "top1Label":     "YU",
+      "top3Label":     "YU,BK,ZP",
+      "latestAccDist": 16.6,
+      "latestAvgPrice": 1285
+    }
+  ],
+  "total": 87
+}
+
+FIELD KUNCI
+Field	Arti	Dipakai untuk
+phase	Fase siklus broker	Badge utama kartu
+flowScore	Skor 0-100	Sort + bar visual
+avg3d	Rata-rata net buy 3 hari (Miliar)	Nilai utama kartu
+mom3d	Momentum (avg3d - avg5d)	Arah trend ↑↓
+brokerNet	Net broker top vs retail	Negatif = bandar masih beli diam-diam
+accDays	Jumlah hari akumulasi	Kekuatan akumulasi
+sparkline	Array 5 nilai net (array angka)	Mini chart
+flowTrend	"up" / "down" / "flat"	Arah pergerakan
+top1Label	Kode broker paling aktif	Info broker
+PHASE — 6 Fase Siklus Broker
+const PHASE_CONFIG = {
+  IGNITION: {
+    label:   "IGNITION",
+    display: "Akumulasi Diam",
+    desc:    "Bandar beli saat retail jual — setup terbaik",
+    color:   "#10b981",
+    bg:      "#052e16",
+    badge:   "ACC",
+    badgeColor: "#10b981",
+    priority: 1,   // urutan tampil teratas
+  },
+  EARLY_ACC: {
+    label:   "EARLY_ACC",
+    display: "Akumulasi Awal",
+    desc:    "Akumulasi mulai meluas — konfirmasi mulai ada",
+    color:   "#34d399",
+    bg:      "#0a1f15",
+    badge:   "ACC",
+    badgeColor: "#34d399",
+    priority: 2,
+  },
+  STRONG_TREND: {
+    label:   "STRONG_TREND",
+    display: "Trend Kuat",
+    desc:    "Broker dan momentum selaras — uptrend aktif",
+    color:   "#60a5fa",
+    bg:      "#0c1629",
+    badge:   "TREND",
+    badgeColor: "#60a5fa",
+    priority: 3,
+  },
+  EXHAUSTION: {
+    label:   "EXHAUSTION",
+    display: "Mulai Jenuh",
+    desc:    "Momentum melambat — waspadai pembalikan",
+    color:   "#f97316",
+    bg:      "#1c0e05",
+    badge:   "LATE",
+    badgeColor: "#f97316",
+    priority: 4,
+  },
+  DISTRIBUTION: {
+    label:   "DISTRIBUTION",
+    display: "Distribusi",
+    desc:    "Bandar jual ke retail — hindari masuk",
+    color:   "#f87171",
+    bg:      "#2d0a0a",
+    badge:   "DIST",
+    badgeColor: "#f87171",
+    priority: 5,
+  },
+  CHURNING: {
+    label:   "CHURNING",
+    display: "Sideways",
+    desc:    "Tidak ada sinyal jelas — tunggu konfirmasi",
+    color:   "#64748b",
+    bg:      "#1e2433",
+    badge:   "NEU",
+    badgeColor: "#64748b",
+    priority: 6,
+  },
+};
+
+LAYOUT SCREEN
+┌─────────────────────────────────────────────────────┐
+│  💎 Smart Money Flow                                 │
+│  Analisis broker · Update setelah 17:30             │
+│                                                     │
+│  📅 Data: 7 Apr 2026  ·  87 saham                   │
+│                                                     │
+│  [🔥 IGNITION 8] [ACC 12] [TREND 9] [LATE 4]        │
+│  [DIST 22] [NEU 32]                                 │
+│                                                     │
+│  ─── IGNITION — Akumulasi Diam ───────────────────  │
+│                                                     │
+│  1  JPFA [ACC]  IGNITION        +16.6B   88        │
+│     Japfa Comfeed               avg3d   score      │
+│     [████████████████░░░░]  ↑ mom +4.3             │
+│     broker top: YU  ·  18 hari akumulasi           │
+│                                                     │
+│  2  INDF [ACC]  IGNITION        +14.2B   85        │
+│  ...                                               │
+└─────────────────────────────────────────────────────┘
+
+KOMPONEN: SmartMoneyFlowScreen
+export function SmartMoneyFlowScreen({ navigation }) {
+  const [activePhase, setActivePhase] = useState(null);  // null = semua
+  const [search, setSearch]           = useState("");
+  const { data: raw, isLoading, refetch } = useQuery({
+    queryKey: ["smart-money-flow"],
+    queryFn:  () => fetchWithAuth("/api/broker-summary/smart-money"),
+    staleTime: 30 * 60 * 1000,   // 30 menit — data tidak berubah sampai hari berikutnya
+  });
+  const smData = raw?.data ?? [];
+  const latestDate = smData[0]?.date ?? null;
+  // Cek apakah data tersedia (setelah 17:30)
+  const dataAvailable = smData.length > 0;
+  // Filter
+  const filtered = useMemo(() => {
+    let list = activePhase ? smData.filter(s => s.phase === activePhase) : [...smData];
+    if (search) {
+      const q = search.toUpperCase();
+      list = list.filter(s => s.ticker?.includes(q) || s.name?.toUpperCase().includes(q));
+    }
+    return list;
+  }, [smData, activePhase, search]);
+  // Phase pill counts
+  const phaseCounts = useMemo(() => {
+    const c = {};
+    smData.forEach(s => { c[s.phase] = (c[s.phase] ?? 0) + 1; });
+    return c;
+  }, [smData]);
+  // Sort phase pills by priority
+  const sortedPhases = Object.keys(PHASE_CONFIG).filter(p => phaseCounts[p] > 0);
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 20 }}>💎 Smart Money Flow</Text>
+        <Text style={{ color: "#475569", fontSize: 11 }}>Analisis broker · Update setelah 17:30 WIB</Text>
+        {latestDate && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#34d399" }} />
+            <Text style={{ color: "#64748b", fontSize: 11 }}>
+              Data: {new Date(latestDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+              {"  ·  "}{smData.length} saham
+            </Text>
+          </View>
+        )}
+      </View>
+      {/* Belum tersedia (sebelum 17:30) */}
+      {!dataAvailable && !isLoading && (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
+          <Text style={{ fontSize: 40, marginBottom: 16 }}>🕐</Text>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 16, textAlign: "center", marginBottom: 8 }}>
+            Data Belum Tersedia
+          </Text>
+          <Text style={{ color: "#64748b", fontSize: 13, textAlign: "center", lineHeight: 20 }}>
+            Smart Money Flow diproses setelah market tutup.{"\n"}
+            Coba lagi setelah jam 17:30 WIB.
+          </Text>
+        </View>
+      )}
+      {/* Data tersedia */}
+      {dataAvailable && (
+        <>
+          {/* Search */}
+          <View style={{ marginHorizontal: 16, marginBottom: 8,
+            backgroundColor: "#1e2433", borderRadius: 10,
+            flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
+            <Text style={{ color: "#475569", marginRight: 8 }}>🔍</Text>
+            <TextInput
+              placeholder="Cari ticker atau nama..."
+              placeholderTextColor="#475569"
+              value={search}
+              onChangeText={setSearch}
+              style={{ flex: 1, color: "white", fontSize: 13, paddingVertical: 10 }}
+              autoCapitalize="characters"
+            />
+          </View>
+          {/* Phase Filter Pills */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 6, paddingBottom: 8 }}>
+            <TouchableOpacity
+              onPress={() => setActivePhase(null)}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+                backgroundColor: !activePhase ? "#1e2433" : "transparent",
+                borderWidth: 1, borderColor: !activePhase ? "#94a3b8" : "#1e293b" }}>
+              <Text style={{ color: !activePhase ? "#94a3b8" : "#64748b", fontSize: 12 }}>
+                Semua {smData.length}
+              </Text>
+            </TouchableOpacity>
+            {sortedPhases.map(phase => {
+              const cfg    = PHASE_CONFIG[phase];
+              const active = activePhase === phase;
+              return (
+                <TouchableOpacity key={phase}
+                  onPress={() => setActivePhase(p => p === phase ? null : phase)}
+                  style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+                    backgroundColor: active ? cfg.bg : "transparent",
+                    borderWidth: 1, borderColor: active ? cfg.color : "#1e293b" }}>
+                  <Text style={{ color: active ? cfg.color : "#64748b", fontSize: 12,
+                    fontWeight: active ? "700" : "400" }}>
+                    🔥 {cfg.display} {phaseCounts[phase]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          {/* Stock List */}
+          <FlatList
+            data={filtered}
+            keyExtractor={item => item.ticker}
+            renderItem={({ item, index: idx }) => (
+              <SmartMoneyCard
+                stock={item}
+                rank={idx + 1}
+                onPress={() => navigation.navigate("StockDetail", { symbol: item.ticker })}
+              />
+            )}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}
+            showsVerticalScrollIndicator={false}
+            refreshing={isLoading}
+            onRefresh={refetch}
+          />
+        </>
+      )}
+    </View>
+  );
+}
+
+KOMPONEN: SmartMoneyCard
+function SmartMoneyCard({ stock, rank, onPress }) {
+  const cfg    = PHASE_CONFIG[stock.phase] ?? PHASE_CONFIG.CHURNING;
+  const isUp   = (stock.mom3d ?? 0) >= 0;
+  const momColor = isUp ? "#34d399" : "#f87171";
+  // Sparkline mini (5 titik)
+  const spark  = stock.sparkline ?? [];
+  const maxVal = Math.max(...spark.map(Math.abs), 1);
+  return (
+    <TouchableOpacity onPress={onPress}
+      style={{ backgroundColor: "#1e2433", borderRadius: 12, padding: 14,
+        borderLeftWidth: 3, borderLeftColor: cfg.color }}>
+      {/* Row 1: Rank + Ticker + Phase badge + avg3d + Score */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+        <Text style={{ color: "#475569", fontSize: 11, width: 22 }}>{rank}</Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>{stock.ticker}</Text>
+            <View style={{ backgroundColor: cfg.bg, borderRadius: 4,
+              paddingHorizontal: 6, paddingVertical: 1, borderWidth: 1, borderColor: cfg.color + "50" }}>
+              <Text style={{ color: cfg.color, fontSize: 9, fontWeight: "700" }}>{cfg.badge}</Text>
+            </View>
+            <Text style={{ color: "#64748b", fontSize: 10 }}>{cfg.display}</Text>
+          </View>
+          <Text style={{ color: "#475569", fontSize: 10 }} numberOfLines={1}>{stock.name}</Text>
+        </View>
+        {/* avg3d + score */}
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ color: (stock.avg3d ?? 0) >= 0 ? "#34d399" : "#f87171",
+            fontWeight: "700", fontSize: 14 }}>
+            {(stock.avg3d ?? 0) >= 0 ? "+" : ""}{(stock.avg3d ?? 0).toFixed(1)}B
+          </Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>avg3d</Text>
+        </View>
+        <View style={{ alignItems: "flex-end", marginLeft: 12, minWidth: 32 }}>
+          <Text style={{ color: "#a78bfa", fontWeight: "900", fontSize: 18 }}>{stock.flowScore}</Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>score</Text>
+        </View>
+      </View>
+      {/* Row 2: Flow score bar + Momentum */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <View style={{ flex: 1, height: 4, backgroundColor: "#0f1629", borderRadius: 2, overflow: "hidden" }}>
+          <View style={{ height: "100%", borderRadius: 2,
+            width: `${Math.min(100, stock.flowScore ?? 0)}%`,
+            backgroundColor: cfg.color }} />
+        </View>
+        <Text style={{ color: momColor, fontSize: 11 }}>
+          {isUp ? "↑" : "↓"} mom {isUp ? "+" : ""}{(stock.mom3d ?? 0).toFixed(1)}
+        </Text>
+      </View>
+      {/* Row 3: Acc days + Broker info */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ color: "#64748b", fontSize: 10 }}>
+          📅 {stock.accDays ?? 0} hari akumulasi
+          {(stock.distDays ?? 0) > 0 ? `  ·  ${stock.distDays} hari dist` : ""}
+        </Text>
+        {stock.top1Label && (
+          <Text style={{ color: "#475569", fontSize: 10 }}>
+            broker top: <Text style={{ color: "#94a3b8" }}>{stock.top1Label}</Text>
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+NAVIGASI — Di Mana Smart Money Flow Diakses?
+Tambahkan sebagai screen terpisah yang bisa diakses dari:
+
+Bottom Tab — tambah tab baru "Smart Money" di sebelah "Bandar" (Buy/Sell Flow)
+Dari Home — kartu Signal Snapshot Lihat Semua → bisa point ke sini
+Dari Trending Tools — ganti shortcut 💎 Bandar menjadi dua: 📊 Flow + 💎 Smart Money
+// Saran Tab Navigator
+<Tab.Navigator>
+  <Tab.Screen name="Market"      component={MarketScreen} />
+  <Tab.Screen name="Watchlist"   component={WatchlistScreen} />
+  <Tab.Screen name="Flow"        component={BuySellFlowScreen} />   {/* Sebelumnya: Bandar */}
+  <Tab.Screen name="SmartMoney"  component={SmartMoneyFlowScreen} /> {/* Baru */}
+  <Tab.Screen name="Stockpick"   component={StockpickScreen} />
+  <Tab.Screen name="Screener"    component={ScreenerScreen} />
+</Tab.Navigator>

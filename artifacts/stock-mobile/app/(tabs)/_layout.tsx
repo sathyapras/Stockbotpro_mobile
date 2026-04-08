@@ -24,6 +24,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "waveform.path.ecg", selected: "waveform.path.ecg.rectangle.fill" }} />
         <Label>Flow</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="smartmoney">
+        <Icon sf={{ default: "dollarsign.circle", selected: "dollarsign.circle.fill" }} />
+        <Label>Smart</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="stockpick">
         <Icon sf={{ default: "target", selected: "target" }} />
         <Label>Stockpick</Label>
@@ -107,6 +111,18 @@ function ClassicTabLayout() {
               <SymbolView name="waveform.path.ecg" tintColor={color} size={24} />
             ) : (
               <Feather name="activity" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="smartmoney"
+        options={{
+          title: "Smart",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="dollarsign.circle" tintColor={color} size={24} />
+            ) : (
+              <Feather name="trending-up" size={22} color={color} />
             ),
         }}
       />
