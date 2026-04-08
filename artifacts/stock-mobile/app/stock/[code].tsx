@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -135,75 +134,6 @@ function SignalSourceBadge({ plan, colors }: {
           <Text style={{ color: "#fbbf24", fontWeight: "700", fontSize: 10 }}>HOLD</Text>
         </View>
       )}
-    </View>
-  );
-}
-
-// ─── Position size calculator ─────────────────────────────────
-
-function PosSizeCalc({ entry, sl, colors }: {
-  entry: number; sl: number; colors: ReturnType<typeof useColors>;
-}) {
-  const [capital, setCapital] = useState("25000000");
-  const [riskPct, setRiskPct] = useState("2");
-
-  const cap = parseInt(capital.replace(/\D/g, "")) || 25_000_000;
-  const risk = parseFloat(riskPct) || 2;
-  const riskPerShare = Math.abs(entry - sl);
-  const maxRupiah = cap * risk / 100;
-  const lotByRisk = riskPerShare > 0 ? Math.floor(maxRupiah / riskPerShare / 100) : 0;
-  const lotByCap = entry > 0 ? Math.floor(cap / (entry * 100)) : 0;
-  const maxLot = Math.max(1, Math.min(lotByRisk, lotByCap));
-  const actualCost = maxLot * 100 * entry;
-  const fmtM = (n: number) => n >= 1_000_000 ? `Rp ${(n / 1_000_000).toFixed(1)} jt`
-    : `Rp ${n.toLocaleString("id-ID")}`;
-
-  return (
-    <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-      backgroundColor: colors.card, padding: 12, gap: 10 }}>
-      <Text style={{ color: colors.mutedForeground, fontSize: 10, fontWeight: "700" }}>
-        🧮 POSITION SIZE CALCULATOR
-      </Text>
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        <View style={{ flex: 2 }}>
-          <Text style={{ color: colors.mutedForeground, fontSize: 9, marginBottom: 3 }}>MODAL</Text>
-          <View style={{ borderRadius: 8, borderWidth: 1, borderColor: colors.border,
-            backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 6 }}>
-            <TextInput
-              style={{ color: colors.foreground, fontSize: 13, fontWeight: "700" }}
-              value={capital}
-              onChangeText={setCapital}
-              keyboardType="numeric"
-              selectTextOnFocus
-            />
-          </View>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.mutedForeground, fontSize: 9, marginBottom: 3 }}>RISK %</Text>
-          <View style={{ borderRadius: 8, borderWidth: 1, borderColor: colors.border,
-            backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 6 }}>
-            <TextInput
-              style={{ color: colors.foreground, fontSize: 13, fontWeight: "700" }}
-              value={riskPct}
-              onChangeText={setRiskPct}
-              keyboardType="decimal-pad"
-              selectTextOnFocus
-            />
-          </View>
-        </View>
-      </View>
-      <View style={{ borderRadius: 10, backgroundColor: "#60a5fa18",
-        borderWidth: 1, borderColor: "#60a5fa30", padding: 10 }}>
-        <Text style={{ color: "#60a5fa", fontWeight: "900", fontSize: 16 }}>
-          ~{maxLot} lot · {fmtM(actualCost)}
-        </Text>
-        <Text style={{ color: colors.mutedForeground, fontSize: 10, marginTop: 3 }}>
-          Risiko/saham: Rp {fRp(riskPerShare)} → max rugi {fmtM(maxRupiah)} ({risk}% dari {fmtM(cap)})
-        </Text>
-        <Text style={{ color: "#f87171", fontSize: 10, marginTop: 3 }}>
-          Stop loss jika close &lt; {fRp(sl)}
-        </Text>
-      </View>
     </View>
   );
 }
@@ -341,11 +271,6 @@ function TradingPlanContent({ plan, colors }: {
             <Text style={{ color: "#34d399", fontSize: 10 }}>Reward {tp1Pct.toFixed(1)}%</Text>
           </View>
         </View>
-      )}
-
-      {/* Position Size Calculator */}
-      {plan.entry > 0 && plan.stopLoss > 0 && (
-        <PosSizeCalc entry={plan.entry} sl={plan.stopLoss} colors={colors} />
       )}
 
       {/* Bullet checklist */}
