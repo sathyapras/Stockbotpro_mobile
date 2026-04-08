@@ -1000,6 +1000,14 @@ const SORT_OPTS: { label: string; val: SortKey }[] = [
   { label: "A–Z",       val: "alpha" },
 ];
 
+const PRESETS: { key: string; icon: string; label: string; color: string; bg: string }[] = [
+  { key: "entry",  icon: "🚀", label: "Entry Signal",  color: "#0ea5e9", bg: "#071624" },
+  { key: "acc",    icon: "⭐", label: "Strong Acc",    color: "#16a34a", bg: "#041f10" },
+  { key: "bandar", icon: "💎", label: "Top Bandar",    color: "#a78bfa", bg: "#1a1030" },
+  { key: "volume", icon: "📈", label: "Vol Spike",     color: "#f59e0b", bg: "#180e00" },
+  { key: "dist",   icon: "🔴", label: "Distribusi",    color: "#dc2626", bg: "#1a0707" },
+];
+
 // ─── Main screen ──────────────────────────────────────────────
 
 const PAGE_SIZE = 30;
@@ -1009,11 +1017,12 @@ export default function MarketScreen() {
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
-  const [query, setQuery]             = useState("");
-  const [indexFilter, setIndexFilter] = useState<StockFilter["index"]>("");
-  const [sortBy, setSortBy]           = useState<SortKey>("ret10d");
-  const [showSort, setShowSort]       = useState(false);
+  const [query, setQuery]               = useState("");
+  const [indexFilter, setIndexFilter]   = useState<StockFilter["index"]>("");
+  const [sortBy, setSortBy]             = useState<SortKey>("ret10d");
+  const [showSort, setShowSort]         = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
   const { data: stocks = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["master-stock"],
@@ -1038,17 +1047,54 @@ export default function MarketScreen() {
     return sortStocks(f, sortBy);
   }, [stocks, query, indexFilter, sortBy]);
 
-  // Reset pagination when filter/sort/search changes
-  React.useEffect(() => { setVisibleCount(PAGE_SIZE); }, [query, indexFilter, sortBy]);
+  const radarMap = useMemo(
+    () => new Map(radar.map(r => [r.ticker, r])),
+    [radar]
+  );
+
+  const presetFiltered = useMemo(() => {
+    if (!activePreset) return filtered;
+    switch (activePreset) {
+      case "entry":
+        return filtered.filter(s => {
+          const r = radarMap.get(s.symbol);
+          return r && derivePhaseLabel(r) === "IGNITION";
+        });
+      case "acc":
+        return filtered.filter(s => {
+          const r = radarMap.get(s.symbol);
+          if (!r) return false;
+          return ["IGNITION","EARLY_ACC","STRONG_TREND"].includes(derivePhaseLabel(r));
+        });
+      case "bandar":
+        return filtered.filter(s => {
+          const r = radarMap.get(s.symbol);
+          return r && r.bandarScore >= 65;
+        });
+      case "volume":
+        return filtered.filter(s => s.vol50dPct >= 200);
+      case "dist":
+        return filtered.filter(s => {
+          const r = radarMap.get(s.symbol);
+          if (!r) return false;
+          return ["DISTRIBUTION","EXHAUSTION"].includes(derivePhaseLabel(r));
+        });
+      default:
+        return filtered;
+    }
+  }, [filtered, activePreset, radarMap]);
+
+  // Reset pagination when filter/sort/search/preset changes
+  React.useEffect(() => { setVisibleCount(PAGE_SIZE); }, [query, indexFilter, sortBy, activePreset]);
 
   const visibleStocks = useMemo(
-    () => filtered.slice(0, visibleCount),
-    [filtered, visibleCount],
+    () => presetFiltered.slice(0, visibleCount),
+    [presetFiltered, visibleCount],
   );
 
   const loadMore = React.useCallback(() => {
-    setVisibleCount(c => Math.min(c + PAGE_SIZE, filtered.length));
-  }, [filtered.length]);
+    setVisibleCount(c => Math.min(c + PAGE_SIZE, presetFiltered.length));
+  }, [presetFiltered.length]);
 
   const sortLabel   = SORT_OPTS.find(o => o.val === sortBy)?.label ?? "Sort";
   const radarReady  = radar.length > 0;
@@ -1065,7 +1111,7 @@ export default function MarketScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListFooterComponent={
-          visibleCount < filtered.length ? (
+          visibleCount < presetFiltered.length ? (
             <TouchableOpacity
               onPress={loadMore}
               style={{
@@ -1076,13 +1122,13 @@ export default function MarketScreen() {
                 alignItems: "center",
               }}>
               <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>
-                Muat lebih banyak ({filtered.length - visibleCount} saham lagi)
+                Muat lebih banyak ({presetFiltered.length - visibleCount} saham lagi)
               </Text>
             </TouchableOpacity>
-          ) : filtered.length > 0 ? (
+          ) : presetFiltered.length > 0 ? (
             <Text style={{ color: "#475569", fontSize: 11, textAlign: "center",
               paddingVertical: 16, paddingBottom: 24 }}>
-              ✓ Semua {filtered.length} saham ditampilkan
+              ✓ {presetFiltered.length} saham ditampilkan
             </Text>
           ) : null
         }
@@ -1144,8 +1190,15 @@ export default function MarketScreen() {
             <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8,
               borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
               backgroundColor: colors.background }}>
-              <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: "700",
-                marginBottom: 10 }}>Semua Saham</Text>
+              <View style={{ flexDirection: "row", alignItems: "baseline",
+                justifyContent: "space-between", marginBottom: 10 }}>
+                <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: "700" }}>
+                  Semua Saham
+                </Text>
+                <Text style={{ color: "#475569", fontSize: 11 }}>
+                  {presetFiltered.length} dari {filtered.length} saham
+                </Text>
+              </View>
 
               {isError && (
                 <View style={{ borderRadius: 12, borderWidth: 1, borderColor: "#f8717140",
@@ -1185,6 +1238,34 @@ export default function MarketScreen() {
                     )}
                   </View>
 
+                  {/* Smart preset filters */}
+                  {radarReady && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 8, paddingTop: 10, paddingBottom: 2 }}>
+                      {PRESETS.map(p => {
+                        const active = activePreset === p.key;
+                        return (
+                          <TouchableOpacity key={p.key}
+                            onPress={() => setActivePreset(active ? null : p.key)}
+                            style={{
+                              flexDirection: "row", alignItems: "center", gap: 4,
+                              paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20,
+                              backgroundColor: active ? p.bg : colors.card,
+                              borderWidth: 1,
+                              borderColor: active ? p.color : colors.border,
+                            }}>
+                            <Text style={{ fontSize: 11 }}>{p.icon}</Text>
+                            <Text style={{
+                              color: active ? p.color : colors.mutedForeground,
+                              fontSize: 11, fontWeight: active ? "700" : "500",
+                            }}>{p.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  )}
+
+                  {/* Index + sort filters */}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ gap: 6, paddingTop: 8 }}>
                     {INDEX_OPTS.map(o => {
