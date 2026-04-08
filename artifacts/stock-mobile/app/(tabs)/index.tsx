@@ -775,6 +775,19 @@ function AnalisisKonteksSection({ radar, breadth }: {
           ))}
         </View>
       )}
+
+      {/* Sentimen Global link */}
+      <TouchableOpacity
+        onPress={() => router.push("/global-sentiment" as any)}
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center",
+          marginTop: 10, paddingVertical: 8, borderRadius: 8,
+          backgroundColor: "#0f1629", borderWidth: 1, borderColor: "#1e3a5f", gap: 6 }}>
+        <Text style={{ fontSize: 14 }}>🌍</Text>
+        <Text style={{ color: "#60a5fa", fontSize: 12, fontWeight: "700" }}>
+          Sentimen Global — VIX · DXY · Oil · Narasi
+        </Text>
+        <Text style={{ color: "#60a5fa", fontSize: 12 }}>→</Text>
+      </TouchableOpacity>
     </View>
   );
 }

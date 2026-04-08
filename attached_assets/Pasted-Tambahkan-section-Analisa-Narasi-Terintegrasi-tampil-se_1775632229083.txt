@@ -1,0 +1,77 @@
+Tambahkan section "Analisa Narasi Terintegrasi" — tampil sebagai paragraf teks analisis otomatis yang dirangkai dari data GET /api/global-sentiment (sudah dipakai di screen Analisis Konteks IDX).
+
+Narasi dirangkai client-side menggunakan function berikut:
+
+function generateNarrative(data) {
+  const s        = data.sentiment;
+  const ihsg     = data.domestic?.find(d => d.name === "IHSG");
+  const wti      = data.commodities?.find(d => d.name === "WTI Crude Oil");
+  const brent    = data.commodities?.find(d => d.name === "Brent Crude Oil");
+  const paragraphs = [];
+  // 1. VIX + IHSG
+  const ihsgPct = ihsg?.changePct;
+  const ihsgStr = ihsgPct != null
+    ? `meskipun IHSG ${ihsgPct >= 0 ? "masih bertahan" : "tertekan"} ${ihsgPct >= 0 ? "+" : ""}${ihsgPct?.toFixed(2)}%`
+    : "";
+  paragraphs.push(
+    `VIX ${s.vix} berada di zona ${s.fearLabel === "EXTREME FEAR" ? "Extreme Fear" : s.fearLabel === "FEAR" ? "Fear" : s.fearLabel === "GREED" ? "Greed" : "Neutral"} — sentimen global ${s.fearLabel.includes("FEAR") ? "defensif" : "risk-on"}` +
+    (ihsgStr ? `, ${ihsgStr}.` : ".")
+  );
+  // 2. USD/IDR + DXY
+  const rupiah = s.usdIdr >= 16500 ? "melemah" : s.usdIdr >= 16000 ? "stabil" : "menguat";
+  const dxyDir = s.dxyBias.includes("WEAK") ? "melemah" : s.dxyBias.includes("STRONG") ? "menguat" : "stabil";
+  const eMImpact = s.dxyBias.includes("WEAK")
+    ? "menjadi tailwind bagi pasar EM termasuk IDX"
+    : "memberikan tekanan pada arus modal EM";
+  paragraphs.push(
+    `Di sisi nilai tukar, Rupiah ${rupiah} ke ${s.usdIdr?.toLocaleString("id-ID")} — memberikan tekanan pada emiten berutang valas seperti GOTO, TLKM, dan ISAT; ` +
+    `DXY ${s.dxyValue?.toFixed(1)} ${dxyDir}, ${eMImpact}.`
+  );
+  // 3. Minyak (kalau ada)
+  if (wti?.value) {
+    const oilDir   = (wti.changePct ?? 0) < -5 ? "melemah signifikan" : (wti.changePct ?? 0) < 0 ? "melemah" : "menguat";
+    const oilPct   = wti.changePct != null ? ` (${wti.changePct >= 0 ? "+" : ""}${wti.changePct?.toFixed(1)}%)` : "";
+    const brentStr = brent?.value ? ` (Brent $${brent.value?.toFixed(1)})` : "";
+    const oilImpact = (wti.changePct ?? 0) < 0
+      ? "memberikan tekanan pada saham energi (MEDC, ELSA), namun positif untuk sektor transportasi dan manufaktur yang margin-nya terbantu biaya bahan bakar lebih rendah"
+      : "menguntungkan saham energi dan tambang (MEDC, ELSA, ADRO), namun menekan margin sektor transportasi dan manufaktur";
+    paragraphs.push(
+      `Harga minyak ${oilDir} — WTI $${wti.value?.toFixed(1)}${oilPct}${brentStr} ${oilImpact}.`
+    );
+  }
+  // 4. Kesimpulan
+  const conclusion = s.fearLabel.includes("FEAR") || s.globalBias === "RISK_OFF"
+    ? "Secara keseluruhan, kondisi masih menantang — selektif pada saham dengan fundamental kuat, valuasi wajar, dan struktur teknikal yang bersih."
+    : s.fearLabel === "NEUTRAL" || s.globalBias === "MIXED"
+    ? "Secara keseluruhan, pasar dalam kondisi campuran — pertahankan posisi yang sudah untung, hindari FOMO pada saham spekulatif."
+    : "Secara keseluruhan, sentimen mendukung — fokus pada momentum kuat di sektor perbankan, konsumer, dan teknologi.";
+  paragraphs.push(conclusion);
+  return paragraphs.join("\n\n");
+}
+
+Tampilan di screen:
+
+┌──────────────────────────────────────────┐
+│ 📝 Analisa Narasi Terintegrasi           │
+│──────────────────────────────────────────│
+│ VIX 25.8 berada di zona Fear — sentimen  │
+│ global defensif, meskipun IHSG masih     │
+│ bertahan +3.58%.                         │
+│                                          │
+│ Di sisi nilai tukar, Rupiah melemah ke   │
+│ 16.995 — memberikan tekanan pada emiten  │
+│ berutang valas seperti GOTO, TLKM, dan   │
+│ ISAT; DXY 98.8 melemah, menjadi tailwind │
+│ bagi pasar EM termasuk IDX.              │
+│                                          │
+│ Harga minyak melemah — WTI $94.8        │
+│ (-16.0%) (Brent $93.0) memberikan        │
+│ tekanan pada saham energi (MEDC, ELSA),  │
+│ namun positif untuk sektor transportasi. │
+│                                          │
+│ Secara keseluruhan, kondisi masih        │
+│ menantang — selektif pada saham dengan   │
+│ fundamental kuat dan teknikal bersih.    │
+└──────────────────────────────────────────┘
+
+Section ini bisa ditempatkan di bawah indikator global di screen Analisis Konteks IDX — tidak perlu endpoint baru, cukup panggil generateNarrative(data) dari data yang sudah di-fetch.
