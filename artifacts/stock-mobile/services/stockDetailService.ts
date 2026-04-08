@@ -2,7 +2,6 @@ import { Platform } from "react-native";
 import {
   BrokerRow,
   SmartMoneyResult,
-  fetchSmartMoneyForTicker,
 } from "./smartMoneyEngine";
 import { MasterStock, fetchMasterStockBySymbol } from "./masterStockService";
 import { RadarMarket, fetchRadarBySymbol } from "./radarMarketService";
@@ -16,7 +15,6 @@ function proxyUrl(name: string) {
   }
   const DIRECT: Record<string, string> = {
     broksum_data_1d: "http://103.190.28.45/broksum_data_1d.json",
-    broksum_data_history15d: "http://103.190.28.45/broksum_data_history15d.json",
     BuyOnStrenght_Signal: "http://103.190.28.248/stockbotprodata/BuyOnStrenght_Signal",
     BuyOnWeakness_Signal: "http://103.190.28.248/stockbotprodata/BuyOnWeakness_Signal",
     STOCKTOOLS_SCREENER: "http://103.190.28.248/stockbotprodata/STOCKTOOLS_SCREENER",
@@ -28,6 +26,89 @@ async function fetchJson<T>(name: string): Promise<T> {
   const res = await fetch(proxyUrl(name));
   if (!res.ok) throw new Error(`Failed: ${name}`);
   return res.json();
+}
+
+// ─── Smart Money via server API (per-ticker, efficient) ────────
+
+function getSmartMoneyUrl(ticker: string): string {
+  if (Platform.OS === "web") {
+    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+    return `https://${d}/api/broker-summary/smart-money?ticker=${ticker}`;
+  }
+  // Native: call API server directly
+  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost";
+  return `https://${domain}/api/broker-summary/smart-money?ticker=${ticker}`;
+}
+
+async function fetchSmartMoneyForTicker(ticker: string): Promise<SmartMoneyResult | null> {
+  try {
+    const res = await fetch(getSmartMoneyUrl(ticker));
+    if (!res.ok) return null;
+    const json = await res.json() as { data: SmartMoneyApiItem };
+    const d = json.data;
+    if (!d) return null;
+    return {
+      ticker:           d.ticker,
+      date:             d.date,
+      latestAccDist:    d.latestAccDist,
+      latestVwap:       d.latestVwap,
+      top1Label:        d.top1Label,
+      top3Label:        d.top3Label,
+      top5Label:        d.top5Label,
+      top1Val:          d.top1Val,
+      top3Val:          d.top3Val,
+      brokerBuy:        d.brokerBuy,
+      brokerSell:       d.brokerSell,
+      avg3d:            d.avg3d,
+      avg5d:            d.avg5d,
+      avg15d:           d.avg15d,
+      mom3d:            d.mom3d,
+      mom5d:            d.mom5d,
+      dominance:        d.dominance,
+      dominanceLabel:   d.dominanceLabel as SmartMoneyResult["dominanceLabel"],
+      brokerNet:        d.brokerNet,
+      fuel:             d.netValBn,
+      accDays:          d.accDays,
+      distDays:         d.distDays,
+      flowScore:        d.flowScore,
+      phase:            d.phase as SmartMoneyResult["phase"],
+      sparkline:        d.sparkline,
+      flowTrend:        d.flowTrend as SmartMoneyResult["flowTrend"],
+      netValBn:         d.netValBn,
+    };
+  } catch {
+    return null;
+  }
+}
+
+interface SmartMoneyApiItem {
+  ticker: string;
+  date: string;
+  phase: string;
+  flowScore: number;
+  avg3d: number;
+  avg5d: number;
+  avg15d: number;
+  mom3d: number;
+  mom5d: number;
+  brokerNet: number;
+  netValBn: number;
+  dominance: number;
+  dominanceLabel: string;
+  fuel: number;
+  accDays: number;
+  distDays: number;
+  sparkline: number[];
+  flowTrend: string;
+  top1Label: string;
+  top3Label: string;
+  top5Label: string;
+  top1Val: number;
+  top3Val: number;
+  brokerBuy: number;
+  brokerSell: number;
+  latestAccDist: "Acc" | "Dist" | null;
+  latestVwap: number;
 }
 
 // ─── Assembled stock detail ────────────────────────────────────

@@ -74,12 +74,14 @@ function parseTop1Value(val: string | null): number {
   return parseFloat(parts[1].trim()) || 0;
 }
 
-function parseTop1Label(val: string | null): string {
+function parseTopLabel(val: string | null): string {
   if (!val) return "—";
   return val.split("|")[0].trim();
 }
 
 type Phase = "IGNITION" | "EARLY_ACC" | "STRONG_TREND" | "EXHAUSTION" | "DISTRIBUTION" | "CHURNING";
+type FlowTrend = "GROWING" | "SHRINKING" | "TURNING_ACC" | "TURNING_DIST" | "STABLE";
+type AccDist = "Acc" | "Dist" | null;
 
 function derivePhase(
   avg3d: number,
@@ -108,111 +110,163 @@ function calcFlowScore(avg3d: number, accDays: number, distDays: number, mom3d: 
   return Math.min(100, Math.max(0, Math.round(base + dBonus + mBonus - dPenal + 10)));
 }
 
-// ─── Main endpoint ────────────────────────────────────────────
+function deriveFlowTrend(
+  latestAccDist: AccDist,
+  prevAccDist: AccDist,
+  mom3d: number,
+): FlowTrend {
+  if (latestAccDist === "Acc" && prevAccDist === "Dist") return "TURNING_ACC";
+  if (latestAccDist === "Dist" && prevAccDist === "Acc") return "TURNING_DIST";
+  if (mom3d > 0.5)  return "GROWING";
+  if (mom3d < -0.5) return "SHRINKING";
+  return "STABLE";
+}
 
-router.get("/broker-summary/smart-money", async (_req: Request, res: Response) => {
+function normalizeAccDist(raw: string | null): AccDist {
+  const v = (raw ?? "").toLowerCase().trim();
+  if (v === "acc") return "Acc";
+  if (v === "dist") return "Dist";
+  return null;
+}
+
+// ─── Core computation (shared by list + single-ticker) ─────────
+
+function computeTicker(ticker: string, history: BrokerRow[]): SmartMoneyItem {
+  const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date));
+  const withData = sorted.filter(r => r.average_rpbn !== null);
+
+  const latest = withData[0];
+  const prev   = withData[1] ?? null;
+  const latestDate = latest.date;
+
+  const last3  = withData.slice(0, 3).map(r => parseRpbn(r.average_rpbn));
+  const last5  = withData.slice(0, 5).map(r => parseRpbn(r.average_rpbn));
+  const lastAll = withData.map(r => parseRpbn(r.average_rpbn));
+  const avg3d  = last3.reduce((s, v) => s + v, 0) / (last3.length || 1);
+  const avg5d  = last5.reduce((s, v) => s + v, 0) / (last5.length || 1);
+  const avg15d = lastAll.reduce((s, v) => s + v, 0) / (lastAll.length || 1);
+  const mom3d  = avg3d - avg5d;
+  const mom5d  = avg5d - avg15d;
+
+  let accDays  = 0;
+  let distDays = 0;
+  for (const r of withData) {
+    const ad = normalizeAccDist(r.acc_dist);
+    if (ad === "Acc") accDays++;
+    else if (ad === "Dist") distDays++;
+  }
+
+  const sparkline = withData.slice(0, 5)
+    .map(r => parseRpbn(r.average_rpbn))
+    .reverse();
+
+  const latestAccDist = normalizeAccDist(latest.acc_dist);
+  const prevAccDist   = prev ? normalizeAccDist(prev.acc_dist) : null;
+  const latestVwap    = latest.vwap ?? 0;
+
+  const top1Label = parseTopLabel(latest.top1_rpb);
+  const top3Label = parseTopLabel(latest.top3_rpb);
+  const top5Label = parseTopLabel(latest.top5_rpb);
+  const top1Val   = parseTop1Value(latest.top1_rpb) * (latestAccDist === "Acc" ? 1 : -1);
+  const top3Val   = parseTop1Value(latest.top3_rpb) * (latestAccDist === "Acc" ? 1 : -1);
+
+  const bb  = latest.broker_buy  ?? 0;
+  const bs  = latest.broker_sell ?? 0;
+  const dom = bb + bs > 0 ? bb / (bb + bs) : 0.5;
+  const dominanceLabel =
+    dom > 0.65 ? "High Concentration"
+    : dom > 0.45 ? "Mid Concentration"
+    : "Low Concentration";
+
+  const netValBn = parseRpbn(latest.net_value_rpb);
+  const fuel     = parseTop1Value(latest.top5_rpb);
+
+  const phase     = derivePhase(avg3d, avg5d, accDays, distDays, top1Label);
+  const flowScore = calcFlowScore(avg3d, accDays, distDays, mom3d);
+  const flowTrend = deriveFlowTrend(latestAccDist, prevAccDist, mom3d);
+
+  return {
+    ticker,
+    name:            ticker,
+    sector:          "",
+    indexCategory:   "",
+    date:            latestDate,
+    phase,
+    flowScore,
+    avg3d:           parseFloat(avg3d.toFixed(2)),
+    avg5d:           parseFloat(avg5d.toFixed(2)),
+    avg15d:          parseFloat(avg15d.toFixed(2)),
+    mom3d:           parseFloat(mom3d.toFixed(2)),
+    mom5d:           parseFloat(mom5d.toFixed(2)),
+    brokerNet:       parseFloat(netValBn.toFixed(2)),
+    netValBn:        parseFloat(netValBn.toFixed(2)),
+    dominance:       parseFloat(dom.toFixed(3)),
+    dominanceLabel,
+    fuel:            parseFloat(fuel.toFixed(2)),
+    accDays,
+    distDays,
+    sparkline,
+    flowTrend,
+    top1Label,
+    top3Label,
+    top5Label,
+    top1Val:         parseFloat(top1Val.toFixed(2)),
+    top3Val:         parseFloat(top3Val.toFixed(2)),
+    brokerBuy:       bb,
+    brokerSell:      bs,
+    latestAccDist,
+    latestVwap,
+    deltaNetVal:     parseFloat(parseRpbn(latest.top1_rpb).toFixed(2)),
+    latestAvgPrice:  latestVwap,
+  };
+}
+
+// ─── Main endpoint ────────────────────────────────────────────
+// GET /api/broker-summary/smart-money          → all tickers
+// GET /api/broker-summary/smart-money?ticker=X → single ticker
+
+router.get("/broker-summary/smart-money", async (req: Request, res: Response) => {
   try {
     const rows = await getBrokerData();
+    const tickerFilter = (req.query.ticker as string | undefined)?.toUpperCase() ?? null;
 
     // Group by ticker
     const byTicker = new Map<string, BrokerRow[]>();
     for (const row of rows) {
       if (!row.ticker) continue;
+      if (tickerFilter && row.ticker.toUpperCase() !== tickerFilter) continue;
       if (!byTicker.has(row.ticker)) byTicker.set(row.ticker, []);
       byTicker.get(row.ticker)!.push(row);
     }
 
-    const result: SmartMoneyItem[] = [];
-
-    for (const [ticker, history] of byTicker.entries()) {
-      // Sort by date descending (most recent first)
-      const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date));
-
-      // Need at least 3 recent rows with data
-      const withData = sorted.filter(r => r.average_rpbn !== null);
-      if (withData.length < 1) continue;
-
-      const latestDate = withData[0].date;
-      const latest     = withData[0];
-
-      // avg3d — average net for last 3 days
-      const last3  = withData.slice(0, 3).map(r => parseRpbn(r.average_rpbn));
-      const last5  = withData.slice(0, 5).map(r => parseRpbn(r.average_rpbn));
-      const avg3d  = last3.reduce((s, v) => s + v, 0) / (last3.length || 1);
-      const avg5d  = last5.reduce((s, v) => s + v, 0) / (last5.length || 1);
-      const mom3d  = avg3d - avg5d;
-
-      // accDays / distDays from history
-      let accDays  = 0;
-      let distDays = 0;
-      for (const r of withData) {
-        const ad = (r.acc_dist ?? "").toLowerCase();
-        if (ad === "acc") accDays++;
-        else if (ad === "dist") distDays++;
-      }
-
-      // sparkline — last 5 daily values
-      const sparkline = withData.slice(0, 5)
-        .map(r => parseRpbn(r.average_rpbn))
-        .reverse();
-
-      // flowTrend
-      const flowTrend = mom3d > 0.5 ? "up" : mom3d < -0.5 ? "down" : "flat";
-
-      // top1Label
-      const top1Label = parseTop1Label(latest.top1_rpb);
-      const top3Label = [
-        parseTop1Label(latest.top1_rpb),
-        parseTop1Label(latest.top3_rpb),
-        parseTop1Label(latest.top5_rpb),
-      ].filter(s => s !== "—").join(",");
-
-      // dominance proxy from broker_buy/(broker_buy+broker_sell)
-      const bb  = latest.broker_buy  ?? 0;
-      const bs  = latest.broker_sell ?? 0;
-      const dom = bb + bs > 0 ? bb / (bb + bs) : 0.5;
-      const dominanceLabel =
-        dom > 0.65 ? "High Concentration"
-        : dom > 0.45 ? "Mid Concentration"
-        : "Low Concentration";
-
-      const fuel = parseTop1Value(latest.top5_rpb);
-
-      const phase     = derivePhase(avg3d, avg5d, accDays, distDays, top1Label);
-      const flowScore = calcFlowScore(avg3d, accDays, distDays, mom3d);
-
-      result.push({
-        ticker,
-        name:           ticker,
-        sector:         "",
-        indexCategory:  "",
-        date:           latestDate,
-        phase,
-        flowScore,
-        avg3d:          parseFloat(avg3d.toFixed(2)),
-        avg5d:          parseFloat(avg5d.toFixed(2)),
-        mom3d:          parseFloat(mom3d.toFixed(2)),
-        brokerNet:      parseFloat(parseRpbn(latest.net_value_rpb).toFixed(2)),
-        dominance:      parseFloat(dom.toFixed(3)),
-        dominanceLabel,
-        fuel:           parseFloat(fuel.toFixed(2)),
-        accDays,
-        distDays,
-        sparkline,
-        flowTrend,
-        deltaNetVal:    parseFloat(parseRpbn(latest.top1_rpb).toFixed(2)),
-        top1Label,
-        top3Label,
-        latestAccDist:  parseFloat(avg3d.toFixed(2)),
-        latestAvgPrice: latest.vwap ?? 0,
-      });
-    }
-
-    // Sort by priority: IGNITION first, then by flowScore desc
     const PRIORITY: Record<Phase, number> = {
       IGNITION: 1, EARLY_ACC: 2, STRONG_TREND: 3,
       EXHAUSTION: 4, DISTRIBUTION: 5, CHURNING: 6,
     };
+
+    // Single-ticker mode
+    if (tickerFilter) {
+      const history = byTicker.get(tickerFilter);
+      if (!history || history.length === 0) {
+        return res.status(404).json({ error: `Ticker ${tickerFilter} not found` });
+      }
+      const withData = history.filter(r => r.average_rpbn !== null);
+      if (withData.length === 0) {
+        return res.status(404).json({ error: `No data for ${tickerFilter}` });
+      }
+      const item = computeTicker(tickerFilter, history);
+      res.setHeader("Cache-Control", "public, max-age=900");
+      return res.json({ data: item });
+    }
+
+    // All-tickers mode
+    const result: SmartMoneyItem[] = [];
+    for (const [ticker, history] of byTicker.entries()) {
+      const withData = history.filter(r => r.average_rpbn !== null);
+      if (withData.length < 1) continue;
+      result.push(computeTicker(ticker, history));
+    }
+
     result.sort((a, b) => {
       const pd = (PRIORITY[a.phase as Phase] ?? 6) - (PRIORITY[b.phase as Phase] ?? 6);
       return pd !== 0 ? pd : b.flowScore - a.flowScore;
@@ -236,8 +290,11 @@ interface SmartMoneyItem {
   flowScore: number;
   avg3d: number;
   avg5d: number;
+  avg15d: number;
   mom3d: number;
+  mom5d: number;
   brokerNet: number;
+  netValBn: number;
   dominance: number;
   dominanceLabel: string;
   fuel: number;
@@ -245,10 +302,16 @@ interface SmartMoneyItem {
   distDays: number;
   sparkline: number[];
   flowTrend: string;
-  deltaNetVal: number;
   top1Label: string;
   top3Label: string;
-  latestAccDist: number;
+  top5Label: string;
+  top1Val: number;
+  top3Val: number;
+  brokerBuy: number;
+  brokerSell: number;
+  latestAccDist: "Acc" | "Dist" | null;
+  latestVwap: number;
+  deltaNetVal: number;
   latestAvgPrice: number;
 }
 
