@@ -1265,14 +1265,26 @@ function sma(closes: number[], idx: number, period: number): number | null {
   return sum / period;
 }
 
-function CandleChartSvg({ candles }: { candles: Candle[] }) {
+function CandleChartSvg({ candles, containerWidth }: { candles: Candle[]; containerWidth: number }) {
   const n = candles.length;
   if (n === 0) return null;
 
-  const cW = Math.max(3, Math.min(12, Math.floor(260 / n)));
-  const gap = cW <= 4 ? 0 : 1;
-  const innerW = n * (cW + gap) - gap;
-  const svgW = CHART_PAD_L + innerW + CHART_PAD_R;
+  // Decide: fill container OR scroll
+  // slotW = width per candle if we fill containerWidth exactly
+  const innerContainerW = containerWidth - CHART_PAD_L - CHART_PAD_R;
+  const slotW = innerContainerW / n;
+
+  // Fill mode defaults (1B / 3B: candles spread to fill full width)
+  let svgW = containerWidth;
+  let cW   = Math.min(12, slotW * 0.82);
+  let xC: (i: number) => number = (i) => CHART_PAD_L + (i + 0.5) * slotW;
+
+  if (slotW < 3.5) {
+    // Scroll mode (6B / 1T): fixed 4px candles, chart scrolls horizontally
+    cW   = 4;
+    svgW = CHART_PAD_L + n * cW + CHART_PAD_R;
+    xC   = (i) => CHART_PAD_L + i * cW + cW / 2;
+  }
 
   const highs  = candles.map(c => c.high);
   const lows   = candles.map(c => c.low);
@@ -1286,8 +1298,6 @@ function CandleChartSvg({ candles }: { candles: Candle[] }) {
 
   const yP = (p: number) =>
     CHART_PAD_L + ((maxP - p) / priceRange) * (CANDLE_H - CHART_PAD_L * 2);
-
-  const xC = (i: number) => CHART_PAD_L + i * (cW + gap) + cW / 2;
 
   // Y-axis levels
   const yLevels = [0, 0.25, 0.5, 0.75, 1].map(f => ({
@@ -1380,15 +1390,14 @@ function CandleChartSvg({ candles }: { candles: Candle[] }) {
         x2={svgW - CHART_PAD_R + 4} y2={CANDLE_H + 2}
         stroke="#1e293b" strokeWidth={0.5} />
 
-      {/* Volume bars */}
+      {/* Volume bars — centered under each candle */}
       {candles.map((c, i) => {
         const isUp  = c.close >= c.open;
         const color = isUp ? "#34d39966" : "#f8717166";
         const bH    = Math.max(1, (c.volume / maxVol) * (VOL_H - 4));
-        const x     = CHART_PAD_L + i * (cW + gap);
         return (
           <Rect key={`v-${i}`}
-            x={x} y={volBase - bH}
+            x={xC(i) - cW / 2} y={volBase - bH}
             width={cW} height={bH}
             fill={color} />
         );
@@ -1424,10 +1433,11 @@ function ChartTab({ symbol }: { symbol: string }) {
   const candles = filterByPeriod(allCandles, days);
   const last = candles[candles.length - 1];
 
-  const minCW = Math.max(3, Math.min(12, Math.floor(260 / Math.max(1, candles.length))));
-  const gap   = minCW <= 4 ? 0 : 1;
-  const chartW = CHART_PAD_L + candles.length * (minCW + gap) + CHART_PAD_R;
-  const scrollNeeded = chartW > width - 32;
+  // containerWidth = usable chart area (card inner width)
+  const containerWidth = width - 32 - 20;  // screen - horizontal margins - card padding
+  const innerContainerW = containerWidth - CHART_PAD_L - CHART_PAD_R;
+  const slotW = innerContainerW / Math.max(1, candles.length);
+  const scrollNeeded = slotW < 3.5;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -1490,7 +1500,7 @@ function ChartTab({ symbol }: { symbol: string }) {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               scrollEnabled={scrollNeeded}>
               <View style={{ paddingBottom: 4 }}>
-                <CandleChartSvg candles={candles} />
+                <CandleChartSvg candles={candles} containerWidth={containerWidth} />
               </View>
             </ScrollView>
           </View>
