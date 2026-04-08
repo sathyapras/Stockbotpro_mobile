@@ -1306,13 +1306,13 @@ function CandleChartSvg({ candles, containerWidth }: { candles: Candle[]; contai
   }));
 
   // MA lines
+  const ma10pts: { x: number; y: number }[] = [];
   const ma20pts: { x: number; y: number }[] = [];
-  const ma50pts: { x: number; y: number }[] = [];
   closes.forEach((_, i) => {
+    const m10 = sma(closes, i, 10);
     const m20 = sma(closes, i, 20);
-    const m50 = sma(closes, i, 50);
+    if (m10 !== null) ma10pts.push({ x: xC(i), y: yP(m10) });
     if (m20 !== null) ma20pts.push({ x: xC(i), y: yP(m20) });
-    if (m50 !== null) ma50pts.push({ x: xC(i), y: yP(m50) });
   });
 
   // X-axis date labels (sparse)
@@ -1346,24 +1346,18 @@ function CandleChartSvg({ candles, containerWidth }: { candles: Candle[]; contai
         </SvgText>
       ))}
 
-      {/* MA50 line (purple) */}
-      {ma50pts.length > 1 && (
-        <Line
-          x1={ma50pts[0].x} y1={ma50pts[0].y}
-          x2={ma50pts[ma50pts.length - 1].x} y2={ma50pts[ma50pts.length - 1].y}
-          stroke="#a78bfa40" strokeWidth={0} />
-      )}
-      {ma50pts.map((p, i) => i === 0 ? null : (
-        <Line key={`ma50-${i}`}
-          x1={ma50pts[i - 1].x} y1={ma50pts[i - 1].y}
+      {/* MA20 line (purple, dashed) */}
+      {ma20pts.map((p, i) => i === 0 ? null : (
+        <Line key={`ma20-${i}`}
+          x1={ma20pts[i - 1].x} y1={ma20pts[i - 1].y}
           x2={p.x} y2={p.y}
           stroke="#a78bfa" strokeWidth={0.8} strokeDasharray="2,1" />
       ))}
 
-      {/* MA20 line (blue) */}
-      {ma20pts.map((p, i) => i === 0 ? null : (
-        <Line key={`ma20-${i}`}
-          x1={ma20pts[i - 1].x} y1={ma20pts[i - 1].y}
+      {/* MA10 line (blue) */}
+      {ma10pts.map((p, i) => i === 0 ? null : (
+        <Line key={`ma10-${i}`}
+          x1={ma10pts[i - 1].x} y1={ma10pts[i - 1].y}
           x2={p.x} y2={p.y}
           stroke="#60a5fa" strokeWidth={0.8} />
       ))}
@@ -1465,11 +1459,11 @@ function ChartTab({ symbol }: { symbol: string }) {
           alignItems: "center", gap: 8 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
             <View style={{ width: 12, height: 2, backgroundColor: "#60a5fa" }} />
-            <Text style={{ color: "#64748b", fontSize: 9 }}>MA20</Text>
+            <Text style={{ color: "#64748b", fontSize: 9 }}>MA10</Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
             <View style={{ width: 12, height: 2, backgroundColor: "#a78bfa" }} />
-            <Text style={{ color: "#64748b", fontSize: 9 }}>MA50</Text>
+            <Text style={{ color: "#64748b", fontSize: 9 }}>MA20</Text>
           </View>
         </View>
       </View>
