@@ -33,6 +33,11 @@ import {
   type RadarMarket,
   fetchRadarMarket,
 } from "@/services/radarMarketService";
+import {
+  type SectorData,
+  PHASE_CONFIG as SECTOR_PHASE_CFG,
+  buildSectorStats,
+} from "@/services/sectorService";
 
 // ─── Greeting ─────────────────────────────────────────────────
 
@@ -328,7 +333,7 @@ function CommandMiniCard({ card }: { card: CCCard }) {
   );
 }
 
-function CommandCenter({ radar, loading }: { radar: RadarMarket[]; loading: boolean }) {
+function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; loading: boolean; sectors: SectorData[] }) {
   const stocksOnly = useMemo(
     () => radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE"),
     [radar]
@@ -378,6 +383,15 @@ function CommandCenter({ radar, loading }: { radar: RadarMarket[]; loading: bool
     },
   ];
 
+  // Sector summary
+  const sectorSummary = useMemo(() => {
+    if (sectors.length === 0) return null;
+    const leading  = sectors.filter(s => s.phase === "Leading");
+    const lagging  = sectors.filter(s => s.phase === "Lagging");
+    const top = [...sectors].sort((a, b) => b.avgBandarScore - a.avgBandarScore)[0];
+    return { leadingCount: leading.length, laggingCount: lagging.length, top };
+  }, [sectors]);
+
   return (
     <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
       <Text style={{ color: "#64748b", fontSize: 10, fontWeight: "700",
@@ -393,6 +407,54 @@ function CommandCenter({ radar, loading }: { radar: RadarMarket[]; loading: bool
           <CommandMiniCard card={cards[2]} />
           <CommandMiniCard card={cards[3]} />
         </View>
+
+        {/* Sector card — full width */}
+        <TouchableOpacity
+          onPress={() => router.push("/sector-rotation" as any)}
+          activeOpacity={0.8}
+          style={{
+            borderRadius: 14, padding: 13,
+            backgroundColor: "#0e1520", borderWidth: 1, borderColor: "#fb923c25",
+            flexDirection: "row", alignItems: "center", gap: 12,
+          }}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <Text style={{ fontSize: 16 }}>🔄</Text>
+              <View>
+                <Text style={{ color: "#fb923c", fontSize: 10, fontWeight: "800",
+                  letterSpacing: 0.5 }}>SECTOR ROTATION</Text>
+                <Text style={{ color: "#475569", fontSize: 8 }}>Market Breadth</Text>
+              </View>
+            </View>
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
+              {sectorSummary
+                ? `${sectorSummary.leadingCount} Leading  ·  ${sectorSummary.laggingCount} Lagging`
+                : loading ? "Loading…" : "—"}
+            </Text>
+          </View>
+          {sectorSummary?.top && (
+            <View style={{ alignItems: "flex-end" }}>
+              <View style={{
+                paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+                backgroundColor: SECTOR_PHASE_CFG[sectorSummary.top.phase].bg,
+                borderWidth: 1, borderColor: SECTOR_PHASE_CFG[sectorSummary.top.phase].color + "60",
+                marginBottom: 4,
+              }}>
+                <Text style={{ color: SECTOR_PHASE_CFG[sectorSummary.top.phase].color,
+                  fontSize: 10, fontWeight: "700" }}>
+                  {SECTOR_PHASE_CFG[sectorSummary.top.phase].emoji} {sectorSummary.top.phase}
+                </Text>
+              </View>
+              <Text style={{ color: "#94a3b8", fontSize: 11, fontWeight: "600" }}
+                numberOfLines={1}>
+                {sectorSummary.top.sector}
+              </Text>
+              <Text style={{ color: "#a78bfa", fontSize: 10 }}>
+                Score {Math.round(sectorSummary.top.avgBandarScore)}/100
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -1052,6 +1114,11 @@ export default function MarketScreen() {
     [radar]
   );
 
+  const sectorStats = useMemo(
+    () => (stocks.length > 0 && radar.length > 0 ? buildSectorStats(stocks, radar) : []),
+    [stocks, radar]
+  );
+
   const presetFiltered = useMemo(() => {
     if (!activePreset) return filtered;
     switch (activePreset) {
@@ -1139,7 +1206,7 @@ export default function MarketScreen() {
 
             {/* [2] Command Center — live market intel */}
             <View style={{ backgroundColor: "#0f1629", paddingTop: 16, paddingBottom: 8 }}>
-              <CommandCenter radar={radar} loading={loadingRadar} />
+              <CommandCenter radar={radar} loading={loadingRadar} sectors={sectorStats} />
             </View>
 
             {/* [3]-[6] Smart sections — from radar */}
