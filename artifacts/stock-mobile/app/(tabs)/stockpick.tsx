@@ -89,6 +89,32 @@ function PickCard({ item }: { item: StockPickItem }) {
             {Math.round(item.score)}
           </Text>
           <Text style={[styles.scoreUnit, { color: colors.mutedForeground }]}>score</Text>
+          {item.rsi !== null && (
+            <View style={{ alignItems: "center", marginTop: 6,
+              backgroundColor: colors.background, borderRadius: 6,
+              borderWidth: 1, borderColor: colors.border,
+              paddingHorizontal: 6, paddingVertical: 2, width: 52 }}>
+              <Text style={{ color: item.rsi < 30 ? "#34d399"
+                : item.rsi > 70 ? "#f87171" : "#94a3b8",
+                fontSize: 12, fontWeight: "900" }}>
+                {item.rsi.toFixed(0)}
+              </Text>
+              <Text style={{ color: "#475569", fontSize: 7, fontWeight: "600" }}>RSI</Text>
+            </View>
+          )}
+          {item.stochK !== null && item.stochK !== undefined && (
+            <View style={{ alignItems: "center", marginTop: 3,
+              backgroundColor: colors.background, borderRadius: 6,
+              borderWidth: 1, borderColor: colors.border,
+              paddingHorizontal: 6, paddingVertical: 2, width: 52 }}>
+              <Text style={{ color: item.stochK < 20 ? "#34d399"
+                : item.stochK < 40 ? "#fbbf24" : "#94a3b8",
+                fontSize: 12, fontWeight: "900" }}>
+                {item.stochK.toFixed(0)}
+              </Text>
+              <Text style={{ color: "#475569", fontSize: 7, fontWeight: "600" }}>StochK</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -172,7 +198,7 @@ function PickCard({ item }: { item: StockPickItem }) {
       {/* Commentary snippet */}
       {item.commentary ? (
         <Text
-          style={[styles.commentary, { color: colors.mutedForeground }]}
+          style={[styles.commentary, { color: "#94a3b8" }]}
           numberOfLines={2}
         >
           {item.commentary}
@@ -421,7 +447,7 @@ const styles = StyleSheet.create({
   ticker: { fontSize: 20, fontWeight: "900" },
   badge: { borderRadius: 5, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
   badgeText: { fontSize: 10, fontWeight: "700" },
-  scoreBox: { alignItems: "center", minWidth: 44 },
+  scoreBox: { alignItems: "center", minWidth: 56 },
   scoreNum: { fontSize: 22, fontWeight: "900" },
   scoreUnit: { fontSize: 9, fontWeight: "600", marginTop: -3 },
   priceRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
