@@ -243,7 +243,10 @@ function TradingPlanContent({ plan, colors }: {
         {/* Row 2: TP2 · R/R · StochK */}
         <View style={{ flexDirection: "row" }}>
           {[
-            { label: "TP2",    value: plan.tp2 > 0 ? fRp(plan.tp2) : "–",  color: "#60a5fa" },
+            { label: "TP2",    value: plan.tp2 > 0 ? (() => {
+                const pct = plan.entry > 0 ? ((plan.tp2 - plan.entry) / plan.entry) * 100 : 0;
+                return `${fRp(plan.tp2)}${pct > 0 ? ` (+${pct.toFixed(1)}%)` : ""}`;
+              })() : "–",  color: "#60a5fa" },
             { label: "R / R",  value: hasRR ? `1 : ${plan.rr.toFixed(1)}` : "–",
               color: plan.rr >= 2 ? "#34d399" : plan.rr >= 1 ? "#fbbf24" : "#f87171" },
             { label: "STOCHK", value: plan.stochK !== null ? plan.stochK.toFixed(0) : "–",
@@ -365,7 +368,10 @@ function HoldModeContent({ plan, price, colors }: {
         borderWidth: 1, borderColor: colors.border }}>
         <InfoCell label="TARGET (TP1)" value={fRp(plan.tp1)} color="#34d399" colors={colors} />
         <InfoCell label="STOP LOSS" value={fRp(plan.stopLoss)} color="#f87171" colors={colors} />
-        {plan.tp2 > 0 && <InfoCell label="TP2" value={fRp(plan.tp2)} color="#60a5fa" colors={colors} />}
+        {plan.tp2 > 0 && <InfoCell label="TP2" value={(() => {
+          const pct = plan.entry > 0 ? ((plan.tp2 - plan.entry) / plan.entry) * 100 : 0;
+          return `${fRp(plan.tp2)}${pct > 0 ? ` (+${pct.toFixed(1)}%)` : ""}`;
+        })()} color="#60a5fa" colors={colors} />}
         {daysHeld ? <InfoCell label="DURASI" value={daysHeld} colors={colors} /> : null}
       </View>
 

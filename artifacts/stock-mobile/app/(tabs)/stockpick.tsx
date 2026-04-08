@@ -126,7 +126,12 @@ function PickCard({ item }: { item: StockPickItem }) {
             />
             <InfoBlock
               label="TP2"
-              value={`Rp ${formatRp(item.tp2)}`}
+              value={(() => {
+                const pct = item.entry > 0
+                  ? ((item.tp2 - item.entry) / item.entry) * 100
+                  : 0;
+                return `Rp ${formatRp(item.tp2)}${pct > 0 ? `\n+${pct.toFixed(1)}%` : ""}`;
+              })()}
               color="#a78bfa"
             />
           </View>
