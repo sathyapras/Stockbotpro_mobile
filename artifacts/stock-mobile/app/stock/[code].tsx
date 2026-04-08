@@ -7,9 +7,17 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
-import Svg, { Circle, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, G, Line, Rect, Text as SvgText } from "react-native-svg";
+import {
+  type Candle,
+  PERIODS,
+  fetchHistorical,
+  filterByPeriod,
+  shortDateLabel,
+} from "@/services/historicalService";
 
 import { useColors } from "@/hooks/useColors";
 import {
@@ -31,7 +39,7 @@ import { formatVol } from "@/services/stockToolsService";
 
 // ─── Tab types ────────────────────────────────────────────────
 
-type Tab = "plan" | "financials" | "smartmoney" | "levels";
+type Tab = "plan" | "chart" | "financials" | "smartmoney" | "levels";
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -1241,6 +1249,321 @@ function PriceLevelsTab({ quote, colors }: {
   );
 }
 
+// ─── Tab 5: Chart (Candlestick + Volume) ─────────────────────
+
+const CHART_PAD_L = 4;
+const CHART_PAD_R = 52;
+const CANDLE_H    = 175;
+const VOL_H       = 50;
+const DATE_H      = 18;
+const CHART_TOTAL_H = CANDLE_H + 4 + VOL_H + DATE_H;
+
+function sma(closes: number[], idx: number, period: number): number | null {
+  if (idx < period - 1) return null;
+  let sum = 0;
+  for (let i = idx - period + 1; i <= idx; i++) sum += closes[i];
+  return sum / period;
+}
+
+function CandleChartSvg({ candles }: { candles: Candle[] }) {
+  const n = candles.length;
+  if (n === 0) return null;
+
+  const cW = Math.max(3, Math.min(12, Math.floor(260 / n)));
+  const gap = cW <= 4 ? 0 : 1;
+  const innerW = n * (cW + gap) - gap;
+  const svgW = CHART_PAD_L + innerW + CHART_PAD_R;
+
+  const highs  = candles.map(c => c.high);
+  const lows   = candles.map(c => c.low);
+  const closes = candles.map(c => c.close);
+  const vols   = candles.map(c => c.volume);
+
+  const maxP = Math.max(...highs);
+  const minP = Math.min(...lows);
+  const priceRange = maxP - minP || 1;
+  const maxVol = Math.max(...vols) || 1;
+
+  const yP = (p: number) =>
+    CHART_PAD_L + ((maxP - p) / priceRange) * (CANDLE_H - CHART_PAD_L * 2);
+
+  const xC = (i: number) => CHART_PAD_L + i * (cW + gap) + cW / 2;
+
+  // Y-axis levels
+  const yLevels = [0, 0.25, 0.5, 0.75, 1].map(f => ({
+    price: maxP - f * priceRange,
+    y: CHART_PAD_L + f * (CANDLE_H - CHART_PAD_L * 2),
+  }));
+
+  // MA lines
+  const ma20pts: { x: number; y: number }[] = [];
+  const ma50pts: { x: number; y: number }[] = [];
+  closes.forEach((_, i) => {
+    const m20 = sma(closes, i, 20);
+    const m50 = sma(closes, i, 50);
+    if (m20 !== null) ma20pts.push({ x: xC(i), y: yP(m20) });
+    if (m50 !== null) ma50pts.push({ x: xC(i), y: yP(m50) });
+  });
+
+  // X-axis date labels (sparse)
+  const labelStep = Math.max(1, Math.floor(n / 5));
+  const dateLabels = candles
+    .map((c, i) => ({ i, label: shortDateLabel(c.date) }))
+    .filter(({ i }) => i % labelStep === 0 || i === n - 1);
+
+  // Volume y baseline
+  const volBase = CANDLE_H + 4 + VOL_H;
+
+  return (
+    <Svg width={svgW} height={CHART_TOTAL_H}>
+
+      {/* Grid lines */}
+      {yLevels.map((lv, i) => (
+        <Line key={`grid-${i}`}
+          x1={CHART_PAD_L} y1={lv.y}
+          x2={svgW - CHART_PAD_R + 4} y2={lv.y}
+          stroke="#1e293b" strokeWidth={0.5} />
+      ))}
+
+      {/* Y-axis price labels */}
+      {yLevels.map((lv, i) => (
+        <SvgText key={`yl-${i}`}
+          x={svgW - 2} y={lv.y + 3}
+          fontSize={8} fill="#475569" textAnchor="end">
+          {lv.price >= 1000
+            ? lv.price.toFixed(0)
+            : lv.price.toFixed(1)}
+        </SvgText>
+      ))}
+
+      {/* MA50 line (purple) */}
+      {ma50pts.length > 1 && (
+        <Line
+          x1={ma50pts[0].x} y1={ma50pts[0].y}
+          x2={ma50pts[ma50pts.length - 1].x} y2={ma50pts[ma50pts.length - 1].y}
+          stroke="#a78bfa40" strokeWidth={0} />
+      )}
+      {ma50pts.map((p, i) => i === 0 ? null : (
+        <Line key={`ma50-${i}`}
+          x1={ma50pts[i - 1].x} y1={ma50pts[i - 1].y}
+          x2={p.x} y2={p.y}
+          stroke="#a78bfa" strokeWidth={0.8} strokeDasharray="2,1" />
+      ))}
+
+      {/* MA20 line (blue) */}
+      {ma20pts.map((p, i) => i === 0 ? null : (
+        <Line key={`ma20-${i}`}
+          x1={ma20pts[i - 1].x} y1={ma20pts[i - 1].y}
+          x2={p.x} y2={p.y}
+          stroke="#60a5fa" strokeWidth={0.8} />
+      ))}
+
+      {/* Candles */}
+      {candles.map((c, i) => {
+        const cx    = xC(i);
+        const isUp  = c.close >= c.open;
+        const color = isUp ? "#34d399" : "#f87171";
+        const bTop  = yP(Math.max(c.open, c.close));
+        const bBot  = yP(Math.min(c.open, c.close));
+        const bH    = Math.max(1, bBot - bTop);
+        return (
+          <G key={`c-${i}`}>
+            <Line x1={cx} y1={yP(c.high)} x2={cx} y2={yP(c.low)}
+              stroke={color} strokeWidth={1} />
+            <Rect x={cx - cW / 2} y={bTop} width={cW} height={bH} fill={color} />
+          </G>
+        );
+      })}
+
+      {/* Volume separator line */}
+      <Line x1={CHART_PAD_L} y1={CANDLE_H + 2}
+        x2={svgW - CHART_PAD_R + 4} y2={CANDLE_H + 2}
+        stroke="#1e293b" strokeWidth={0.5} />
+
+      {/* Volume bars */}
+      {candles.map((c, i) => {
+        const isUp  = c.close >= c.open;
+        const color = isUp ? "#34d39966" : "#f8717166";
+        const bH    = Math.max(1, (c.volume / maxVol) * (VOL_H - 4));
+        const x     = CHART_PAD_L + i * (cW + gap);
+        return (
+          <Rect key={`v-${i}`}
+            x={x} y={volBase - bH}
+            width={cW} height={bH}
+            fill={color} />
+        );
+      })}
+
+      {/* X-axis date labels */}
+      {dateLabels.map(({ i, label }) => (
+        <SvgText key={`dl-${i}`}
+          x={xC(i)} y={CHART_TOTAL_H - 2}
+          fontSize={7} fill="#475569" textAnchor="middle">
+          {label}
+        </SvgText>
+      ))}
+
+    </Svg>
+  );
+}
+
+function ChartTab({ symbol }: { symbol: string }) {
+  const { width } = useWindowDimensions();
+  const colors = useColors();
+  const [period, setPeriod] = useState<"1mo" | "3mo" | "6mo" | "1y">("3mo");
+
+  const { data: allCandles = [], isLoading } = useQuery({
+    queryKey: ["ohlcv", symbol],
+    queryFn: () => fetchHistorical(symbol),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 2,
+  });
+
+  const days = PERIODS.find(p => p.key === period)?.days ?? 90;
+  const candles = filterByPeriod(allCandles, days);
+  const last = candles[candles.length - 1];
+
+  const minCW = Math.max(3, Math.min(12, Math.floor(260 / Math.max(1, candles.length))));
+  const gap   = minCW <= 4 ? 0 : 1;
+  const chartW = CHART_PAD_L + candles.length * (minCW + gap) + CHART_PAD_R;
+  const scrollNeeded = chartW > width - 32;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Period selector */}
+      <View style={{ flexDirection: "row", paddingHorizontal: 16,
+        paddingTop: 12, paddingBottom: 8, gap: 6 }}>
+        {PERIODS.map(p => {
+          const active = period === p.key;
+          return (
+            <TouchableOpacity key={p.key}
+              onPress={() => setPeriod(p.key)}
+              style={{ paddingHorizontal: 14, paddingVertical: 5,
+                borderRadius: 8, borderWidth: 1,
+                backgroundColor: active ? colors.primary + "20" : "transparent",
+                borderColor: active ? colors.primary : colors.border }}>
+              <Text style={{ fontSize: 12, fontWeight: "700",
+                color: active ? colors.primary : colors.mutedForeground }}>
+                {p.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+        {/* MA legend */}
+        <View style={{ marginLeft: "auto" as any, flexDirection: "row",
+          alignItems: "center", gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+            <View style={{ width: 12, height: 2, backgroundColor: "#60a5fa" }} />
+            <Text style={{ color: "#64748b", fontSize: 9 }}>MA20</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+            <View style={{ width: 12, height: 2, backgroundColor: "#a78bfa" }} />
+            <Text style={{ color: "#64748b", fontSize: 9 }}>MA50</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Chart area */}
+      {isLoading ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+            Memuat data historis…
+          </Text>
+        </View>
+      ) : candles.length === 0 ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center",
+          padding: 32, gap: 8 }}>
+          <Text style={{ fontSize: 32 }}>📭</Text>
+          <Text style={{ color: colors.mutedForeground, textAlign: "center", fontSize: 13 }}>
+            Data historis belum tersedia untuk saham ini.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 16 }}>
+          {/* Chart container */}
+          <View style={{ marginHorizontal: 16, borderRadius: 14,
+            borderWidth: 1, borderColor: colors.border,
+            backgroundColor: colors.card, padding: 10, overflow: "hidden" }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              scrollEnabled={scrollNeeded}>
+              <View style={{ paddingBottom: 4 }}>
+                <CandleChartSvg candles={candles} />
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* Latest OHLCV strip */}
+          {last && (
+            <View style={{ marginHorizontal: 16, marginTop: 10,
+              borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+              backgroundColor: colors.card, padding: 10 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 9,
+                fontWeight: "700", marginBottom: 6 }}>
+                📅 {shortDateLabel(last.date).toUpperCase()} — OHLCV
+              </Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                {[
+                  { label: "OPEN",   value: last.open.toLocaleString("id-ID"),  color: "#94a3b8" },
+                  { label: "HIGH",   value: last.high.toLocaleString("id-ID"),  color: "#34d399" },
+                  { label: "LOW",    value: last.low.toLocaleString("id-ID"),   color: "#f87171" },
+                  { label: "CLOSE",  value: last.close.toLocaleString("id-ID"), color: last.close >= last.open ? "#34d399" : "#f87171" },
+                  { label: "VOL",    value: last.volume >= 1_000_000
+                    ? `${(last.volume / 1_000_000).toFixed(1)}M`
+                    : `${(last.volume / 1_000).toFixed(0)}K`,            color: "#60a5fa" },
+                ].map(cell => (
+                  <View key={cell.label} style={{ alignItems: "center" }}>
+                    <Text style={{ color: "#475569", fontSize: 8,
+                      fontWeight: "700", marginBottom: 2 }}>{cell.label}</Text>
+                    <Text style={{ color: cell.color, fontWeight: "700",
+                      fontSize: 11 }}>{cell.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Price range summary */}
+          {candles.length > 0 && (() => {
+            const periodHigh = Math.max(...candles.map(c => c.high));
+            const periodLow  = Math.min(...candles.map(c => c.low));
+            const pLabel = PERIODS.find(p => p.key === period)?.label ?? "";
+            return (
+              <View style={{ marginHorizontal: 16, marginTop: 10,
+                borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+                backgroundColor: colors.card, padding: 10,
+                flexDirection: "row", justifyContent: "space-around" }}>
+                <View style={{ alignItems: "center" }}>
+                  <Text style={{ color: "#475569", fontSize: 9 }}>HIGH {pLabel}</Text>
+                  <Text style={{ color: "#34d399", fontWeight: "700", fontSize: 13 }}>
+                    {periodHigh.toLocaleString("id-ID")}
+                  </Text>
+                </View>
+                <View style={{ width: 1, backgroundColor: colors.border }} />
+                <View style={{ alignItems: "center" }}>
+                  <Text style={{ color: "#475569", fontSize: 9 }}>LOW {pLabel}</Text>
+                  <Text style={{ color: "#f87171", fontWeight: "700", fontSize: 13 }}>
+                    {periodLow.toLocaleString("id-ID")}
+                  </Text>
+                </View>
+                <View style={{ width: 1, backgroundColor: colors.border }} />
+                <View style={{ alignItems: "center" }}>
+                  <Text style={{ color: "#475569", fontSize: 9 }}>CANDLES</Text>
+                  <Text style={{ color: "#94a3b8", fontWeight: "700", fontSize: 13 }}>
+                    {candles.length}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
 // ─── Main screen ─────────────────────────────────────────────
 
 export default function StockDetailScreen() {
@@ -1267,10 +1590,11 @@ export default function StockDetailScreen() {
   const planTabLabel = isHold ? "Trading Position" : "Trading Plan";
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "plan", label: planTabLabel },
-    { id: "financials", label: "Financials" },
-    { id: "smartmoney", label: "Smart Money" },
-    { id: "levels", label: "Price Levels" },
+    { id: "plan",       label: planTabLabel    },
+    { id: "chart",      label: "Chart"         },
+    { id: "financials", label: "Financials"    },
+    { id: "smartmoney", label: "Smart Money"   },
+    { id: "levels",     label: "Price Levels"  },
   ];
 
   return (
@@ -1427,6 +1751,9 @@ export default function StockDetailScreen() {
                   currentPrice={data.quote?.price ?? data.radar?.close ?? 0}
                   colors={colors}
                 />
+              )}
+              {activeTab === "chart" && (
+                <ChartTab symbol={ticker} />
               )}
               {activeTab === "levels" && (
                 <PriceLevelsTab quote={quote} colors={colors} />
