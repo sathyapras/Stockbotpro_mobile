@@ -1,0 +1,401 @@
+Watchlist — Panduan Implementasi Mobile
+Pantau saham pilihan — maksimum 20 saham per akun
+3 ENDPOINT
+Method	URL	Fungsi
+GET	/api/watchlist	Ambil semua saham watchlist user (dengan harga live + SM + MA trend)
+POST	/api/watchlist	Tambah saham ke watchlist
+DELETE	/api/watchlist/:symbol	Hapus saham dari watchlist
+Semua endpoint wajib Authorization: Bearer <token> — data watchlist bersifat per-user.
+
+GET /api/watchlist — Ambil Watchlist
+GET /api/watchlist
+Authorization: Bearer <token>
+
+Response
+[
+  {
+    "id":            42,
+    "symbol":        "BBCA",
+    "name":          "Bank Central Asia Tbk.",
+    "addedAt":       "2026-04-05T10:23:00.000Z",
+    "price":         9150,
+    "change":        100,
+    "changePercent": 1.11,
+    "smfPhase":      "EARLY_ACC",
+    "smfScore":      68,
+    "smfTrend":      "UP",
+    "maTrend":       "Uptrend"
+  },
+  {
+    "id":            43,
+    "symbol":        "TLKM",
+    "name":          "Telekomunikasi Indonesia Tbk.",
+    "addedAt":       "2026-04-06T08:15:00.000Z",
+    "price":         3210,
+    "change":        -30,
+    "changePercent": -0.93,
+    "smfPhase":      "N/A",
+    "smfScore":      0,
+    "smfTrend":      "NEUTRAL",
+    "maTrend":       "Sideways"
+  }
+]
+
+Field Per Item
+Field	Keterangan
+id	ID baris watchlist (untuk operasi delete)
+symbol	Kode saham (selalu uppercase)
+name	Nama perusahaan
+addedAt	Waktu ditambahkan (ISO 8601)
+price	Harga close terakhir (dari AFL master cache)
+change	Perubahan harga (Rp)
+changePercent	Perubahan % hari ini
+smfPhase	Smart Money phase broker (IGNITION/EARLY_ACC/STRONG_TREND/EXHAUSTION/DISTRIBUTION/CHURNING/N/A)
+smfScore	Smart Money score 0-100
+smfTrend	UP / DOWN / NEUTRAL
+maTrend	Uptrend / Downtrend / Above MA20 / Sideways / N/A
+smfPhase = "N/A": data broker belum tersedia (sebelum 17:30 WIB atau saham tidak ada di data broker)
+
+POST /api/watchlist — Tambah Saham
+POST /api/watchlist
+Authorization: Bearer <token>
+Content-Type: application/json
+{ "symbol": "BBCA" }
+
+Response Sukses (201)
+{
+  "id":      44,
+  "symbol":  "BBCA",
+  "name":    "Bank Central Asia Tbk.",
+  "addedAt": "2026-04-08T09:00:00.000Z"
+}
+
+Error Cases
+// Sudah ada di watchlist
+{ "error": "BBCA sudah ada di watchlist" }
+// Sudah penuh
+{ "error": "Maksimum 20 saham di watchlist. Hapus beberapa untuk menambahkan yang baru." }
+// Symbol tidak diisi
+{ "error": "Symbol wajib diisi" }
+
+Batas maksimum: 20 saham per user.
+
+DELETE /api/watchlist/:symbol — Hapus Saham
+DELETE /api/watchlist/BBCA
+Authorization: Bearer <token>
+
+Response Sukses (200)
+{
+  "success": true,
+  "message": "BBCA dihapus dari watchlist"
+}
+
+LAYOUT SCREEN
+┌─────────────────────────────────────────────────────────┐
+│  ★ Watchlist                                    [+ Tambah]│
+│  5 / 20 saham                                           │
+│─────────────────────────────────────────────────────────│
+│  BBCA                                     9.150         │
+│  Bank Central Asia              ▲ 1.11%                 │
+│  Uptrend · SM: EARLY_ACC · Score 68                     │
+│─────────────────────────────────────────────────────────│
+│  TLKM                                     3.210         │
+│  Telekomunikasi Indonesia       ▼ 0.93%                 │
+│  Sideways · SM: N/A                                     │
+│─────────────────────────────────────────────────────────│
+│  [Swipe kiri untuk hapus]                               │
+└─────────────────────────────────────────────────────────┘
+
+IMPLEMENTASI MOBILE
+WatchlistScreen
+export function WatchlistScreen({ navigation }) {
+  const queryClient = useQueryClient();
+  const { data: items = [], isLoading, refetch } = useQuery({
+    queryKey: ["watchlist"],
+    queryFn:  () => fetchWithAuth("/api/watchlist"),
+    staleTime: 5 * 60 * 1000,  // 5 menit
+  });
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center",
+        paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 20, flex: 1 }}>
+          ★ Watchlist
+        </Text>
+        <Text style={{ color: "#64748b", fontSize: 12, marginRight: 12 }}>
+          {items.length} / 20
+        </Text>
+        <TouchableOpacity
+          onPress={() => setAddModalVisible(true)}
+          style={{ backgroundColor: "#0ea5e9", borderRadius: 8,
+            paddingHorizontal: 12, paddingVertical: 6 }}>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 13 }}>
+            + Tambah
+          </Text>
+        </TouchableOpacity>
+      </View>
+      {/* Empty state */}
+      {!isLoading && items.length === 0 && (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ fontSize: 40, marginBottom: 12 }}>★</Text>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+            Watchlist Kosong
+          </Text>
+          <Text style={{ color: "#64748b", fontSize: 13, marginTop: 6,
+            textAlign: "center", paddingHorizontal: 32 }}>
+            Tambahkan saham yang ingin dipantau. Maksimum 20 saham.
+          </Text>
+          <TouchableOpacity
+            onPress={() => setAddModalVisible(true)}
+            style={{ marginTop: 20, backgroundColor: "#0ea5e9",
+              borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 }}>
+            <Text style={{ color: "white", fontWeight: "700" }}>Tambah Saham</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {/* List */}
+      <FlatList
+        data={items}
+        keyExtractor={item => item.symbol}
+        renderItem={({ item }) => (
+          <WatchlistCard
+            item={item}
+            onPress={() => navigation.navigate("StockDetail", { symbol: item.symbol })}
+            onDelete={() => handleDelete(item.symbol, queryClient)}
+          />
+        )}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+        refreshing={isLoading}
+        onRefresh={refetch}
+        showsVerticalScrollIndicator={false}
+      />
+      {/* Add Modal */}
+      <AddWatchlistModal
+        visible={addModalVisible}
+        onClose={() => setAddModalVisible(false)}
+        onAdded={() => {
+          setAddModalVisible(false);
+          queryClient.invalidateQueries({ queryKey: ["watchlist"] });
+        }}
+      />
+    </View>
+  );
+}
+
+WatchlistCard (dengan swipe hapus)
+function WatchlistCard({ item, onPress, onDelete }) {
+  const isUp     = (item.changePercent ?? 0) >= 0;
+  const chgColor = isUp ? "#34d399" : "#f87171";
+  const chgBg    = isUp ? "#052e16" : "#2d0a0a";
+  // MA Trend warna
+  function maTrendColor(trend) {
+    if (trend === "Uptrend")    return "#34d399";
+    if (trend === "Downtrend")  return "#f87171";
+    if (trend === "Above MA20") return "#60a5fa";
+    return "#64748b";
+  }
+  // SM Phase label (singkat untuk card)
+  function smLabel(phase) {
+    const map = {
+      IGNITION:      "Akumulasi Diam 🔥",
+      EARLY_ACC:     "Akumulasi Awal",
+      STRONG_TREND:  "Trend Kuat 📈",
+      EXHAUSTION:    "Mulai Jenuh",
+      DISTRIBUTION:  "Distribusi ⚠",
+      CHURNING:      "Sideways",
+    };
+    return map[phase] ?? null;
+  }
+  return (
+    <Swipeable
+      renderRightActions={() => (
+        <TouchableOpacity
+          onPress={onDelete}
+          style={{ backgroundColor: "#ef4444", justifyContent: "center",
+            alignItems: "center", width: 80, borderRadius: 12, marginBottom: 10 }}>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 12 }}>Hapus</Text>
+        </TouchableOpacity>
+      )}>
+      <TouchableOpacity onPress={onPress}
+        style={{ backgroundColor: "#1e2433", borderRadius: 12,
+          padding: 14, marginBottom: 10 }}>
+        {/* Row 1: Ticker + Harga + % */}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: "white", fontWeight: "900", fontSize: 16 }}>
+              {item.symbol}
+            </Text>
+            <Text style={{ color: "#64748b", fontSize: 11 }} numberOfLines={1}>
+              {item.name}
+            </Text>
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+              {item.price?.toLocaleString("id-ID")}
+            </Text>
+            <View style={{ backgroundColor: chgBg, borderRadius: 6,
+              paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 }}>
+              <Text style={{ color: chgColor, fontSize: 12, fontWeight: "700" }}>
+                {isUp ? "▲" : "▼"} {Math.abs(item.changePercent ?? 0).toFixed(2)}%
+              </Text>
+            </View>
+          </View>
+        </View>
+        {/* Row 2: MA Trend + SM Phase */}
+        <View style={{ flexDirection: "row", alignItems: "center",
+          marginTop: 8, gap: 8 }}>
+          {/* MA Trend badge */}
+          <View style={{ borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
+            backgroundColor: "#0f1629", borderWidth: 1,
+            borderColor: maTrendColor(item.maTrend) }}>
+            <Text style={{ color: maTrendColor(item.maTrend), fontSize: 10, fontWeight: "600" }}>
+              {item.maTrend ?? "N/A"}
+            </Text>
+          </View>
+          {/* SM Phase badge — tampilkan hanya kalau ada */}
+          {item.smfPhase && item.smfPhase !== "N/A" && smLabel(item.smfPhase) && (
+            <View style={{ borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
+              backgroundColor: "#0a1a2e" }}>
+              <Text style={{ color: "#06b6d4", fontSize: 10 }}>
+                SM: {smLabel(item.smfPhase)} · {item.smfScore}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Swipeable>
+  );
+}
+
+AddWatchlistModal
+function AddWatchlistModal({ visible, onClose, onAdded }) {
+  const [ticker,   setTicker]   = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
+  async function handleAdd() {
+    const sym = ticker.trim().toUpperCase();
+    if (!sym) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetchWithAuth("/api/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: sym }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Gagal menambahkan saham");
+        return;
+      }
+      setTicker("");
+      onAdded();
+    } catch {
+      setError("Koneksi gagal. Coba lagi.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={{ flex: 1, backgroundColor: "#00000080" }}
+        activeOpacity={1} onPress={onClose} />
+      <View style={{ backgroundColor: "#1e2433", borderTopLeftRadius: 20,
+        borderTopRightRadius: 20, padding: 24, paddingBottom: 40 }}>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 18, marginBottom: 16 }}>
+          Tambah ke Watchlist
+        </Text>
+        {/* Input ticker */}
+        <View style={{ backgroundColor: "#0f1629", borderRadius: 10,
+          flexDirection: "row", alignItems: "center",
+          paddingHorizontal: 14, marginBottom: 12 }}>
+          <TextInput
+            placeholder="Kode saham (contoh: BBCA)"
+            placeholderTextColor="#475569"
+            value={ticker}
+            onChangeText={t => { setTicker(t); setError(""); }}
+            style={{ flex: 1, color: "white", fontSize: 16,
+              paddingVertical: 12, letterSpacing: 1 }}
+            autoCapitalize="characters"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleAdd}
+          />
+        </View>
+        {/* Error message */}
+        {error ? (
+          <Text style={{ color: "#f87171", fontSize: 12, marginBottom: 10 }}>
+            ⚠ {error}
+          </Text>
+        ) : null}
+        {/* Add button */}
+        <TouchableOpacity
+          onPress={handleAdd}
+          disabled={!ticker.trim() || loading}
+          style={{ backgroundColor: ticker.trim() && !loading ? "#0ea5e9" : "#1e293b",
+            borderRadius: 10, paddingVertical: 14, alignItems: "center" }}>
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>
+              + Tambah Saham
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
+
+Hapus Saham
+async function handleDelete(symbol, queryClient) {
+  // Konfirmasi sebelum hapus
+  Alert.alert(
+    "Hapus dari Watchlist",
+    `Hapus ${symbol} dari watchlist?`,
+    [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await fetchWithAuth(`/api/watchlist/${symbol}`, { method: "DELETE" });
+            queryClient.invalidateQueries({ queryKey: ["watchlist"] });
+          } catch {
+            Alert.alert("Gagal", "Tidak dapat menghapus. Coba lagi.");
+          }
+        },
+      },
+    ]
+  );
+}
+
+MA TREND — Arti Label
+Label	Kondisi	Warna
+Uptrend	Close > MA20 > MA50	🟢 Hijau
+Downtrend	Close < MA20 < MA50	🔴 Merah
+Above MA20	Close > MA20 (tapi MA20 ≤ MA50)	🔵 Biru
+Sideways	Close ≤ MA20	⚫ Abu
+N/A	Data historis tidak cukup	⚫ Abu
+SM PHASE — Label di Watchlist Card
+Phase	Label di Card	Warna
+IGNITION	Akumulasi Diam 🔥	Cyan
+EARLY_ACC	Akumulasi Awal	Cyan
+STRONG_TREND	Trend Kuat 📈	Cyan
+EXHAUSTION	Mulai Jenuh	Cyan
+DISTRIBUTION	Distribusi ⚠	Cyan
+CHURNING	Sideways	Cyan
+N/A	(tidak ditampilkan)	—
+RINGKASAN
+Item	Detail
+GET endpoint	GET /api/watchlist — data per user, termasuk harga + SM + MA
+POST endpoint	POST /api/watchlist — body: { symbol: "BBCA" }
+DELETE endpoint	DELETE /api/watchlist/BBCA
+Batas	Maksimum 20 saham per user
+Auth	Wajib Bearer token di semua endpoint
+Harga	Dari AFL master cache (real-time), fallback ke engine cache
+Hapus	Swipe kiri → konfirmasi Alert → DELETE
+Stale time	5 menit (refetch otomatis saat pull-to-refresh)

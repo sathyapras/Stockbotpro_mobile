@@ -1,16 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
+export const MAX_WATCHLIST = 20;
+
 interface WatchlistContextType {
   watchlist: string[];
-  addToWatchlist: (code: string) => void;
+  addToWatchlist: (code: string) => boolean;
   removeFromWatchlist: (code: string) => void;
   isWatched: (code: string) => boolean;
 }
 
 const WatchlistContext = createContext<WatchlistContextType>({
   watchlist: [],
-  addToWatchlist: () => {},
+  addToWatchlist: () => false,
   removeFromWatchlist: () => {},
   isWatched: () => false,
 });
@@ -28,13 +30,17 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const addToWatchlist = useCallback((code: string) => {
+  const addToWatchlist = useCallback((code: string): boolean => {
+    let added = false;
     setWatchlist(prev => {
       if (prev.includes(code)) return prev;
+      if (prev.length >= MAX_WATCHLIST) return prev;
+      added = true;
       const next = [...prev, code];
       AsyncStorage.setItem('stock_watchlist', JSON.stringify(next));
       return next;
     });
+    return added;
   }, []);
 
   const removeFromWatchlist = useCallback((code: string) => {
