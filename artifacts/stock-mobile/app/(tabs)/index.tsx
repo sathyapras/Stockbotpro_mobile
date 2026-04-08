@@ -38,6 +38,10 @@ import {
   PHASE_CONFIG as SECTOR_PHASE_CFG,
   buildSectorStats,
 } from "@/services/sectorService";
+import {
+  fearLabelDisplay,
+  fetchGlobalSentiment,
+} from "@/services/globalSentimentService";
 
 // ─── Greeting ─────────────────────────────────────────────────
 
@@ -676,119 +680,126 @@ function PhaseDistributionSection({ radar }: { radar: RadarMarket[] }) {
   );
 }
 
-// ─── [5] Analisis Konteks IDX (collapsible) ───────────────────
+// ─── [5] Sentimen Global Card ─────────────────────────────────
 
-function AnalisisKonteksSection({ radar, breadth }: {
-  radar: RadarMarket[];
-  breadth: ReturnType<typeof calcBreadth>;
-}) {
-  const [expanded, setExpanded] = useState(false);
+function SentimenGlobalCard() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["global-sentiment"],
+    queryFn: fetchGlobalSentiment,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 2,
+  });
 
-  const stocks = useMemo(
-    () => radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE"),
-    [radar]
-  );
-  const composite = useMemo(() => radar.find(r => r.ticker === "COMPOSITE"), [radar]);
+  const s        = data?.sentiment;
+  const fearInfo = fearLabelDisplay(s?.fearLabel ?? "NEUTRAL");
+  const ihsg     = data?.domestic?.find(d => d.name === "IHSG");
+  const sp       = data?.indices?.find(d => d.name === "S&P 500");
+  const nasdaq   = data?.indices?.find(d => d.name === "NASDAQ");
+  const wti      = data?.commodities?.find(d => d.name === "WTI Crude Oil");
 
-  const accCount  = useMemo(() => stocks.filter(r => r.signal1d === "Accumulation").length, [stocks]);
-  const distCount = useMemo(() => stocks.filter(r => r.signal1d === "Distribution").length, [stocks]);
-  const total     = stocks.length || 1;
-  const accPct    = Math.round((accCount / total) * 100);
-  const distPct   = Math.round((distCount / total) * 100);
+  const cardBg     = s ? fearInfo.bg     : "#1e2433";
+  const borderCol  = s ? fearInfo.color + "55" : "#2d3748";
 
-  const globalBias = accPct >= 50 && breadth.advancerPct >= 45 ? "RISK ON"
-    : distPct >= 60 || breadth.declinerPct >= 60 ? "RISK OFF" : "MIXED";
+  const biasBadge =
+    s?.globalBias === "RISK_OFF" ? { text: "RISK OFF", color: "#f87171", bg: "#2d0a0a" } :
+    s?.globalBias === "RISK_ON"  ? { text: "RISK ON",  color: "#34d399", bg: "#052e16" } :
+                                   { text: "MIXED",    color: "#fbbf24", bg: "#1c1500" };
 
-  const biasBadge = globalBias === "RISK ON"
-    ? { text: "RISK ON",  color: "#34d399", bg: "#052e16" }
-    : globalBias === "RISK OFF"
-    ? { text: "RISK OFF", color: "#f87171", bg: "#2d0a0a" }
-    : { text: "MIXED",    color: "#fbbf24", bg: "#1c1500" };
+  function pctStr(pct: number | null | undefined, decimals = 2) {
+    if (pct == null) return "—";
+    return `${pct >= 0 ? "▲" : "▼"}${Math.abs(pct).toFixed(decimals)}%`;
+  }
+  function pctColor(pct: number | null | undefined) {
+    return (pct ?? 0) >= 0 ? "#34d399" : "#f87171";
+  }
 
   const indicators = [
-    {
-      label: "IHSG", color: composite ? (composite.chgPct >= 0 ? "#34d399" : "#f87171") : "#64748b",
-      value: composite ? `${composite.chgPct >= 0 ? "▲" : "▼"}${Math.abs(composite.chgPct).toFixed(2)}%` : "–",
-      sub: null,
-    },
-    { label: "Naik",   color: "#34d399", value: `${breadth.advancers}`, sub: `${breadth.advancerPct}%` },
-    { label: "Turun",  color: "#f87171", value: `${breadth.decliners}`, sub: `${breadth.declinerPct}%` },
-    { label: "SM Acc", color: "#60a5fa", value: `${accPct}%`, sub: `${accCount} saham` },
-  ];
-
-  const bullets = [
-    breadth.declinerPct > 50
-      ? `${breadth.decliners} saham turun (${breadth.declinerPct}%) — tekanan jual mendominasi`
-      : `${breadth.advancers} saham naik (${breadth.advancerPct}%) — momentum positif`,
-    distPct > 50
-      ? `Smart Money: ${distPct}% distribusi — bandar net jual`
-      : `Smart Money: ${accPct}% akumulasi — bandar net beli`,
-    composite
-      ? `IHSG ${composite.close.toLocaleString("id-ID")} · ${composite.chgPct >= 0 ? "+" : ""}${composite.chgPct.toFixed(2)}% hari ini`
-      : `Nilai transaksi: Rp ${breadth.totalValueT}T`,
+    { label: "S&P 500", value: pctStr(sp?.changePct),     color: pctColor(sp?.changePct) },
+    { label: "NASDAQ",  value: pctStr(nasdaq?.changePct),  color: pctColor(nasdaq?.changePct) },
+    { label: "IHSG",    value: pctStr(ihsg?.changePct),    color: pctColor(ihsg?.changePct) },
+    { label: "WTI Oil", value: pctStr(wti?.changePct),     color: pctColor(wti?.changePct) },
   ];
 
   return (
-    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12 }]}>
-      {/* Header — always visible, tap to expand */}
-      <TouchableOpacity
-        onPress={() => setExpanded(e => !e)}
-        style={{ flexDirection: "row", justifyContent: "space-between",
-          alignItems: "center", marginBottom: 10 }}>
+    <TouchableOpacity
+      onPress={() => router.push("/global-sentiment" as any)}
+      activeOpacity={0.85}
+      style={[styles.card, {
+        marginHorizontal: 16, marginBottom: 12,
+        backgroundColor: cardBg,
+        borderWidth: 1, borderColor: borderCol,
+      }]}
+    >
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center",
+        justifyContent: "space-between", marginBottom: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text style={{ fontSize: 16 }}>🌐</Text>
-          <Text style={styles.cardTitle}>Analisis Konteks IDX</Text>
-          <View style={{ backgroundColor: biasBadge.bg, borderRadius: 6,
-            paddingHorizontal: 8, paddingVertical: 2,
-            borderWidth: 1, borderColor: biasBadge.color + "50" }}>
-            <Text style={{ color: biasBadge.color, fontSize: 10, fontWeight: "700" }}>
-              {biasBadge.text}
-            </Text>
-          </View>
+          <Text style={{ fontSize: 15 }}>🌍</Text>
+          <Text style={styles.cardTitle}>Sentimen Global</Text>
+          {s && (
+            <View style={{ backgroundColor: biasBadge.bg, borderRadius: 6,
+              paddingHorizontal: 8, paddingVertical: 2,
+              borderWidth: 1, borderColor: biasBadge.color + "50" }}>
+              <Text style={{ color: biasBadge.color, fontSize: 10, fontWeight: "700" }}>
+                {biasBadge.text}
+              </Text>
+            </View>
+          )}
         </View>
-        <Text style={{ color: "#475569", fontSize: 14 }}>{expanded ? "▲" : "▼"}</Text>
-      </TouchableOpacity>
-
-      {/* 4 Quick Indicators — always visible */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between",
-        backgroundColor: "#0f1629", borderRadius: 10, padding: 10,
-        marginBottom: expanded ? 12 : 0 }}>
-        {indicators.map(ind => (
-          <View key={ind.label} style={{ alignItems: "center" }}>
-            <Text style={{ color: "#475569", fontSize: 9 }}>{ind.label}</Text>
-            <Text style={{ color: ind.color, fontWeight: "700", fontSize: 13 }}>{ind.value}</Text>
-            {ind.sub ? <Text style={{ color: ind.color + "99", fontSize: 8 }}>{ind.sub}</Text> : null}
-          </View>
-        ))}
+        <Text style={{ color: "#475569", fontSize: 13 }}>→</Text>
       </View>
 
-      {/* Bullet insights — only when expanded */}
-      {expanded && (
-        <View style={{ gap: 6 }}>
-          <Text style={{ color: "#475569", fontSize: 10, fontWeight: "700",
-            letterSpacing: 1, marginBottom: 2 }}>📝 RINGKASAN PASAR</Text>
-          {bullets.map((b, i) => (
-            <View key={i} style={{ flexDirection: "row", gap: 6 }}>
-              <Text style={{ color: "#475569", fontSize: 11 }}>●</Text>
-              <Text style={{ color: "#94a3b8", fontSize: 11, flex: 1 }}>{b}</Text>
+      {/* VIX + Fear Label */}
+      {isLoading ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <ActivityIndicator size="small" color={fearInfo.color} />
+          <Text style={{ color: "#64748b", fontSize: 12 }}>Memuat data global…</Text>
+        </View>
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <Text style={{ color: fearInfo.color, fontWeight: "900", fontSize: 32 }}>
+            {s?.vix?.toFixed(1) ?? "—"}
+          </Text>
+          <View>
+            <Text style={{ color: "#64748b", fontSize: 10 }}>VIX — Fear & Greed</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+              <Text style={{ fontSize: 13 }}>{fearInfo.icon}</Text>
+              <Text style={{ color: fearInfo.color, fontWeight: "700", fontSize: 13 }}>
+                {fearInfo.text}
+              </Text>
+            </View>
+          </View>
+          {s?.usdIdr && (
+            <View style={{ marginLeft: "auto" as any }}>
+              <Text style={{ color: "#64748b", fontSize: 9, textAlign: "right" }}>USD/IDR</Text>
+              <Text style={{ color: "#94a3b8", fontWeight: "700", fontSize: 13, textAlign: "right" }}>
+                {s.usdIdr.toLocaleString("id-ID")}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* 4 Market Indicators */}
+      {!isLoading && (
+        <View style={{ flexDirection: "row", justifyContent: "space-between",
+          backgroundColor: "#0f162960", borderRadius: 10, padding: 10 }}>
+          {indicators.map(ind => (
+            <View key={ind.label} style={{ alignItems: "center" }}>
+              <Text style={{ color: "#475569", fontSize: 9 }}>{ind.label}</Text>
+              <Text style={{ color: ind.color, fontWeight: "700", fontSize: 12 }}>{ind.value}</Text>
             </View>
           ))}
         </View>
       )}
 
-      {/* Sentimen Global link */}
-      <TouchableOpacity
-        onPress={() => router.push("/global-sentiment" as any)}
-        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center",
-          marginTop: 10, paddingVertical: 8, borderRadius: 8,
-          backgroundColor: "#0f1629", borderWidth: 1, borderColor: "#1e3a5f", gap: 6 }}>
-        <Text style={{ fontSize: 14 }}>🌍</Text>
-        <Text style={{ color: "#60a5fa", fontSize: 12, fontWeight: "700" }}>
-          Sentimen Global — VIX · DXY · Oil · Narasi
-        </Text>
-        <Text style={{ color: "#60a5fa", fontSize: 12 }}>→</Text>
-      </TouchableOpacity>
-    </View>
+      {/* Tap hint */}
+      <Text style={{ color: fearInfo.color + "80", fontSize: 10,
+        textAlign: "center", marginTop: 8 }}>
+        Tap untuk analisa narasi lengkap →
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -1227,7 +1238,7 @@ export default function MarketScreen() {
               <View style={{ backgroundColor: "#0f1629", paddingTop: 8 }}>
                 <SignalSnapshotSection radar={radar} />
                 <PhaseDistributionSection radar={radar} />
-                <AnalisisKonteksSection radar={radar} breadth={breadth} />
+                <SentimenGlobalCard />
                 <MarketRiskCard radar={radar} breadth={breadth} />
               </View>
             ) : loadingRadar ? (
