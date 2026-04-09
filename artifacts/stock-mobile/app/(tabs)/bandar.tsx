@@ -183,7 +183,7 @@ function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
           color: aboveVwap ? "#34d399" : "#f87171",
           fontSize: 11, fontWeight: "600", marginBottom: 8,
         }}>
-          {aboveVwap ? "📈" : "📉"} Harga di {aboveVwap ? "ATAS" : "BAWAH"} VWAP bandar
+          {aboveVwap ? "📈" : "📉"} Harga di {aboveVwap ? "atas" : "bawah"} rata-rata Big Money
           {" "}({vwapGap >= 0 ? "+" : ""}{vwapGap.toFixed(1)}%)
         </Text>
       )}

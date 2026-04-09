@@ -157,12 +157,22 @@ export function vwapInterpretation(
   if (!vwap || !currentPrice) return null;
   const diff = currentPrice - vwap;
   const pct  = ((diff / vwap) * 100).toFixed(1);
-  if (diff > 0) return {
-    text:  `Harga ${Math.round(diff).toLocaleString("id-ID")} di ATAS VWAP bandar (+${pct}%)`,
+  const pts = Math.round(Math.abs(diff)).toLocaleString("id-ID");
+  const pctNum = parseFloat(pct);
+  if (pctNum > 2) return {
+    text: `Harga ${pts} poin di atas rata-rata Big Money → Akumulator dalam posisi sangat menguntungkan ✅`,
     color: "#34d399", icon: "📈",
   };
+  if (pctNum >= 0) return {
+    text: `Harga ${pts} poin di atas rata-rata Big Money → Posisi Akumulator masih menguntungkan 📈`,
+    color: "#6ee7b7", icon: "📈",
+  };
+  if (pctNum > -2) return {
+    text: `Harga ${pts} poin di bawah rata-rata Big Money → Tekanan jual memaksa Akumulator pada posisi kurang menguntungkan ⚠️`,
+    color: "#fbbf24", icon: "📉",
+  };
   return {
-    text:  `Harga ${Math.round(Math.abs(diff)).toLocaleString("id-ID")} di BAWAH VWAP bandar (${pct}%)`,
+    text: `Harga ${pts} poin di bawah rata-rata Big Money → Akumulator tertekan signifikan — waspadai potensi cut loss 🔴`,
     color: "#f87171", icon: "📉",
   };
 }

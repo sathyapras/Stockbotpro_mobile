@@ -972,13 +972,21 @@ function RadarNBSSection({ radar, currentPrice, colors }: {
                 color={parseFloat(vwapDiffPct) >= 0 ? "#34d399" : "#f87171"} />
             )}
           </View>
-          {vwapDiff != null && (
-            <Text style={{ color: vwapDiff >= 0 ? "#34d399" : "#f87171", fontSize: 12 }}>
-              Harga {vwapDiff >= 0 ? "di atas" : "di bawah"} VWAP bandar{" "}
-              {Math.abs(vwapDiff).toLocaleString("id-ID")} poin
-              {" → Bandar sedang "}{vwapDiff >= 0 ? "untung ✅" : "rugi ⚠️"}
-            </Text>
-          )}
+          {vwapDiff != null && (() => {
+            const pct = parseFloat(vwapDiffPct ?? "0");
+            const pts = Math.abs(Math.round(vwapDiff)).toLocaleString("id-ID");
+            const dir = vwapDiff >= 0 ? "atas" : "bawah";
+            let msg: string; let clr: string;
+            if (pct > 2)        { msg = "Akumulator dalam posisi sangat menguntungkan — momentum kuat ✅";         clr = "#34d399"; }
+            else if (pct >= 0)  { msg = "Posisi Akumulator masih menguntungkan — pantau kelanjutan trend 📈";      clr = "#6ee7b7"; }
+            else if (pct > -2)  { msg = "Tekanan jual memaksa Akumulator pada posisi kurang menguntungkan ⚠️";    clr = "#fbbf24"; }
+            else                { msg = "Akumulator tertekan signifikan — waspadai potensi cut loss 🔴";           clr = "#f87171"; }
+            return (
+              <Text style={{ color: clr, fontSize: 12 }}>
+                Harga {pts} poin di {dir} rata-rata Big Money → {msg}
+              </Text>
+            );
+          })()}
           {radar.vwapSlopeState ? (
             <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
               Slope VWAP: <Text style={{ color: colors.foreground, fontWeight: "600" }}>
