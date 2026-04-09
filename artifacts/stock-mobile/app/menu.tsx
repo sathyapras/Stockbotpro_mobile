@@ -11,12 +11,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const TELEGRAM_URL   = "https://t.me/stockbotpro";
-const WHATSAPP_URL   = "https://wa.me/6281234567890";
-const BROKER_URL     = "https://stockbotpro.replit.app";
-const AFFILIATE_URL  = "https://stockbotpro.replit.app";
-const SUBSCRIBE_URL  = "https://stockbotpro.replit.app";
-const CONTACT_EMAIL  = "mailto:support@stockbotpro.com";
+const TELEGRAM_URL = "https://t.me/stockbotpro";
+const WHATSAPP_URL = "https://wa.me/6281234567890";
+const BROKER_URL   = "https://stockbotpro.replit.app";
 
 function openURL(url: string) {
   Linking.openURL(url).catch(() => {
@@ -83,7 +80,7 @@ function buildMenuGroups(router: ReturnType<typeof useRouter>): MenuGroup[] {
         {
           icon: "✉️",
           label: "Contact Us",
-          onPress: () => openURL(CONTACT_EMAIL),
+          onPress: () => router.push("/contact-us" as any),
         },
       ],
     },

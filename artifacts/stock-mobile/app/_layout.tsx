@@ -83,6 +83,7 @@ function RootLayoutNav() {
       <Stack.Screen name="midtrans-webview" options={{ headerShown: false }} />
       <Stack.Screen name="payment-success" options={{ headerShown: false }} />
       <Stack.Screen name="payment-pending" options={{ headerShown: false }} />
+      <Stack.Screen name="contact-us" options={{ headerShown: false }} />
       <Stack.Screen name="about-us" options={{ headerShown: false }} />
       <Stack.Screen name="tutorial" options={{ headerShown: false }} />
     </Stack>
