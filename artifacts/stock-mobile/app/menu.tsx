@@ -53,6 +53,11 @@ function buildMenuGroups(
       section: null,
       items: [
         {
+          icon: "⚙️",
+          label: "Pengaturan",
+          onPress: () => router.push("/settings" as any),
+        },
+        {
           icon: "🎁",
           label: "Program Afiliasi",
           onPress: () => router.push("/affiliate" as any),

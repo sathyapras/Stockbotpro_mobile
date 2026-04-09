@@ -93,7 +93,10 @@ function RootLayoutNav() {
       <Stack.Screen name="contact-us" options={{ headerShown: false }} />
       <Stack.Screen name="about-us" options={{ headerShown: false }} />
       <Stack.Screen name="tutorial" options={{ headerShown: false }} />
-      <Stack.Screen name="notifications" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications"   options={{ headerShown: false }} />
+      <Stack.Screen name="settings"         options={{ headerShown: false }} />
+      <Stack.Screen name="edit-profile"     options={{ headerShown: false }} />
+      <Stack.Screen name="change-password"  options={{ headerShown: false }} />
     </Stack>
   );
 }

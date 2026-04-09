@@ -1,0 +1,306 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import React from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+
+import { useColors } from "@/hooks/useColors";
+import { fetchMe, clearAuthToken, type UserProfile } from "@/services/userService";
+
+// ─── Plan config ──────────────────────────────────────────────
+
+const PLAN_LABEL: Record<string, string> = {
+  free: "Gratis", pro: "Pro", elite: "Elite", enterprise: "Enterprise",
+};
+const PLAN_COLOR: Record<string, string> = {
+  Gratis: "#64748b", Pro: "#0ea5e9", Elite: "#a78bfa", Enterprise: "#f59e0b",
+};
+
+function planLabel(plan?: string) {
+  return PLAN_LABEL[plan ?? "free"] ?? "Gratis";
+}
+function planColor(label: string) {
+  return PLAN_COLOR[label] ?? "#64748b";
+}
+function expiryText(user: UserProfile): string {
+  if (user.planExpiresAt) {
+    return `Aktif sampai ${new Date(user.planExpiresAt).toLocaleDateString("id-ID",
+      { day: "numeric", month: "long", year: "numeric" })}`;
+  }
+  if (user.subscriptionPlan !== "free") return "Aktif tanpa batas waktu";
+  if (user.isTrialActive) return `Trial — sisa ${user.trialDaysRemaining} hari`;
+  return "Akun Gratis";
+}
+
+// ─── Profile Card ─────────────────────────────────────────────
+
+function ProfileCard({ user }: { user: UserProfile }) {
+  const initial = ((user.name ?? user.username ?? "U")[0]).toUpperCase();
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 14,
+      backgroundColor: "#1e2433", borderRadius: 16, padding: 20 }}>
+      <View style={{ width: 56, height: 56, borderRadius: 28,
+        backgroundColor: "#0ea5e922", alignItems: "center",
+        justifyContent: "center", marginBottom: 12 }}>
+        <Text style={{ color: "#0ea5e9", fontWeight: "900", fontSize: 22 }}>{initial}</Text>
+      </View>
+
+      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 18 }}>
+        {user.name ?? user.username}
+      </Text>
+      <Text style={{ color: "#64748b", fontSize: 13, marginTop: 3 }}>{user.email}</Text>
+      {user.phone ? (
+        <Text style={{ color: "#475569", fontSize: 12, marginTop: 3 }}>📱 {user.phone}</Text>
+      ) : null}
+      <Text style={{ color: "#334155", fontSize: 11, marginTop: 10 }}>
+        Bergabung {new Date(user.createdAt).toLocaleDateString("id-ID",
+          { month: "long", year: "numeric" })}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Subscription Card ────────────────────────────────────────
+
+function SubscriptionCard({
+  user, onUpgrade,
+}: { user: UserProfile; onUpgrade: () => void }) {
+  const label  = planLabel(user.subscriptionPlan);
+  const color  = planColor(label);
+  const expiry = expiryText(user);
+
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 14,
+      backgroundColor: "#1e2433", borderRadius: 16, padding: 20 }}>
+      <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+        letterSpacing: 1, marginBottom: 12 }}>LANGGANAN</Text>
+
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text style={{ color, fontWeight: "900", fontSize: 22,
+              textTransform: "uppercase" }}>{label}</Text>
+            {user.hasPremiumAccess && (
+              <View style={{ backgroundColor: color + "22", borderRadius: 8,
+                paddingHorizontal: 8, paddingVertical: 3,
+                borderWidth: 1, borderColor: color + "44" }}>
+                <Text style={{ color, fontSize: 10, fontWeight: "700" }}>AKTIF ✓</Text>
+              </View>
+            )}
+          </View>
+          <Text style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>{expiry}</Text>
+          {user.isTrialActive && (
+            <Text style={{ color: "#fbbf24", fontSize: 11, marginTop: 4 }}>
+              ⚡ Trial masih berjalan
+            </Text>
+          )}
+        </View>
+
+        {!user.hasPremiumAccess && (
+          <TouchableOpacity onPress={onUpgrade}
+            style={{ backgroundColor: "#0ea5e9", borderRadius: 10,
+              paddingHorizontal: 16, paddingVertical: 10 }}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Upgrade</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ─── Setting Row ──────────────────────────────────────────────
+
+function SettingRow({
+  icon, label, onPress, last, danger = false,
+}: {
+  icon: string; label: string; onPress: () => void;
+  last?: boolean; danger?: boolean;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress}
+      style={{ flexDirection: "row", alignItems: "center",
+        paddingHorizontal: 16, paddingVertical: 15,
+        borderBottomWidth: last ? 0 : 1, borderBottomColor: "#0f1629" }}>
+      <Text style={{ fontSize: 17, marginRight: 13 }}>{icon}</Text>
+      <Text style={{ color: danger ? "#f87171" : "#fff", fontSize: 14, flex: 1 }}>{label}</Text>
+      {!danger && <Text style={{ color: "#334155", fontSize: 18 }}>›</Text>}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Section ──────────────────────────────────────────────────
+
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 14,
+      overflow: "hidden", marginHorizontal: 16, marginBottom: 14 }}>
+      {children}
+    </View>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────
+
+export default function SettingsScreen() {
+  const insets      = useSafeAreaInsets();
+  const router      = useRouter();
+  const colors      = useColors();
+  const queryClient = useQueryClient();
+  const topPad      = Platform.OS === "web" ? 67 : insets.top + 8;
+
+  const { data: user, isLoading, isError, error } = useQuery<UserProfile>({
+    queryKey: ["me"],
+    queryFn: fetchMe,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  async function handleLogout() {
+    Alert.alert("Keluar", "Yakin ingin keluar dari akun?", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Keluar",
+        style: "destructive",
+        onPress: async () => {
+          await clearAuthToken();
+          queryClient.clear();
+          router.replace("/menu" as any);
+        },
+      },
+    ]);
+  }
+
+  const noToken = isError && (error as Error)?.message === "UNAUTHORIZED";
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* ── Header ── */}
+      <View style={{ paddingTop: topPad, paddingHorizontal: 16, paddingBottom: 12,
+        borderBottomWidth: 1, borderBottomColor: "#1e2433" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <TouchableOpacity onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="arrow-left" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 20 }}>
+            ⚙️ Pengaturan
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Loading ── */}
+      {isLoading && (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
+          <ActivityIndicator size="large" color="#0ea5e9" />
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Memuat profil…</Text>
+        </View>
+      )}
+
+      {/* ── No token / not logged in ── */}
+      {(noToken || (!isLoading && !user && isError)) && (
+        <ScrollView contentContainerStyle={{ padding: 24, alignItems: "center", paddingTop: 60 }}>
+          <Text style={{ fontSize: 52, marginBottom: 16 }}>🔐</Text>
+          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18, textAlign: "center",
+            marginBottom: 10 }}>Login Diperlukan</Text>
+          <Text style={{ color: "#64748b", fontSize: 13, textAlign: "center", lineHeight: 20,
+            marginBottom: 32 }}>
+            Masukkan API token StockBot Pro untuk melihat profil dan kelola langgananmu.
+          </Text>
+          <TouchableOpacity onPress={() => router.push("/affiliate" as any)}
+            style={{ backgroundColor: "#0ea5e9", borderRadius: 12,
+              paddingHorizontal: 28, paddingVertical: 14 }}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Login via Afiliasi</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* ── Content ── */}
+      {!isLoading && user && (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: 20, paddingBottom: insets.bottom + 60 }}>
+
+          <ProfileCard user={user} />
+
+          <SubscriptionCard
+            user={user}
+            onUpgrade={() => router.push("/subscribe" as any)}
+          />
+
+          {/* Section: Akun */}
+          <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+            marginHorizontal: 16, marginBottom: 8, letterSpacing: 1 }}>AKUN</Text>
+          <SectionCard>
+            <SettingRow
+              icon="✏️"
+              label="Edit Profil"
+              onPress={() => router.push({
+                pathname: "/edit-profile",
+                params: {
+                  name:  user.name ?? "",
+                  phone: user.phone ?? "",
+                  email: user.email,
+                },
+              } as any)}
+            />
+            <SettingRow
+              icon="🔐"
+              label="Ganti Password"
+              onPress={() => router.push({
+                pathname: "/change-password",
+                params: { email: user.email },
+              } as any)}
+            />
+            <SettingRow
+              icon="🎁"
+              label="Program Afiliasi"
+              last
+              onPress={() => router.push("/affiliate" as any)}
+            />
+          </SectionCard>
+
+          {/* Section: Bantuan */}
+          <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+            marginHorizontal: 16, marginBottom: 8, letterSpacing: 1 }}>BANTUAN</Text>
+          <SectionCard>
+            <SettingRow
+              icon="📞"
+              label="Hubungi Kami"
+              onPress={() => router.push("/contact-us" as any)}
+            />
+            <SettingRow
+              icon="ℹ️"
+              label="Tentang Aplikasi"
+              last
+              onPress={() => router.push("/about-us" as any)}
+            />
+          </SectionCard>
+
+          {/* Logout */}
+          <TouchableOpacity onPress={handleLogout}
+            style={{ marginHorizontal: 16, marginTop: 6,
+              backgroundColor: "#1e2433", borderRadius: 14,
+              paddingVertical: 16, alignItems: "center",
+              borderWidth: 1, borderColor: "#f8717133" }}>
+            <Text style={{ color: "#f87171", fontWeight: "700", fontSize: 15 }}>
+              🚪 Keluar dari Akun
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={{ color: "#334155", fontSize: 10, textAlign: "center", marginTop: 20 }}>
+            Stock Insight Mobile
+          </Text>
+        </ScrollView>
+      )}
+    </View>
+  );
+}

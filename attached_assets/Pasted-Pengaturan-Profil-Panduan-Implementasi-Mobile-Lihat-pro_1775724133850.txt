@@ -1,0 +1,416 @@
+Pengaturan & Profil — Panduan Implementasi Mobile
+Lihat profil, edit nama/HP, info langganan, ganti password, logout
+ENDPOINT SUMMARY
+Method	URL	Auth	Keterangan
+GET	/api/auth/me	✅	Data profil + status langganan
+PATCH	/api/auth/profile	✅	Update nama + nomor HP
+POST	/api/auth/forgot-password	❌	Kirim email reset password
+GET /api/auth/me — Data Profil
+GET /api/auth/me
+Authorization: Bearer <token>
+
+Response
+{
+  "id":                 45,
+  "username":           "budi_trader",
+  "name":               "Budi Santoso",
+  "email":              "budi@email.com",
+  "phone":              "08123456789",
+  "role":               "user",
+  "subscriptionPlan":   "pro",
+  "planExpiresAt":      "2026-07-09T00:00:00.000Z",
+  "emailVerified":      true,
+  "trialDaysRemaining": 0,
+  "isTrialActive":      false,
+  "hasPremiumAccess":   true,
+  "createdAt":          "2026-01-15T08:00:00.000Z"
+}
+
+Field	Keterangan
+subscriptionPlan	"free" / "pro" / "elite" / "enterprise"
+planExpiresAt	Tanggal kedaluwarsa (null = tidak ada batas / lifetime)
+hasPremiumAccess	true jika trial aktif atau berbayar aktif
+trialDaysRemaining	Sisa hari trial (0 jika trial habis atau sudah berbayar)
+isTrialActive	true jika masih dalam masa trial
+PATCH /api/auth/profile — Update Profil
+PATCH /api/auth/profile
+Authorization: Bearer <token>
+Content-Type: application/json
+{
+  "name":  "Budi Santoso",
+  "phone": "08123456789"
+}
+
+Field	Wajib	Keterangan
+name	✅	Minimal 2 karakter
+phone	❌	Nomor HP (boleh dikosongkan)
+Response Sukses
+{
+  "id":       45,
+  "name":     "Budi Santoso",
+  "phone":    "08123456789",
+  "email":    "budi@email.com",
+  ...
+}
+
+POST /api/auth/forgot-password — Ganti Password
+Email reset dikirim otomatis ke email user. Setelah klik link di email, user set password baru via browser.
+
+POST /api/auth/forgot-password
+Content-Type: application/json
+{ "identifier": "budi@email.com" }
+
+Response
+{ "message": "Email reset password telah dikirim." }
+
+Endpoint ini tidak mengekspos apakah email terdaftar atau tidak (keamanan).
+
+IMPLEMENTASI MOBILE
+PengaturanScreen — Layar Utama
+export function PengaturanScreen({ navigation }) {
+  const queryClient = useQueryClient();
+  const { data: user, isLoading } = useQuery({
+    queryKey: ["me"],
+    queryFn:  () => fetchWithAuth("/api/auth/me").then(r => r.json()),
+  });
+  async function handleLogout() {
+    Alert.alert("Keluar", "Yakin ingin keluar dari akun?", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Keluar",
+        style: "destructive",
+        onPress: async () => {
+          await SecureStore.deleteItemAsync("auth_token");
+          queryClient.clear();
+          navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+        },
+      },
+    ]);
+  }
+  if (isLoading) return <LoadingScreen />;
+  const planLabel = {
+    free:       "Gratis",
+    pro:        "Pro",
+    elite:      "Elite",
+    enterprise: "Enterprise",
+  }[user?.subscriptionPlan ?? "free"] ?? "Gratis";
+  const expiryText = user?.planExpiresAt
+    ? `Aktif sampai ${new Date(user.planExpiresAt).toLocaleDateString("id-ID",
+        { day: "numeric", month: "long", year: "numeric" })}`
+    : user?.subscriptionPlan !== "free"
+      ? "Aktif tanpa batas waktu"
+      : user?.isTrialActive
+        ? `Trial — sisa ${user.trialDaysRemaining} hari`
+        : "Akun Gratis";
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 22 }}>
+          ⚙️ Pengaturan
+        </Text>
+      </View>
+      {/* Card Profil */}
+      <ProfileCard user={user} />
+      {/* Info Langganan */}
+      <SubscriptionCard
+        planLabel={planLabel}
+        expiryText={expiryText}
+        hasPremium={user?.hasPremiumAccess}
+        onUpgrade={() => navigation.navigate("Subscribe")}
+      />
+      {/* Menu Pengaturan */}
+      <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+        <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+          marginBottom: 8 }}>AKUN</Text>
+        <View style={{ backgroundColor: "#1e2433", borderRadius: 14, overflow: "hidden" }}>
+          <SettingRow
+            icon="✏️"
+            label="Edit Profil"
+            onPress={() => navigation.navigate("EditProfil", { user })}
+          />
+          <SettingRow
+            icon="🔐"
+            label="Ganti Password"
+            onPress={() => navigation.navigate("GantiPassword", { email: user?.email })}
+          />
+          <SettingRow
+            icon="🎁"
+            label="Program Afiliasi"
+            onPress={() => navigation.navigate("Afiliasi")}
+          />
+        </View>
+      </View>
+      {/* Tombol Logout */}
+      <TouchableOpacity
+        onPress={handleLogout}
+        style={{ marginHorizontal: 16, marginBottom: 40,
+          backgroundColor: "#1e2433", borderRadius: 14,
+          paddingVertical: 16, alignItems: "center",
+          borderWidth: 1, borderColor: "#f8717133" }}>
+        <Text style={{ color: "#f87171", fontWeight: "700", fontSize: 15 }}>
+          🚪 Keluar dari Akun
+        </Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+ProfileCard — Info Singkat User
+function ProfileCard({ user }) {
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 16,
+      backgroundColor: "#1e2433", borderRadius: 16, padding: 20 }}>
+      {/* Avatar inisial */}
+      <View style={{ width: 56, height: 56, borderRadius: 28,
+        backgroundColor: "#0ea5e922", alignItems: "center",
+        justifyContent: "center", marginBottom: 12 }}>
+        <Text style={{ color: "#0ea5e9", fontWeight: "900", fontSize: 22 }}>
+          {(user?.name ?? user?.username ?? "U")[0].toUpperCase()}
+        </Text>
+      </View>
+      <Text style={{ color: "white", fontWeight: "700", fontSize: 18 }}>
+        {user?.name ?? user?.username}
+      </Text>
+      <Text style={{ color: "#64748b", fontSize: 13, marginTop: 2 }}>
+        {user?.email}
+      </Text>
+      {user?.phone ? (
+        <Text style={{ color: "#475569", fontSize: 12, marginTop: 2 }}>
+          📱 {user.phone}
+        </Text>
+      ) : null}
+      <Text style={{ color: "#334155", fontSize: 11, marginTop: 8 }}>
+        Bergabung {new Date(user?.createdAt).toLocaleDateString("id-ID",
+          { month: "long", year: "numeric" })}
+      </Text>
+    </View>
+  );
+}
+
+SubscriptionCard — Info Langganan
+function SubscriptionCard({ planLabel, expiryText, hasPremium, onUpgrade }) {
+  const planColor = {
+    "Gratis":     "#64748b",
+    "Pro":        "#0ea5e9",
+    "Elite":      "#a78bfa",
+    "Enterprise": "#f59e0b",
+  }[planLabel] ?? "#64748b";
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 16,
+      backgroundColor: "#1e2433", borderRadius: 16, padding: 20 }}>
+      <Text style={{ color: "#475569", fontSize: 11,
+        fontWeight: "700", marginBottom: 12 }}>LANGGANAN</Text>
+      <View style={{ flexDirection: "row", alignItems: "center",
+        justifyContent: "space-between" }}>
+        <View>
+          <Text style={{ color: planColor, fontWeight: "900",
+            fontSize: 20, textTransform: "uppercase" }}>
+            {planLabel}
+          </Text>
+          <Text style={{ color: "#64748b", fontSize: 12, marginTop: 2 }}>
+            {expiryText}
+          </Text>
+        </View>
+        {!hasPremium && (
+          <TouchableOpacity onPress={onUpgrade}
+            style={{ backgroundColor: "#0ea5e9", borderRadius: 10,
+              paddingHorizontal: 16, paddingVertical: 8 }}>
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 13 }}>
+              Upgrade
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+SettingRow — Baris Menu
+function SettingRow({ icon, label, onPress, last }) {
+  return (
+    <TouchableOpacity onPress={onPress}
+      style={{ flexDirection: "row", alignItems: "center",
+        paddingHorizontal: 16, paddingVertical: 14,
+        borderBottomWidth: last ? 0 : 1, borderBottomColor: "#0f1629" }}>
+      <Text style={{ fontSize: 18, marginRight: 12 }}>{icon}</Text>
+      <Text style={{ color: "white", fontSize: 14, flex: 1 }}>{label}</Text>
+      <Text style={{ color: "#334155", fontSize: 16 }}>›</Text>
+    </TouchableOpacity>
+  );
+}
+
+EditProfilScreen — Form Edit Nama + HP
+export function EditProfilScreen({ route, navigation }) {
+  const { user } = route.params;
+  const [name,    setName]    = useState(user?.name ?? "");
+  const [phone,   setPhone]   = useState(user?.phone ?? "");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const queryClient = useQueryClient();
+  async function handleSave() {
+    if (!name.trim() || name.trim().length < 2) {
+      setError("Nama minimal 2 karakter.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetchWithAuth("/api/auth/profile", {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), phone: phone.trim() || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error ?? "Gagal menyimpan."); return; }
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      Alert.alert("Tersimpan", "Profil berhasil diperbarui.", [
+        { text: "OK", onPress: () => navigation.goBack() }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "#0f1629" }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        {/* Header */}
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 12 }}>
+            <Text style={{ color: "#0ea5e9", fontSize: 16 }}>← Kembali</Text>
+          </TouchableOpacity>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 18 }}>
+            ✏️ Edit Profil
+          </Text>
+        </View>
+        {/* Nama */}
+        <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 6 }}>Nama *</Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Nama lengkap"
+          placeholderTextColor="#475569"
+          style={{ backgroundColor: "#1e2433", borderRadius: 10,
+            color: "white", fontSize: 14, padding: 14, marginBottom: 16 }}
+        />
+        {/* Nomor HP */}
+        <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 6 }}>
+          Nomor HP (opsional)
+        </Text>
+        <TextInput
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="08xxxxxxxxxx"
+          placeholderTextColor="#475569"
+          keyboardType="phone-pad"
+          style={{ backgroundColor: "#1e2433", borderRadius: 10,
+            color: "white", fontSize: 14, padding: 14, marginBottom: 6 }}
+        />
+        <Text style={{ color: "#334155", fontSize: 11, marginBottom: 24 }}>
+          Email tidak dapat diubah melalui aplikasi.
+        </Text>
+        {error ? (
+          <Text style={{ color: "#f87171", fontSize: 13, marginBottom: 14 }}>⚠ {error}</Text>
+        ) : null}
+        <TouchableOpacity onPress={handleSave} disabled={loading}
+          style={{ backgroundColor: loading ? "#1e293b" : "#0ea5e9",
+            borderRadius: 12, paddingVertical: 16, alignItems: "center" }}>
+          {loading
+            ? <ActivityIndicator color="white" />
+            : <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>
+                Simpan Perubahan
+              </Text>}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+GantiPasswordScreen — Request Reset via Email
+export function GantiPasswordScreen({ route, navigation }) {
+  const { email } = route.params;
+  const [sent,    setSent]    = useState(false);
+  const [loading, setLoading] = useState(false);
+  async function handleSend() {
+    setLoading(true);
+    try {
+      await fetch(`${BASE_URL}api/auth/forgot-password`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: email }),
+      });
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629", padding: 20 }}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginBottom: 24 }}>
+        <Text style={{ color: "#0ea5e9", fontSize: 16 }}>← Kembali</Text>
+      </TouchableOpacity>
+      <Text style={{ color: "white", fontWeight: "900", fontSize: 22, marginBottom: 8 }}>
+        🔐 Ganti Password
+      </Text>
+      {!sent ? (
+        <>
+          <Text style={{ color: "#64748b", fontSize: 14, lineHeight: 22, marginBottom: 32 }}>
+            Link reset password akan dikirim ke:{"\n"}
+            <Text style={{ color: "#0ea5e9", fontWeight: "700" }}>{email}</Text>
+          </Text>
+          <TouchableOpacity onPress={handleSend} disabled={loading}
+            style={{ backgroundColor: loading ? "#1e293b" : "#0ea5e9",
+              borderRadius: 12, paddingVertical: 16, alignItems: "center" }}>
+            {loading
+              ? <ActivityIndicator color="white" />
+              : <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>
+                  Kirim Link Reset
+                </Text>}
+          </TouchableOpacity>
+        </>
+      ) : (
+        <View style={{ alignItems: "center", paddingTop: 40 }}>
+          <Text style={{ fontSize: 50, marginBottom: 16 }}>✉️</Text>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 18,
+            textAlign: "center", marginBottom: 8 }}>
+            Email Terkirim!
+          </Text>
+          <Text style={{ color: "#64748b", fontSize: 13, textAlign: "center",
+            lineHeight: 20, marginBottom: 32 }}>
+            Cek inbox {email} dan klik link reset password.{"\n"}
+            Setelah selesai, login kembali dengan password baru.
+          </Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Login")}
+            style={{ backgroundColor: "#1e2433", borderRadius: 12,
+              paddingHorizontal: 24, paddingVertical: 14 }}>
+            <Text style={{ color: "#0ea5e9", fontWeight: "700" }}>Kembali ke Login</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
+NAVIGASI
+// Di stack navigator
+<Stack.Screen name="Pengaturan"   component={PengaturanScreen} />
+<Stack.Screen name="EditProfil"   component={EditProfilScreen} />
+<Stack.Screen name="GantiPassword" component={GantiPasswordScreen} />
+// Di menu hamburger
+{
+  icon:    "⚙️",
+  label:   "Pengaturan",
+  onPress: () => { setMenuVisible(false); navigation.navigate("Pengaturan"); },
+}
+
+RINGKASAN
+Screen	Endpoint yang dipakai
+PengaturanScreen	GET /api/auth/me
+EditProfilScreen	GET /api/auth/me + PATCH /api/auth/profile
+GantiPasswordScreen	POST /api/auth/forgot-password
+Field yang bisa diubah	Endpoint
+Nama	PATCH /api/auth/profile → name
+Nomor HP	PATCH /api/auth/profile → phone
+Password	POST /api/auth/forgot-password (via email)
+Email	❌ Tidak bisa diubah via app
