@@ -17,10 +17,43 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WatchlistProvider } from "@/context/WatchlistContext";
 import { useColors } from "@/hooks/useColors";
+import { fetchGlobalSentiment } from "@/services/globalSentimentService";
+import { fetchMasterStock } from "@/services/masterStockService";
+import { fetchRadarMarket } from "@/services/radarMarketService";
+import { fetchSmartMoneyFlow } from "@/services/smartMoneyService";
+import { fetchScreener } from "@/services/stockToolsService";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+function prefetchAll() {
+  queryClient.prefetchQuery({
+    queryKey: ["global-sentiment"],
+    queryFn: fetchGlobalSentiment,
+    staleTime: 10 * 60 * 1000,
+  });
+  queryClient.prefetchQuery({
+    queryKey: ["master-stock"],
+    queryFn: fetchMasterStock,
+    staleTime: 60 * 60 * 1000,
+  });
+  queryClient.prefetchQuery({
+    queryKey: ["radar-market"],
+    queryFn: fetchRadarMarket,
+    staleTime: 60 * 60 * 1000,
+  });
+  queryClient.prefetchQuery({
+    queryKey: ["smart-money-flow"],
+    queryFn: fetchSmartMoneyFlow,
+    staleTime: 30 * 60 * 1000,
+  });
+  queryClient.prefetchQuery({
+    queryKey: ["stocktools-screener"],
+    queryFn: fetchScreener,
+    staleTime: 60 * 60 * 1000,
+  });
+}
 
 function RootLayoutNav() {
   const colors = useColors();
@@ -63,6 +96,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
+      prefetchAll();
     }
   }, [fontsLoaded, fontError]);
 
