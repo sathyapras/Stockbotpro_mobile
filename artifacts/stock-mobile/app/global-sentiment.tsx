@@ -18,6 +18,10 @@ import {
   fetchGlobalSentiment,
   generateNarrative,
 } from "@/services/globalSentimentService";
+import {
+  fetchRoboCommentary,
+  getCommentaryText,
+} from "@/services/roboCommentaryService";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -172,14 +176,61 @@ function NarasiCard({ text }: { text: string }) {
   const paragraphs = text.split("\n\n");
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>📝 Analisa Narasi Terintegrasi</Text>
+      <Text style={styles.cardTitle}>📊 Integrated Market Analysis</Text>
       <Text style={{ color: "#64748b", fontSize: 10, marginTop: 2, marginBottom: 12 }}>
-        Dihasilkan otomatis dari data real-time
+        Auto-generated from real-time market data
       </Text>
       {paragraphs.map((p, i) => (
         <Text key={i} style={[styles.narasiParagraph, i < paragraphs.length - 1 && { marginBottom: 12 }]}>
           {p}
         </Text>
+      ))}
+    </View>
+  );
+}
+
+// ─── Robo Commentary Card (Composite) ─────────────────────────
+
+function RoboCompositeCard({ text }: { text: string }) {
+  if (!text) return null;
+
+  const BADGE_RE = /^===\s*(.+?)\s*===\s*/;
+  const sections: { badge: string | null; body: string }[] = [];
+  let remaining = text.trim();
+
+  while (remaining.length > 0) {
+    const m = remaining.match(BADGE_RE);
+    if (m) {
+      remaining = remaining.slice(m[0].length).trim();
+      const nextBadge = remaining.search(/===\s*.+?\s*===/);
+      const body = nextBadge > -1 ? remaining.slice(0, nextBadge).trim() : remaining.trim();
+      if (body) sections.push({ badge: m[1], body });
+      remaining = nextBadge > -1 ? remaining.slice(nextBadge) : "";
+    } else {
+      sections.push({ badge: null, body: remaining.trim() });
+      remaining = "";
+    }
+  }
+
+  if (sections.length === 0) return null;
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>🤖 RoboCommentary — Composite</Text>
+      <Text style={{ color: "#64748b", fontSize: 10, marginTop: 2, marginBottom: 12 }}>
+        AI-powered analysis of the IDX Composite index
+      </Text>
+      {sections.map((sec, i) => (
+        <View key={i} style={i < sections.length - 1 ? { marginBottom: 14 } : {}}>
+          {sec.badge && (
+            <View style={styles.roboBadge}>
+              <Text style={styles.roboBadgeText}>{sec.badge}</Text>
+            </View>
+          )}
+          <Text style={[styles.narasiParagraph, sec.badge ? { marginTop: 6 } : {}]}>
+            {sec.body}
+          </Text>
+        </View>
       ))}
     </View>
   );
@@ -214,6 +265,16 @@ export default function GlobalSentimentScreen() {
     gcTime: 30 * 60 * 1000,
     retry: 2,
   });
+
+  const { data: roboMap } = useQuery({
+    queryKey: ["robo-commentary"],
+    queryFn: fetchRoboCommentary,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+  const compositeCommentary = roboMap
+    ? (getCommentaryText(roboMap, "COMPOSITE") || getCommentaryText(roboMap, "^JKSE") || getCommentaryText(roboMap, "IHSG"))
+    : "";
 
   const narrative = data ? generateNarrative(data) : null;
 
@@ -315,6 +376,11 @@ export default function GlobalSentimentScreen() {
           {/* Narasi */}
           {narrative && <NarasiCard text={narrative} />}
 
+          {/* RoboCommentary Composite */}
+          {compositeCommentary ? (
+            <RoboCompositeCard text={compositeCommentary} />
+          ) : null}
+
           {/* Footer note */}
           <Text style={styles.footerNote}>
             Data dari Yahoo Finance. Refresh pull-down untuk update terbaru.
@@ -385,6 +451,13 @@ const styles = StyleSheet.create({
 
   dxyBadge: { borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2, alignSelf: "flex-start" },
   dxyBadgeText: { fontSize: 10, fontWeight: "600" },
+
+  roboBadge: {
+    backgroundColor: "#1e40af22", borderRadius: 5,
+    paddingHorizontal: 8, paddingVertical: 3,
+    alignSelf: "flex-start", borderWidth: 1, borderColor: "#3b82f6",
+  },
+  roboBadgeText: { color: "#60a5fa", fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
 
   footerNote: {
     color: "#334155", fontSize: 10, textAlign: "center",
