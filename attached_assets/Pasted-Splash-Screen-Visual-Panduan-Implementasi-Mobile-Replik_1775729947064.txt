@@ -1,0 +1,315 @@
+Splash Screen Visual — Panduan Implementasi Mobile
+Replikasi splash screen web apps ke React Native
+TAMPILAN KESELURUHAN
+┌─────────────────────────────────────┐
+│                                     │
+│    [grid lines samar + glow biru]   │
+│                                     │
+│         [Robot BD]    [Robot SP]    │
+│            ╲              ╱         │
+│             ╲            ╱          │
+│          ─── [BRAIN] ───            │
+│                  │                  │
+│             [Robot HFT]             │
+│                                     │
+│     [Logo stockbot-logo.png] PRO    │
+│  Verifying Signal Neural-Chain...   │
+│  ████████████████░░░░░  78%         │
+│  Data Flowing...              78%   │
+└─────────────────────────────────────┘
+
+Warna utama: Biru gelap #020912 → #050e1a Aksen: Cyan #00d4ff / #00ffff Durasi total: ~3.2 detik → fade out → masuk ke app
+
+DEPENDENCY MOBILE
+npx expo install react-native-svg
+
+SVG dipakai untuk menggambar robot, brain, path, dan data packet yang bergerak.
+
+FASE ANIMASI (0 → 3)
+Phase	Waktu	Yang terjadi
+0	0ms	Semua robot gelap/redup, path belum muncul
+1	~800ms	Path dari brain ke 3 robot mulai muncul (stroke-dashoffset 0), robot aktif (cerah), mata robot mulai berkedip
+2	~1600ms	Mini candlestick muncul di path, secondary mesh lines muncul
+3	~2400ms	Progress bar 100%, fade out dimulai
+LAYOUT & WARNA
+Background
+// Latar belakang utama
+backgroundColor: "#020912"
+// Grid lines samar di atas background (bisa di-skip di mobile untuk performa)
+// Warna grid: rgba(0,200,255,0.018) — sangat tipis
+// Radial glow di tengah
+// radial-gradient ellipse 60%x50% di center: rgba(0,180,255,0.055)
+// Di mobile: pakai View dengan borderRadius + opacity sangat rendah di tengah
+
+SVG UTAMA — Ukuran & Posisi
+Canvas SVG: 300 × 320 units (tampilkan sebagai 288×307 dp di layar)
+
+Posisi elemen dalam SVG:
+
+Elemen	Posisi (cx, cy)
+Brain (pusat)	150, 150
+Robot BD (Bandar Detector)	58, 68 — kiri atas
+Robot SP (Signal Predictor)	242, 68 — kanan atas
+Robot HFT	150, 264 — bawah tengah
+ROBOT BD — Bandar Detector (kiri atas, cx=58, cy=68)
+Bentuk: Kepala kotak persegi panjang, 2 mata bulat, antena di atas, badan kecil
+
+// Kepala
+<Rect x={-12} y={-18} width={24} height={18} rx={4}
+  fill="#040f1a" stroke="#00d4ff" strokeWidth={1.2} opacity={active ? 1 : 0.3} />
+// Mata kiri
+<Ellipse cx={-5} cy={-10} rx={3.5} ry={3.5}
+  fill="#000f1a" stroke="#00d4ff" strokeWidth={0.8} />
+<Circle cx={-5} cy={-10} r={1.5} fill="#00d4ff"
+  opacity={active ? 1 : 0.2} />
+  // Animasi pulse saat active: opacity 1 → 0.2 → 1 (1.8 detik)
+// Mata kanan (sama, offset +0.9 detik)
+<Ellipse cx={5} cy={-10} rx={3.5} ry={3.5}
+  fill="#000f1a" stroke="#00d4ff" strokeWidth={0.8} />
+<Circle cx={5} cy={-10} r={1.5} fill="#00d4ff"
+  opacity={active ? 1 : 0.2} />
+// Scanning line (hanya saat active)
+<Line x1={-9} y1={-10} x2={9} y2={-10}
+  stroke="#00ffff" strokeWidth={0.6} opacity={0.5} />
+  // Animasi pulse: opacity 1→0→1 (1.2 detik)
+// Antena
+<Line x1={0} y1={-18} x2={0} y2={-24}
+  stroke="#00d4ff" strokeWidth={0.8} opacity={0.7} />
+<Circle cx={0} cy={-25.5} r={1.5} fill="#00ffff"
+  opacity={active ? 0.9 : 0.2} />
+  // Animasi pulse: 1.0 detik
+// Badan
+<Rect x={-10} y={1} width={20} height={12} rx={2}
+  fill="#040f1a" stroke="#00d4ff" strokeWidth={0.8}
+  opacity={active ? 0.9 : 0.3} />
+// Lampu status (hijau saat active)
+<Circle cx={7} cy={7} r={2}
+  fill={active ? "#22c55e" : "#334155"} />
+  // Animasi pulse: 2.5 detik
+// Label kecil di bawah
+<SvgText x={0} y={22} textAnchor="middle" fontSize={4.5}
+  fill="#00d4ff" opacity={0.4} fontFamily="monospace">BD</SvgText>
+// Animasi idle (naik-turun 0→-1.5→0 px, 3 detik loop)
+
+ROBOT SP — Signal Predictor (kanan atas, cx=242, cy=68)
+Bentuk: Kepala heksagon, 1 mata besar di tengah, antena sinyal gelombang
+
+// Kepala heksagon
+<Polygon points="0,-22 12,-14 12,2 0,10 -12,2 -12,-14"
+  fill="#040f1a" stroke="#00d4ff" strokeWidth={1.2}
+  opacity={active ? 1 : 0.3} />
+// Antena + gelombang sinyal (3 arc)
+<Line x1={0} y1={-22} x2={0} y2={-28} stroke="#00d4ff" strokeWidth={0.8} opacity={0.7} />
+// Arc 1: d="M -3.5,-22 Q 0,-24.5 3.5,-22"
+// Arc 2: d="M -7,-22 Q 0,-27 7,-22"
+// Arc 3: d="M -10.5,-22 Q 0,-29.5 10.5,-22"
+// Masing-masing pulse dengan delay 0, 0.2, 0.4 detik
+// Mata tunggal besar (sensor)
+<Circle cx={0} cy={-7} r={5} fill="#000f1a" stroke="#00d4ff" strokeWidth={0.8} />
+<Circle cx={0} cy={-7} r={2.5} fill="#00d4ff" opacity={active ? 0.7 : 0.1} />
+<Circle cx={0} cy={-7} r={1} fill="white" opacity={active ? 0.9 : 0.1} />
+// Pulse: 1.5 detik
+// Badan
+<Rect x={-8} y={11} width={16} height={10} rx={2}
+  fill="#040f1a" stroke="#00d4ff" strokeWidth={0.8} />
+<Circle cx={6} cy={16} r={2} fill={active ? "#3b82f6" : "#334155"} />
+// Pulse: 1.8 detik
+<SvgText x={0} y={30} textAnchor="middle" fontSize={4.5}
+  fill="#00d4ff" opacity={0.4}>SP</SvgText>
+// Animasi idle: 3.5 detik, delay 0.3 detik
+
+ROBOT HFT — HFT Agent (bawah tengah, cx=150, cy=264)
+Bentuk: Kepala persegi lebar dengan circuit lines, mata persegi berkedip cepat, 4 lampu status
+
+// Kepala
+<Rect x={-14} y={-16} width={28} height={22} rx={6}
+  fill="#040f1a" stroke="#00d4ff" strokeWidth={1.2} />
+// Circuit lines di wajah (3 garis horizontal)
+<Line x1={-10} y1={-8} x2={10} y2={-8} stroke="#00d4ff" strokeWidth={0.5} opacity={0.5} />
+<Line x1={-10} y1={-4} x2={10} y2={-4} stroke="#00d4ff" strokeWidth={0.5} opacity={0.4} />
+<Line x1={-10} y1={0}  x2={10} y2={0}  stroke="#00d4ff" strokeWidth={0.5} opacity={0.3} />
+// Mata kiri (persegi, berkedip cepat 0.4 detik step-end!)
+<Rect x={-10} y={-13} width={7} height={4} rx={1} fill="#00d4ff" opacity={0.8} />
+// Mata kanan (delay 0.2 detik)
+<Rect x={3} y={-13} width={7} height={4} rx={1} fill="#00d4ff" opacity={0.8} />
+// 4 lampu status berwarna berbeda: hijau, biru, kuning, hijau
+// posisi x: -6, -2, 2, 6 — y: 10
+// Masing-masing pulse dengan interval 0.5-0.7 detik dan delay berbeda
+// Badan
+<Rect x={-12} y={7} width={24} height={11} rx={2}
+  fill="#040f1a" stroke="#00d4ff" strokeWidth={0.8} />
+<SvgText x={0} y={27} textAnchor="middle" fontSize={4.5}
+  fill="#00d4ff" opacity={0.4}>HFT</SvgText>
+// Animasi idle: 2.8 detik, delay 0.7 detik
+
+BRAIN — Pusat (cx=150, cy=150)
+// Orbit ring berputar (spin 8 detik)
+<Circle cx={0} cy={0} r={30} fill="none" stroke="#00d4ff"
+  strokeWidth={0.5} opacity={0.3} strokeDasharray="6 4" />
+// Di mobile: pakai Animated.loop + rotate
+// Belahan otak kiri
+<Path d="M-2,-14 C-18,-14 -26,-6 -25,2 C-26,8 -22,14 -14,16 C-8,18 -4,16 -2,14 Z"
+  fill="#001a2a" stroke="#00d4ff" strokeWidth={1.4} />
+// Belahan otak kanan (mirror)
+<Path d="M2,-14 C18,-14 26,-6 25,2 C26,8 22,14 14,16 C8,18 4,16 2,14 Z"
+  fill="#001a2a" stroke="#00d4ff" strokeWidth={1.4} />
+// Garis tengah pemisah
+<Line x1={0} y1={-14} x2={0} y2={14} stroke="#00d4ff" strokeWidth={0.6} opacity={0.4} />
+// Lekukan otak kiri
+<Path d="M-20,0 C-16,-4 -12,4 -8,0" fill="none" stroke="#00d4ff" strokeWidth={0.8} opacity={0.6} />
+<Path d="M-18,8 C-14,4 -10,10 -6,6" fill="none" stroke="#00d4ff" strokeWidth={0.8} opacity={0.5} />
+// Lekukan otak kanan (mirror)
+<Path d="M20,0 C16,-4 12,4 8,0" fill="none" stroke="#00d4ff" strokeWidth={0.8} opacity={0.6} />
+<Path d="M18,8 C14,4 10,10 6,6" fill="none" stroke="#00d4ff" strokeWidth={0.8} opacity={0.5} />
+// Inti berdenyut
+<Circle cx={0} cy={1} r={3.5} fill="#00d4ff" opacity={0.4} />
+<Circle cx={0} cy={1} r={1.5} fill="#00ffff" opacity={0.9} />
+// Pulse: r 1.5 → 2.5 dan opacity 0.9 → 0.4 (2 detik loop)
+
+PATH (Garis Koneksi Brain → Robot)
+// Path 1: Brain → Robot BD (kiri atas)
+<Path d="M 150 150 C 120 120, 90 95, 58 68"
+  stroke="url(#path-grad-1)" strokeWidth={1.2} fill="none" opacity={0.7}
+  strokeDasharray={120}
+  // strokeDashoffset: phase >= 1 ? 0 : 120 — animate 0.8 detik
+/>
+// Path 2: Brain → Robot SP (kanan atas)
+<Path d="M 150 150 C 180 120, 210 95, 242 68"
+  stroke="url(#path-grad-1)" strokeWidth={1.2} fill="none" opacity={0.7}
+  strokeDasharray={120}
+  // strokeDashoffset: phase >= 1 ? 0 : 120 — animate 0.9 detik, delay 0.1 detik
+/>
+// Path 3: Brain → Robot HFT (bawah)
+<Path d="M 150 160 C 150 195, 150 215, 150 252"
+  stroke="url(#path-grad-1)" strokeWidth={1.2} fill="none" opacity={0.7}
+  strokeDasharray={95}
+  // strokeDashoffset: phase >= 1 ? 0 : 95 — animate 0.8 detik, delay 0.15 detik
+/>
+// Gradient path-grad-1: cyan #00d4ff kiri → transparan tengah → cyan kanan
+
+Secondary Mesh Lines (Phase 2)
+// Garis tipis BD → SP (horizontal)
+<Path d="M 58 68 C 100 68, 200 68, 242 68"
+  stroke="#00d4ff" strokeWidth={0.4} opacity={0.2}
+  strokeDasharray={190}
+  // strokeDashoffset: phase >= 2 ? 0 : 190 — 1.0 detik, delay 0.5 detik
+/>
+// BD → HFT
+<Path d="M 58 68 C 100 180, 130 240, 150 252"
+  stroke="#00d4ff" strokeWidth={0.35} opacity={0.15}
+  strokeDasharray={220}
+  // delay 0.6 detik
+/>
+// SP → HFT
+<Path d="M 242 68 C 200 180, 170 240, 150 252"
+  stroke="#00d4ff" strokeWidth={0.35} opacity={0.15}
+  strokeDasharray={220}
+  // delay 0.7 detik
+/>
+
+DATA PACKETS (Bola bergerak di sepanjang path)
+Lingkaran kecil berwarna cyan yang bergerak mengikuti path dari brain ke robot dan kembali.
+
+// Di web: pakai animateMotion SVG
+// Di mobile (react-native-svg): gunakan animateMotion yang sama
+// Cyan packets: brain → robot (5 packet, warna #00d4ff)
+<AnimatedPacket path="M 150 150 C 120 120, 90 95, 58 68"  dur={2200} delay={0} />
+<AnimatedPacket path="M 150 150 C 180 120, 210 95, 242 68" dur={2400} delay={500} />
+<AnimatedPacket path="M 150 160 C 150 195, 150 215, 150 252" dur={1800} delay={300} />
+// Green packets: robot → brain (balik arah, warna #00ffaa)
+<AnimatedPacket path="M 58 68 C 90 95, 120 120, 150 150"   dur={3000} delay={1100} color="#00ffaa" />
+<AnimatedPacket path="M 242 68 C 210 95, 180 120, 150 150"  dur={3200} delay={1600} color="#00ffaa" />
+// Setiap packet: r=2, opacity=0.85, ada glow cyan di sekitarnya
+
+MINI CANDLESTICKS DI PATH
+Muncul di phase >= 2 — mini candlestick chart kecil di sepanjang path 1 (kiri) dan path 2 (kanan).
+
+Path kiri — sekitar koordinat (100, 105):
+
+x=95:  open=108, close=102 → bearish (merah) — high=109, low=101
+x=100: open=103, close=106 → bullish (hijau) — high=107, low=101
+x=105: open=105, close=100 → bearish (merah) — high=106, low=99
+
+Path kanan — sekitar koordinat (200, 105):
+
+x=195: open=108, close=104 → bearish — high=109, low=103
+x=200: open=103, close=107 → bullish — high=108, low=102
+x=205: open=107, close=105 → bearish — high=108, low=104
+
+Warna: bullish = #22c55e, bearish = #ef4444 Lebar body candle: 3 units, opacity 0.85
+
+BAGIAN BAWAH SVG — Logo & Loading Bar
+Logo
+// Logo image dari file lokal
+<Image source={require("./assets/logo-stockbot.png")}
+  style={{ height: 32, width: "auto" }}
+  // filter: drop-shadow cyan 0 0 10px rgba(0,212,255,0.6)
+/>
+// Badge PRO di sebelah kanan logo
+<View style={{ backgroundColor: "rgba(0,212,255,0.12)",
+  borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2,
+  borderWidth: 1, borderColor: "rgba(245,166,0,0.35)" }}>
+  <Text style={{ color: "hsl(45, 100%, 65%)", // kuning keemasan
+    fontSize: 10, fontWeight: "700", letterSpacing: 2 }}>PRO</Text>
+</View>
+
+Teks Tagline
+"Trace the Flow. See the Unseen. Master the Market"
+
+Font: monospace
+Ukuran: 10px
+Warna: #00d4ff
+Style: uppercase, letter-spacing lebar (0.12em)
+Loading Bar
+// Container bar
+backgroundColor: "rgba(0,180,255,0.1)"
+borderRadius: "full"
+height: 6
+border: "1px solid rgba(0,180,255,0.15)"
+// Isi bar (bergerak sesuai progress)
+background: "linear-gradient(90deg,
+  #0066aa 0%,
+  #00b4d8 40%,
+  #00ffff 80%,
+  #00d4ff 100%)"
+boxShadow: "0 0 8px rgba(0,212,255,0.6)"
+// Di mobile: LinearGradient dari expo-linear-gradient
+// Shimmer overlay (bergerak di ujung bar)
+background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)"
+// Animasi opacity: 0 → 1 → 0 (0.8 detik loop)
+
+Teks Progress
+"Data Flowing..."         [78%]
+
+Font: monospace, 9px
+Warna kiri: rgba(0,180,255,0.5)
+Warna kanan: rgba(0,212,255,0.7)
+IMPLEMENTASI REACT NATIVE (Ringkasan)
+import Svg, {
+  Circle, Ellipse, Rect, Polygon, Path, Line, G, Text as SvgText,
+  Defs, LinearGradient, Stop, Filter,
+  AnimateMotion,  // untuk data packets
+} from "react-native-svg";
+import Animated, {
+  useSharedValue, withTiming, withRepeat, withSequence,
+  Easing, useAnimatedStyle, interpolate,
+} from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
+// Progress: 0 → 100 dalam 2800ms
+// Phase: 0 → 1 pada ~800ms, → 2 pada ~1600ms, → 3 pada ~2400ms
+// FadeOut: mulai pada 2800ms, durasi 500ms
+// onComplete: dipanggil pada 3300ms
+
+RINGKASAN VISUAL
+Elemen	Detail
+Background	#020912 gelap + grid cyan sangat samar + radial glow
+SVG canvas	300×320 units, tampil ~288dp
+Brain	Tengah (150,150), orbit ring berputar, inti berdenyut
+Robot BD	Kiri atas (58,68), kotak, 2 mata, antena
+Robot SP	Kanan atas (242,68), heksagon, 1 mata besar, antena sinyal
+Robot HFT	Bawah (150,264), lebar, circuit lines, berkedip cepat
+Path	3 path utama + 3 secondary mesh, stroke-dashoffset animation
+Data packets	5 bola bergerak (cyan + hijau), animateMotion SVG
+Mini candles	6 candle kecil di path kiri & kanan, muncul phase 2
+Loading bar	Gradient cyan + shimmer + counter persen
+Durasi total	~3.2 detik + fade out 0.5 detik
