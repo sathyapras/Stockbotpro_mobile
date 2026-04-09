@@ -181,9 +181,9 @@ function NarasiCard({ text }: { text: string }) {
   const paragraphs = text.split("\n\n");
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>📊 Integrated Market Analysis</Text>
+      <Text style={styles.cardTitle}>📊 Analisis Makro & Sentimen Pasar</Text>
       <Text style={{ color: "#64748b", fontSize: 10, marginTop: 2, marginBottom: 12 }}>
-        Auto-generated from real-time market data
+        Dihasilkan otomatis dari data pasar real-time
       </Text>
       {paragraphs.map((p, i) => (
         <Text key={i} style={[styles.narasiParagraph, i < paragraphs.length - 1 && { marginBottom: 12 }]}>

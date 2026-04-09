@@ -107,7 +107,21 @@ export function generateNarrative(data: GlobalSentimentData): string {
     );
   }
 
-  // 4. Conclusion
+  // 4. VIX Interpretation & Action Guide
+  const vixAction =
+    s.fearLabel === "EXTREME_FEAR"
+      ? "VIX menembus level ekstrem (>30) — area jenuh jual (peak panic). Sejarah mencatat ini sebagai momen terbaik untuk mulai mencicil saham-saham undervalued secara bertahap. Pertimbangkan parkir sebagian dana di Emas atau Reksadana Pasar Uang sambil menunggu volatilitas mereda."
+      : s.fearLabel === "FEAR"
+      ? "VIX di zona Fear (23–30): sinyal waspada. Rupiah biasanya ikut tertekan dan IHSG berpotensi koreksi lanjutan. Prioritaskan cash, pantau area support kuat pada Blue Chip perbankan (BBCA, BBRI, BMRI, ASII), dan hindari Average Down terlalu dini di tengah volatilitas."
+      : s.fearLabel === "NEUTRAL"
+      ? "VIX di zona Neutral (15–22): pasar EM dalam mode konsolidasi. Pantau apakah VIX cenderung naik atau turun — jika merangkak naik, mulai siapkan strategi defensif. Jaga porsi kas yang cukup sebagai peluru untuk aksi beli saat peluang muncul."
+      : s.fearLabel === "GREED"
+      ? "VIX di zona Risk-On (12–15): kondisi ideal untuk akumulasi. Dana asing biasanya Net Buy, IHSG cenderung bullish, dan saham Blue Chip seperti perbankan besar biasanya memimpin penguatan. Manfaatkan momentum, namun tetap disiplin pada level entry."
+      : "VIX di level sangat rendah (<12) — pasar terlalu nyaman (complacent). Ingat pepatah: 'When the VIX is low, look out below.' Kurangi eksposur ke saham spekulatif dan perketat manajemen risiko.";
+
+  paragraphs.push(vixAction);
+
+  // 5. Conclusion
   const conclusion =
     s.fearLabel.includes("FEAR") || s.globalBias === "RISK_OFF"
       ? "Overall, conditions remain challenging — stay selective: focus on stocks with strong fundamentals, fair valuations, and clean technical setups."
