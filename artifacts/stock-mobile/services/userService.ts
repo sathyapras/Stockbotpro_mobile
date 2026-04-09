@@ -75,3 +75,35 @@ export async function forgotPassword(email: string): Promise<void> {
     body: JSON.stringify({ identifier: email }),
   });
 }
+
+export async function loginUser(identifier: string, password: string): Promise<string> {
+  const res  = await fetch(`${apiBase()}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier, password }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error ?? "Login gagal.");
+  return json.token as string;
+}
+
+export async function registerUser(data: {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+  phone?: string;
+}): Promise<string> {
+  const res  = await fetch(`${apiBase()}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...data, agreedToDisclaimer: true }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error ?? "Gagal mendaftar.");
+  return json.token as string;
+}
+
+export async function saveAuthToken(token: string): Promise<void> {
+  return AsyncStorage.setItem(TOKEN_KEY, token.trim());
+}

@@ -213,12 +213,20 @@ export default function SettingsScreen() {
             marginBottom: 10 }}>Login Diperlukan</Text>
           <Text style={{ color: "#64748b", fontSize: 13, textAlign: "center", lineHeight: 20,
             marginBottom: 32 }}>
-            Masukkan API token StockBot Pro untuk melihat profil dan kelola langgananmu.
+            Login untuk melihat profil, info langganan, dan kelola akun StockBot Pro kamu.
           </Text>
-          <TouchableOpacity onPress={() => router.push("/affiliate" as any)}
+          <TouchableOpacity onPress={() => router.push("/login" as any)}
             style={{ backgroundColor: "#0ea5e9", borderRadius: 12,
-              paddingHorizontal: 28, paddingVertical: 14 }}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Login via Afiliasi</Text>
+              paddingHorizontal: 28, paddingVertical: 14, width: "100%",
+              alignItems: "center" }}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Masuk ke Akun</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/sign-up" as any)}
+            style={{ marginTop: 12, paddingVertical: 12, width: "100%", alignItems: "center" }}>
+            <Text style={{ color: "#64748b", fontSize: 13 }}>
+              Belum punya akun?{" "}
+              <Text style={{ color: "#0ea5e9", fontWeight: "700" }}>Daftar Gratis</Text>
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       )}

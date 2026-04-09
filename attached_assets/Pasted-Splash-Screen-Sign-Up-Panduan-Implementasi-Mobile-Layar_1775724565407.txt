@@ -1,0 +1,532 @@
+Splash Screen & Sign Up — Panduan Implementasi Mobile
+Layar awal app + form registrasi akun baru
+FLOW LENGKAP
+App dibuka
+    │
+    └── Splash Screen (logo + animasi ~1.5 detik)
+            │
+            ├── Cek token di SecureStore
+            │       ├── Ada token → GET /api/auth/me
+            │       │       ├── Valid   → masuk ke Main App (Home)
+            │       │       └── Invalid → hapus token → Login Screen
+            │       └── Tidak ada token → Login Screen
+            │
+            └── Login Screen
+                    ├── Sudah punya akun → POST /api/auth/login → Main App
+                    └── Belum punya akun → Sign Up Screen
+                                                │
+                                                └── POST /api/auth/register → Main App
+
+ENDPOINT
+Method	URL	Auth	Keterangan
+GET	/api/auth/me	✅	Validasi token saat splash
+POST	/api/auth/register	❌	Daftar akun baru
+POST /api/auth/register — Field & Validasi
+POST /api/auth/register
+Content-Type: application/json
+{
+  "name":               "Budi Santoso",
+  "username":           "budi_trader",
+  "email":              "budi@email.com",
+  "password":           "Password123",
+  "phone":              "08123456789",
+  "agreedToDisclaimer": true
+}
+
+Field	Wajib	Aturan Backend
+name	✅	Nama lengkap
+username	✅	3–30 karakter, huruf kecil + angka + underscore saja (regex: ^[a-z0-9_]{3,30}$)
+email	✅	Format email valid
+password	✅	Min 8 karakter, harus ada 1 huruf KAPITAL + 1 angka
+agreedToDisclaimer	✅	Harus true — wajib centang persetujuan
+phone	❌	Nomor HP (opsional)
+Response Sukses (201)
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id":               45,
+    "name":             "Budi Santoso",
+    "username":         "budi_trader",
+    "email":            "budi@email.com",
+    "subscriptionPlan": "free",
+    "emailVerified":    false
+  },
+  "needsVerification": true
+}
+
+Token langsung aktif — user bisa masuk app tanpa verifikasi email dulu. Email verifikasi dikirim otomatis ke inbox user (berlaku 24 jam).
+
+Pesan Error dari Backend
+{ "error": "Nama, username, email, dan password wajib diisi." }
+{ "error": "Username sudah digunakan." }
+{ "error": "Email sudah digunakan." }
+{ "error": "Password minimal 8 karakter." }
+{ "error": "Password harus mengandung minimal 1 huruf kapital dan 1 angka." }
+{ "error": "Username hanya boleh huruf, angka, dan underscore (3-30 karakter)." }
+{ "error": "Anda harus menyetujui Risk & Disclaimer." }
+
+IMPLEMENTASI MOBILE
+SplashScreen
+import { useEffect, useRef } from "react";
+import { View, Text, Animated, ActivityIndicator } from "react-native";
+import * as SecureStore from "expo-secure-store";
+export function SplashScreen({ navigation }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    // Fade in logo
+    Animated.timing(opacity, {
+      toValue: 1, duration: 700, useNativeDriver: true,
+    }).start();
+    // Tunggu minimal 1.5 detik lalu cek token
+    const timer = setTimeout(checkAndNavigate, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+  async function checkAndNavigate() {
+    try {
+      const token = await SecureStore.getItemAsync("auth_token");
+      if (!token) {
+        navigation.replace("Login");
+        return;
+      }
+      const res = await fetch(`${BASE_URL}api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        navigation.replace("Main");
+      } else {
+        await SecureStore.deleteItemAsync("auth_token");
+        navigation.replace("Login");
+      }
+    } catch {
+      // Jaringan error — arahkan ke login, biarkan user retry manual
+      navigation.replace("Login");
+    }
+  }
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0a0f1e",
+      alignItems: "center", justifyContent: "center" }}>
+      <Animated.View style={{ opacity, alignItems: "center" }}>
+        {/* Logo teks */}
+        <Text style={{ color: "white", fontWeight: "900",
+          fontSize: 44, letterSpacing: -2 }}>
+          StockBot
+        </Text>
+        <Text style={{ color: "#0ea5e9", fontWeight: "900",
+          fontSize: 44, letterSpacing: -2, marginTop: -10 }}>
+          PRO
+        </Text>
+        {/* Tagline */}
+        <Text style={{ color: "#475569", fontSize: 12,
+          letterSpacing: 1.5, marginTop: 12, marginBottom: 48,
+          textTransform: "uppercase" }}>
+          Analisa Saham IDX Terpercaya
+        </Text>
+        <ActivityIndicator color="#0ea5e9" size="small" />
+      </Animated.View>
+      <Text style={{ position: "absolute", bottom: 32,
+        color: "#1e293b", fontSize: 11 }}>
+        v1.0.0
+      </Text>
+    </View>
+  );
+}
+
+LoginScreen — Termasuk Tombol ke Sign Up
+export function LoginScreen({ navigation }) {
+  const [identifier, setIdentifier] = useState("");
+  const [password,   setPassword]   = useState(");
+  const [showPass,   setShowPass]   = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
+  const queryClient = useQueryClient();
+  async function handleLogin() {
+    if (!identifier.trim() || !password) {
+      setError("Email/username dan password wajib diisi.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${BASE_URL}api/auth/login`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: identifier.trim(), password }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Login gagal. Cek email/username dan password.");
+        return;
+      }
+      await SecureStore.setItemAsync("auth_token", json.token);
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      navigation.replace("Main");
+    } catch {
+      setError("Tidak dapat terhubung ke server. Cek koneksi internet.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "#0a0f1e" }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center",
+        padding: 24 }} keyboardShouldPersistTaps="handled">
+        {/* Judul */}
+        <Text style={{ color: "white", fontWeight: "900",
+          fontSize: 28, marginBottom: 4 }}>
+          Selamat Datang
+        </Text>
+        <Text style={{ color: "#64748b", fontSize: 14, marginBottom: 32 }}>
+          Masuk ke akun StockBot Pro kamu
+        </Text>
+        {/* Email / Username */}
+        <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 6 }}>
+          Email atau Username
+        </Text>
+        <TextInput
+          value={identifier}
+          onChangeText={setIdentifier}
+          placeholder="email@kamu.com atau username"
+          placeholderTextColor="#334155"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          style={{ backgroundColor: "#1e2433", borderRadius: 12,
+            color: "white", fontSize: 14, padding: 16, marginBottom: 16 }}
+        />
+        {/* Password */}
+        <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 6 }}>
+          Password
+        </Text>
+        <View style={{ position: "relative", marginBottom: 8 }}>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••"
+            placeholderTextColor="#334155"
+            secureTextEntry={!showPass}
+            style={{ backgroundColor: "#1e2433", borderRadius: 12,
+              color: "white", fontSize: 14, padding: 16, paddingRight: 50 }}
+          />
+          <TouchableOpacity
+            onPress={() => setShowPass(p => !p)}
+            style={{ position: "absolute", right: 16, top: 16 }}>
+            <Text style={{ fontSize: 18 }}>{showPass ? "🙈" : "👁️"}</Text>
+          </TouchableOpacity>
+        </View>
+        {/* Lupa password */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("LupaPassword")}
+          style={{ alignSelf: "flex-end", marginBottom: 24 }}>
+          <Text style={{ color: "#0ea5e9", fontSize: 12 }}>
+            Lupa Password?
+          </Text>
+        </TouchableOpacity>
+        {/* Error */}
+        {error ? (
+          <Text style={{ color: "#f87171", fontSize: 13, marginBottom: 16 }}>
+            ⚠ {error}
+          </Text>
+        ) : null}
+        {/* Tombol Login */}
+        <TouchableOpacity onPress={handleLogin} disabled={loading}
+          style={{ backgroundColor: loading ? "#1e293b" : "#0ea5e9",
+            borderRadius: 14, paddingVertical: 16, alignItems: "center",
+            marginBottom: 16 }}>
+          {loading
+            ? <ActivityIndicator color="white" />
+            : <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+                Masuk
+              </Text>}
+        </TouchableOpacity>
+        {/* Link ke Sign Up */}
+        <View style={{ flexDirection: "row", justifyContent: "center",
+          alignItems: "center" }}>
+          <Text style={{ color: "#64748b", fontSize: 13 }}>
+            Belum punya akun?{" "}
+          </Text>
+          <TouchableOpacity onPress={() => navigation.navigate("SignUp")}>
+            <Text style={{ color: "#0ea5e9", fontWeight: "700", fontSize: 13 }}>
+              Daftar Gratis
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+SignUpScreen — Form Registrasi
+export function SignUpScreen({ navigation }) {
+  const [name,      setName]      = useState("");
+  const [username,  setUsername]  = useState("");
+  const [email,     setEmail]     = useState("");
+  const [password,  setPassword]  = useState("");
+  const [phone,     setPhone]     = useState("");
+  const [showPass,  setShowPass]  = useState(false);
+  const [agreed,    setAgreed]    = useState(false);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
+  const queryClient = useQueryClient();
+  // Validasi password real-time
+  const passHasUpper  = /[A-Z]/.test(password);
+  const passHasNumber = /[0-9]/.test(password);
+  const passLongEnough = password.length >= 8;
+  // Validasi username real-time
+  const usernameValid = /^[a-z0-9_]{3,30}$/.test(username);
+  async function handleRegister() {
+    setError("");
+    // Validasi client-side
+    if (!name.trim() || !username.trim() || !email.trim() || !password) {
+      setError("Nama, username, email, dan password wajib diisi.");
+      return;
+    }
+    if (!usernameValid) {
+      setError("Username hanya boleh huruf kecil, angka, dan underscore (3-30 karakter).");
+      return;
+    }
+    if (!passLongEnough || !passHasUpper || !passHasNumber) {
+      setError("Password min 8 karakter, harus ada huruf KAPITAL dan angka.");
+      return;
+    }
+    if (!agreed) {
+      setError("Kamu harus menyetujui Risk & Disclaimer untuk mendaftar.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}api/auth/register`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:               name.trim(),
+          username:           username.trim().toLowerCase(),
+          email:              email.trim().toLowerCase(),
+          password,
+          phone:              phone.trim() || undefined,
+          agreedToDisclaimer: true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Gagal mendaftar. Coba lagi.");
+        return;
+      }
+      // Simpan token & masuk ke app
+      await SecureStore.setItemAsync("auth_token", json.token);
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      navigation.replace("Main");
+    } catch {
+      setError("Tidak dapat terhubung ke server. Cek koneksi internet.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "#0a0f1e" }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 48 }}
+        keyboardShouldPersistTaps="handled">
+        {/* Header */}
+        <TouchableOpacity onPress={() => navigation.goBack()}
+          style={{ marginBottom: 24 }}>
+          <Text style={{ color: "#0ea5e9", fontSize: 16 }}>← Kembali</Text>
+        </TouchableOpacity>
+        <Text style={{ color: "white", fontWeight: "900",
+          fontSize: 28, marginBottom: 4 }}>
+          Buat Akun
+        </Text>
+        <Text style={{ color: "#64748b", fontSize: 13, marginBottom: 32 }}>
+          Gratis · Trial 7 hari akses penuh
+        </Text>
+        {/* Nama */}
+        <FormLabel text="Nama Lengkap *" />
+        <TextInput
+          value={name} onChangeText={setName}
+          placeholder="Nama kamu"
+          placeholderTextColor="#334155"
+          style={inputStyle}
+        />
+        {/* Username */}
+        <FormLabel text="Username *" />
+        <TextInput
+          value={username}
+          onChangeText={t => setUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+          placeholder="contoh: budi_trader"
+          placeholderTextColor="#334155"
+          autoCapitalize="none"
+          style={[inputStyle, username.length >= 3 && !usernameValid
+            ? { borderWidth: 1, borderColor: "#f87171" }
+            : {}]}
+        />
+        <Text style={{ color: "#475569", fontSize: 11, marginBottom: 14 }}>
+          Huruf kecil, angka, underscore · 3–30 karakter
+          {username.length >= 3 && (
+            <Text style={{ color: usernameValid ? "#34d399" : "#f87171" }}>
+              {usernameValid ? "  ✓ Valid" : "  ✗ Tidak valid"}
+            </Text>
+          )}
+        </Text>
+        {/* Email */}
+        <FormLabel text="Email *" />
+        <TextInput
+          value={email} onChangeText={setEmail}
+          placeholder="email@kamu.com"
+          placeholderTextColor="#334155"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          style={inputStyle}
+        />
+        {/* Nomor HP */}
+        <FormLabel text="Nomor HP (opsional)" />
+        <TextInput
+          value={phone} onChangeText={setPhone}
+          placeholder="08xxxxxxxxxx"
+          placeholderTextColor="#334155"
+          keyboardType="phone-pad"
+          style={inputStyle}
+        />
+        {/* Password */}
+        <FormLabel text="Password *" />
+        <View style={{ position: "relative", marginBottom: 10 }}>
+          <TextInput
+            value={password} onChangeText={setPassword}
+            placeholder="Min 8 karakter"
+            placeholderTextColor="#334155"
+            secureTextEntry={!showPass}
+            style={[inputStyle, { paddingRight: 50, marginBottom: 0 }]}
+          />
+          <TouchableOpacity onPress={() => setShowPass(p => !p)}
+            style={{ position: "absolute", right: 16, top: 16 }}>
+            <Text style={{ fontSize: 18 }}>{showPass ? "🙈" : "👁️"}</Text>
+          </TouchableOpacity>
+        </View>
+        {/* Password strength indicator */}
+        {password.length > 0 && (
+          <View style={{ marginBottom: 16, gap: 4 }}>
+            <PasswordCheck ok={passLongEnough} text="Minimal 8 karakter" />
+            <PasswordCheck ok={passHasUpper}   text="Ada huruf KAPITAL" />
+            <PasswordCheck ok={passHasNumber}  text="Ada angka (0-9)" />
+          </View>
+        )}
+        {/* Disclaimer checkbox */}
+        <TouchableOpacity
+          onPress={() => setAgreed(a => !a)}
+          style={{ flexDirection: "row", alignItems: "flex-start",
+            marginBottom: 24, gap: 12 }}>
+          <View style={{ width: 22, height: 22, borderRadius: 6,
+            backgroundColor: agreed ? "#0ea5e9" : "#1e2433",
+            borderWidth: agreed ? 0 : 1, borderColor: "#334155",
+            alignItems: "center", justifyContent: "center", marginTop: 1 }}>
+            {agreed && <Text style={{ color: "white", fontWeight: "900", fontSize: 13 }}>✓</Text>}
+          </View>
+          <Text style={{ color: "#64748b", fontSize: 12,
+            lineHeight: 20, flex: 1 }}>
+            Saya memahami bahwa StockBot Pro hanya memberikan{" "}
+            <Text style={{ color: "#94a3b8" }}>analisa dan edukasi investasi</Text>,
+            bukan rekomendasi beli/jual. Keputusan investasi sepenuhnya
+            menjadi tanggung jawab saya sendiri.
+          </Text>
+        </TouchableOpacity>
+        {/* Error */}
+        {error ? (
+          <Text style={{ color: "#f87171", fontSize: 13, marginBottom: 16 }}>
+            ⚠ {error}
+          </Text>
+        ) : null}
+        {/* Tombol Daftar */}
+        <TouchableOpacity onPress={handleRegister} disabled={loading}
+          style={{ backgroundColor: loading ? "#1e293b" : "#0ea5e9",
+            borderRadius: 14, paddingVertical: 16,
+            alignItems: "center", marginBottom: 24 }}>
+          {loading
+            ? <ActivityIndicator color="white" />
+            : <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+                Daftar Gratis
+              </Text>}
+        </TouchableOpacity>
+        {/* Sudah punya akun */}
+        <View style={{ flexDirection: "row", justifyContent: "center" }}>
+          <Text style={{ color: "#64748b", fontSize: 13 }}>
+            Sudah punya akun?{" "}
+          </Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+            <Text style={{ color: "#0ea5e9", fontWeight: "700", fontSize: 13 }}>
+              Masuk
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+// Helper components
+function FormLabel({ text }) {
+  return (
+    <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 6 }}>
+      {text}
+    </Text>
+  );
+}
+function PasswordCheck({ ok, text }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <Text style={{ color: ok ? "#34d399" : "#475569", fontSize: 12 }}>
+        {ok ? "✓" : "○"}
+      </Text>
+      <Text style={{ color: ok ? "#34d399" : "#475569", fontSize: 12 }}>
+        {text}
+      </Text>
+    </View>
+  );
+}
+const inputStyle = {
+  backgroundColor: "#1e2433",
+  borderRadius: 12,
+  color: "white",
+  fontSize: 14,
+  padding: 16,
+  marginBottom: 16,
+};
+
+NAVIGASI — Setup Stack Navigator
+// RootNavigator.js
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+const Stack = createNativeStackNavigator();
+export function RootNavigator() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Splash"
+        screenOptions={{ headerShown: false }}>
+        {/* Auth flow */}
+        <Stack.Screen name="Splash"        component={SplashScreen} />
+        <Stack.Screen name="Login"         component={LoginScreen} />
+        <Stack.Screen name="SignUp"        component={SignUpScreen} />
+        <Stack.Screen name="LupaPassword"  component={LupaPasswordScreen} />
+        {/* Main app (tab navigator) */}
+        <Stack.Screen name="Main"          component={MainTabNavigator} />
+        {/* Stack screens */}
+        <Stack.Screen name="StockDetail"   component={StockDetailScreen} />
+        <Stack.Screen name="Pengaturan"    component={PengaturanScreen} />
+        <Stack.Screen name="EditProfil"    component={EditProfilScreen} />
+        <Stack.Screen name="GantiPassword" component={GantiPasswordScreen} />
+        <Stack.Screen name="Afiliasi"      component={AfiliasiScreen} />
+        <Stack.Screen name="Subscribe"     component={SubscribeScreen} />
+        <Stack.Screen name="ContactUs"     component={ContactUsScreen} />
+        <Stack.Screen name="Notifikasi"    component={NotifikasiScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+RINGKASAN
+Screen	Endpoint	Navigasi setelah sukses
+SplashScreen	GET /api/auth/me	→ Main atau → Login
+LoginScreen	POST /api/auth/login	→ Main
+SignUpScreen	POST /api/auth/register	→ Main
+Validasi Password	Syarat
+Panjang	Min 8 karakter
+Huruf kapital	Min 1 huruf A-Z
+Angka	Min 1 angka 0-9
+Setelah register, user langsung masuk app tanpa harus verifikasi email dulu. Email verifikasi dikirim otomatis ke inbox (tidak memblokir akses).

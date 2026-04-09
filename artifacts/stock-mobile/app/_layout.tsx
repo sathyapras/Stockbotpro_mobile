@@ -6,10 +6,10 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as SystemUI from "expo-system-ui";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -68,8 +68,17 @@ function prefetchAll() {
   });
 }
 
-function RootLayoutNav() {
-  const colors = useColors();
+function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
+  const colors    = useColors();
+  const router    = useRouter();
+  const didRedirect = useRef(false);
+
+  useEffect(() => {
+    if (fontsReady && !didRedirect.current) {
+      didRedirect.current = true;
+      router.replace("/splash");
+    }
+  }, [fontsReady]);
 
   return (
     <Stack
@@ -80,20 +89,23 @@ function RootLayoutNav() {
         headerTintColor: colors.foreground,
       }}
     >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="stock/[code]" options={{ headerBackTitle: "Back" }} />
-      <Stack.Screen name="tool/[toolId]" options={{ headerShown: false }} />
-      <Stack.Screen name="market-intel" options={{ headerShown: false }} />
-      <Stack.Screen name="menu" options={{ headerShown: false, presentation: "modal" }} />
-      <Stack.Screen name="affiliate" options={{ headerShown: false }} />
-      <Stack.Screen name="subscribe" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)"           options={{ headerShown: false }} />
+      <Stack.Screen name="splash"           options={{ headerShown: false, animation: "none" }} />
+      <Stack.Screen name="login"            options={{ headerShown: false }} />
+      <Stack.Screen name="sign-up"          options={{ headerShown: false }} />
+      <Stack.Screen name="stock/[code]"     options={{ headerBackTitle: "Back" }} />
+      <Stack.Screen name="tool/[toolId]"    options={{ headerShown: false }} />
+      <Stack.Screen name="market-intel"     options={{ headerShown: false }} />
+      <Stack.Screen name="menu"             options={{ headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="affiliate"        options={{ headerShown: false }} />
+      <Stack.Screen name="subscribe"        options={{ headerShown: false }} />
       <Stack.Screen name="midtrans-webview" options={{ headerShown: false }} />
-      <Stack.Screen name="payment-success" options={{ headerShown: false }} />
-      <Stack.Screen name="payment-pending" options={{ headerShown: false }} />
-      <Stack.Screen name="contact-us" options={{ headerShown: false }} />
-      <Stack.Screen name="about-us" options={{ headerShown: false }} />
-      <Stack.Screen name="tutorial" options={{ headerShown: false }} />
-      <Stack.Screen name="notifications"   options={{ headerShown: false }} />
+      <Stack.Screen name="payment-success"  options={{ headerShown: false }} />
+      <Stack.Screen name="payment-pending"  options={{ headerShown: false }} />
+      <Stack.Screen name="contact-us"       options={{ headerShown: false }} />
+      <Stack.Screen name="about-us"         options={{ headerShown: false }} />
+      <Stack.Screen name="tutorial"         options={{ headerShown: false }} />
+      <Stack.Screen name="notifications"    options={{ headerShown: false }} />
       <Stack.Screen name="settings"         options={{ headerShown: false }} />
       <Stack.Screen name="edit-profile"     options={{ headerShown: false }} />
       <Stack.Screen name="change-password"  options={{ headerShown: false }} />
@@ -119,14 +131,16 @@ export default function RootLayout() {
     }
   }, [colorScheme]);
 
+  const fontsReady = fontsLoaded || !!fontError;
+
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if (fontsReady) {
       SplashScreen.hideAsync();
       prefetchAll();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsReady]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!fontsReady) return null;
 
   return (
     <SafeAreaProvider>
@@ -135,7 +149,7 @@ export default function RootLayout() {
           <WatchlistProvider>
             <NotificationProvider>
               <GestureHandlerRootView>
-                <RootLayoutNav />
+                <RootLayoutNav fontsReady={fontsReady} />
               </GestureHandlerRootView>
             </NotificationProvider>
           </WatchlistProvider>
