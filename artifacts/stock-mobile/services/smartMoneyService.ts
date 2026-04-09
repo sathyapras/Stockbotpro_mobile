@@ -3,10 +3,8 @@ import { Platform } from "react-native";
 // ─── API base URL ─────────────────────────────────────────────
 
 function apiBaseUrl(): string {
-  if (Platform.OS === "web") {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${d}/api`;
-  }
+  const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+  if (d) return `https://${d}/api`;
   return "http://localhost:8080/api";
 }
 

@@ -11,11 +11,9 @@ export async function clearAuthToken(): Promise<void> {
 }
 
 function apiBase(): string {
-  if (Platform.OS === "web") {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${d}/api`;
-  }
-  return "http://localhost:8080/api";
+  const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+    if (d) return `https://${d}/api`;
+    return "http://localhost:8080/api";
 }
 
 async function fetchAuth(path: string, opts?: RequestInit): Promise<Response> {

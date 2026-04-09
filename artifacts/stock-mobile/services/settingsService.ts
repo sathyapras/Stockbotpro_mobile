@@ -1,11 +1,9 @@
 import { Platform } from "react-native";
 
 function apiBase(): string {
-  if (Platform.OS === "web") {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${d}/api`;
-  }
-  return "http://localhost:8080/api";
+  const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+    if (d) return `https://${d}/api`;
+    return "http://localhost:8080/api";
 }
 
 export interface AppSettings {
