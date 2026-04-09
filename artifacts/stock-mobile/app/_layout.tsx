@@ -21,6 +21,7 @@ import { fetchGlobalSentiment } from "@/services/globalSentimentService";
 import { fetchMasterStock } from "@/services/masterStockService";
 import { fetchRadarMarket } from "@/services/radarMarketService";
 import { fetchSmartMoneyFlow } from "@/services/smartMoneyService";
+import { fetchAllPicks } from "@/services/stockpickService";
 import { fetchScreener } from "@/services/stockToolsService";
 
 SplashScreen.preventAutoHideAsync();
@@ -52,6 +53,11 @@ function prefetchAll() {
     queryKey: ["stocktools-screener"],
     queryFn: fetchScreener,
     staleTime: 60 * 60 * 1000,
+  });
+  queryClient.prefetchQuery({
+    queryKey: ["stockpick-all"],
+    queryFn: fetchAllPicks,
+    staleTime: 30 * 60 * 1000,
   });
 }
 
