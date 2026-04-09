@@ -107,7 +107,25 @@ export function generateNarrative(data: GlobalSentimentData): string {
     );
   }
 
-  // 4. VIX Interpretation & Action Guide
+  // 4. VIX + DXY Combined Signal
+  const vix = s.vix ?? 0;
+  const dxy = s.dxyValue ?? 0;
+  const isDangerZone = vix > 25 && dxy > 103;
+  const isGoldilocks  = vix < 15 && s.dxyBias === "WEAK_USD";
+
+  const vixDxySignal = isDangerZone
+    ? `⚠️ SINYAL BAHAYA: VIX ${vix.toFixed(1)} (>25) dan DXY ${dxy.toFixed(1)} (>103) menyala bersamaan — ini tanda "pintu keluar" bagi pasar Indonesia. Investor asing kemungkinan besar sedang melakukan massive outflow. Prioritaskan cash, hindari averaging down, dan tunggu stabilisasi sebelum re-entry.`
+    : isGoldilocks
+    ? `✅ SINYAL GOLDILOCKS: VIX ${vix.toFixed(1)} (<15) dan DXY ${dxy.toFixed(1)} melemah — kombinasi terbaik untuk pasar EM. Kondisi ini secara historis mendukung IHSG untuk rally, dengan asing cenderung Net Buy dan Rupiah menguat. Manfaatkan momentum akumulasi.`
+    : vix > 25
+    ? `⚡ WASPADA VIX: VIX ${vix.toFixed(1)} tinggi namun DXY ${dxy.toFixed(1)} belum di level ekstrem. Pantau pergerakan Dollar — jika DXY menembus >103, risiko outflow asing akan meningkat signifikan.`
+    : dxy > 103
+    ? `⚡ WASPADA DXY: Dollar menguat ke ${dxy.toFixed(1)} meski VIX ${vix.toFixed(1)} masih terkendali. Tekanan Rupiah berpotensi berlanjut — cermati saham-saham dengan utang valas besar dan sektor yang sensitif terhadap kurs.`
+    : `📊 VIX ${vix.toFixed(1)} dan DXY ${dxy.toFixed(1)} dalam kondisi normal — belum ada sinyal bahaya kombinasi. Tetap pantau jika salah satu mulai bergerak ekstrem.`;
+
+  paragraphs.push(vixDxySignal);
+
+  // 5. VIX Interpretation & Action Guide
   const vixAction =
     s.fearLabel === "EXTREME_FEAR"
       ? "VIX menembus level ekstrem (>30) — area jenuh jual (peak panic). Sejarah mencatat ini sebagai momen terbaik untuk mulai mencicil saham-saham undervalued secara bertahap. Pertimbangkan parkir sebagian dana di Emas atau Reksadana Pasar Uang sambil menunggu volatilitas mereda."
