@@ -205,8 +205,8 @@ export default function ContactUsScreen() {
             onPress={() => Linking.openURL("https://t.me/stockbotpro")} />
           <ContactLink icon="💬" label="WhatsApp"
             onPress={() => Linking.openURL("https://wa.me/628xxxxxxxxxx")} />
-          <ContactLink icon="✉️" label="support@stockbotpro.com"
-            onPress={() => Linking.openURL("mailto:support@stockbotpro.com")}
+          <ContactLink icon="✉️" label="support@stockbot.id"
+            onPress={() => Linking.openURL("mailto:support@stockbot.id")}
             isLast />
         </View>
       </ScrollView>
