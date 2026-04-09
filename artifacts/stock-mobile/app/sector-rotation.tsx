@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useColors } from "@/hooks/useColors";
 import { fetchMasterStock } from "@/services/masterStockService";
 import { fetchRadarMarket } from "@/services/radarMarketService";
 import {
@@ -30,25 +31,26 @@ type SortMode = "sm" | "phase";
 // ─── Sector Card ──────────────────────────────────────────────
 
 function SectorCard({ sector, rank }: { sector: SectorData; rank: number }) {
+  const colors = useColors();
   const cfg = PHASE_CONFIG[sector.phase];
   const rsUp = sector.rsChange2w >= 0;
 
   return (
     <View style={{
-      backgroundColor: "#1e2433", borderRadius: 14, padding: 14,
+      backgroundColor: colors.card, borderRadius: 14, padding: 14,
       borderLeftWidth: 3, borderLeftColor: cfg.color,
     }}>
       {/* Row 1: Rank + Name + SM Score */}
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-        <Text style={{ color: "#475569", fontSize: 12, width: 22 }}>{rank}.</Text>
-        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15, flex: 1 }}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 12, width: 22 }}>{rank}.</Text>
+        <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 15, flex: 1 }}>
           {sector.sector}
         </Text>
         <View style={{ alignItems: "flex-end" }}>
           <Text style={{ color: "#a78bfa", fontWeight: "900", fontSize: 20 }}>
             {Math.round(sector.avgBandarScore)}
           </Text>
-          <Text style={{ color: "#475569", fontSize: 9 }}>/100</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>/100</Text>
         </View>
       </View>
 
@@ -68,15 +70,17 @@ function SectorCard({ sector, rank }: { sector: SectorData; rank: number }) {
           {rsUp ? "↑" : "↓"} RS {rsUp ? "+" : ""}{sector.rsChange2w.toFixed(1)}
         </Text>
 
-        <Text style={{ color: "#64748b", fontSize: 11, marginLeft: "auto" }}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 11, marginLeft: "auto" }}>
           {sector.accPct.toFixed(0)}% Acc
-          <Text style={{ color: "#475569" }}> ({sector.accCount}/{sector.radarCount})</Text>
+          <Text style={{ color: colors.mutedForeground, opacity: 0.6 }}>
+            {" "}({sector.accCount}/{sector.radarCount})
+          </Text>
         </Text>
       </View>
 
       {/* SM Score bar */}
       <View style={{
-        height: 4, backgroundColor: "#0f1629",
+        height: 4, backgroundColor: colors.muted,
         borderRadius: 2, overflow: "hidden", marginBottom: 10,
       }}>
         <View style={{
@@ -93,13 +97,13 @@ function SectorCard({ sector, rank }: { sector: SectorData; rank: number }) {
               key={s.symbol}
               onPress={() => router.push(`/stock/${s.symbol}` as any)}
               style={{
-                backgroundColor: s.isAccum ? "#052e1680" : "#0f162980",
+                backgroundColor: s.isAccum ? "#052e1680" : colors.muted,
                 borderRadius: 8, borderWidth: 1,
-                borderColor: s.isAccum ? "#16a34a50" : "#33415550",
+                borderColor: s.isAccum ? "#16a34a50" : colors.border,
                 paddingHorizontal: 8, paddingVertical: 5,
               }}>
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 11 }}>{s.symbol}</Text>
-              <Text style={{ color: s.isAccum ? "#34d399" : "#64748b", fontSize: 9 }}>
+              <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 11 }}>{s.symbol}</Text>
+              <Text style={{ color: s.isAccum ? "#34d399" : colors.mutedForeground, fontSize: 9 }}>
                 {s.bandarScore}
               </Text>
             </TouchableOpacity>
@@ -114,6 +118,7 @@ function SectorCard({ sector, rank }: { sector: SectorData; rank: number }) {
 
 export default function SectorRotationScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const topPad = Platform.OS === "web" ? 67 : insets.top + 8;
 
   const [sortBy, setSortBy]         = useState<SortMode>("sm");
@@ -155,7 +160,7 @@ export default function SectorRotationScreen() {
   }, [sectors, sortBy, filterPhase]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ height: topPad }} />
 
       {/* ── Header ── */}
@@ -168,19 +173,19 @@ export default function SectorRotationScreen() {
             style={{ paddingRight: 4 }}>
             <Text style={{ color: "#60a5fa", fontSize: 22 }}>‹</Text>
           </TouchableOpacity>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 18 }}>🔄 Rotasi Sektor</Text>
+          <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 18 }}>🔄 Rotasi Sektor</Text>
           {sectors.length > 0 && (
-            <Text style={{ color: "#475569", fontSize: 11 }}>{sectors.length} sektor</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{sectors.length} sektor</Text>
           )}
         </View>
         <TouchableOpacity
           onPress={() => setSortBy(s => s === "sm" ? "phase" : "sm")}
           style={{
             flexDirection: "row", alignItems: "center", gap: 4,
-            backgroundColor: "#1e2433", borderRadius: 8,
+            backgroundColor: colors.card, borderRadius: 8,
             paddingHorizontal: 10, paddingVertical: 5,
           }}>
-          <Text style={{ color: "#64748b", fontSize: 12 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
             {sortBy === "sm" ? "SM Score ▼" : "Phase ▼"}
           </Text>
         </TouchableOpacity>
@@ -193,10 +198,10 @@ export default function SectorRotationScreen() {
           onPress={() => setFilterPhase(null)}
           style={{
             paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-            backgroundColor: filterPhase === null ? "#1e2433" : "transparent",
-            borderWidth: 1, borderColor: filterPhase === null ? "#475569" : "#1e293b",
+            backgroundColor: filterPhase === null ? colors.card : "transparent",
+            borderWidth: 1, borderColor: filterPhase === null ? colors.border : colors.border,
           }}>
-          <Text style={{ color: "#94a3b8", fontSize: 12 }}>Semua {sectors.length}</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Semua {sectors.length}</Text>
         </TouchableOpacity>
 
         {(Object.keys(PHASE_CONFIG) as PhaseKey[]).map(phase => {
@@ -208,9 +213,9 @@ export default function SectorRotationScreen() {
               style={{
                 paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
                 backgroundColor: active ? cfg.bg : "transparent",
-                borderWidth: 1, borderColor: active ? cfg.color : "#1e293b",
+                borderWidth: 1, borderColor: active ? cfg.color : colors.border,
               }}>
-              <Text style={{ color: active ? cfg.color : "#64748b", fontSize: 12 }}>
+              <Text style={{ color: active ? cfg.color : colors.mutedForeground, fontSize: 12 }}>
                 {cfg.emoji} {phase} {phaseCounts[phase]}
               </Text>
             </TouchableOpacity>
@@ -222,7 +227,7 @@ export default function SectorRotationScreen() {
       {isLoading ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 12 }}>
           <ActivityIndicator size="large" color="#60a5fa" />
-          <Text style={{ color: "#64748b", fontSize: 13 }}>Menghitung rotasi sektor…</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Menghitung rotasi sektor…</Text>
         </View>
       ) : (
         <FlatList
@@ -238,18 +243,18 @@ export default function SectorRotationScreen() {
               <TouchableOpacity
                 onPress={() => setHintDismissed(true)}
                 style={{
-                  backgroundColor: "#1e2433", borderRadius: 12, padding: 12,
-                  marginBottom: 4, borderWidth: 1, borderColor: "#334155",
+                  backgroundColor: colors.card, borderRadius: 12, padding: 12,
+                  marginBottom: 4, borderWidth: 1, borderColor: colors.border,
                 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between",
                   alignItems: "flex-start" }}>
                   <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700",
                     letterSpacing: 1, marginBottom: 6 }}>ℹ️  CARA BACA</Text>
-                  <Text style={{ color: "#475569", fontSize: 11 }}>✕</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>✕</Text>
                 </View>
                 <View style={{ gap: 4 }}>
                   {(Object.keys(PHASE_CONFIG) as PhaseKey[]).map(phase => (
-                    <Text key={phase} style={{ color: "#94a3b8", fontSize: 11 }}>
+                    <Text key={phase} style={{ color: colors.mutedForeground, fontSize: 11 }}>
                       {PHASE_CONFIG[phase].emoji} <Text style={{ fontWeight: "600" }}>{phase}</Text>
                       {" — "}{PHASE_HINTS[phase]}
                     </Text>
@@ -261,7 +266,7 @@ export default function SectorRotationScreen() {
           ListEmptyComponent={
             <View style={{ alignItems: "center", paddingTop: 60, gap: 10 }}>
               <Text style={{ fontSize: 32 }}>🔄</Text>
-              <Text style={{ color: "#64748b", fontSize: 14 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>
                 {filterPhase ? `Tidak ada sektor "${filterPhase}"` : "Data sektor tidak tersedia"}
               </Text>
             </View>

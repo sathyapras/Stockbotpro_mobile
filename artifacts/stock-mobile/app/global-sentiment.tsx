@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useColors } from "@/hooks/useColors";
 import {
   type QuoteItem,
   fearLabelDisplay,
@@ -22,6 +23,95 @@ import {
   fetchRoboCommentary,
   getCommentaryText,
 } from "@/services/roboCommentaryService";
+
+// ─── Styles factory ───────────────────────────────────────────
+
+function useStyles() {
+  const colors = useColors();
+  return useMemo(() => StyleSheet.create({
+    header: {
+      flexDirection: "row", alignItems: "center", gap: 10,
+      paddingHorizontal: 16, paddingBottom: 12,
+      borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
+    backBtn: { padding: 4, marginRight: 4 },
+    pageTitle: { color: colors.foreground, fontWeight: "900", fontSize: 20 },
+
+    scroll: { padding: 16, paddingBottom: 40 },
+
+    card: {
+      backgroundColor: colors.card, borderRadius: 16,
+      padding: 16, marginBottom: 12,
+    },
+    cardTitle: { color: colors.foreground, fontWeight: "700", fontSize: 14 },
+
+    rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
+
+    fearBadge: {
+      borderRadius: 8, borderWidth: 1,
+      paddingHorizontal: 10, paddingVertical: 4,
+    },
+    fearBadgeText: { fontWeight: "700", fontSize: 12 },
+
+    vixValue: { fontWeight: "900", fontSize: 40 },
+
+    statusPill: {
+      borderRadius: 6, borderWidth: 1,
+      paddingHorizontal: 8, paddingVertical: 3,
+      marginBottom: 6, alignSelf: "flex-end",
+    },
+    statusPillText: { fontSize: 11, fontWeight: "700" },
+
+    noteBox: {
+      marginTop: 12, borderLeftWidth: 3,
+      paddingLeft: 10, paddingVertical: 4,
+    },
+    noteText: { fontSize: 12, lineHeight: 18, fontStyle: "italic" },
+
+    gaugeBg: { height: 8, backgroundColor: colors.muted, borderRadius: 4, marginBottom: 4 },
+    gaugeFill: { height: 8, borderRadius: 4 },
+    gaugeLabels: { flexDirection: "row", justifyContent: "space-between" },
+    gaugeLabelText: { color: colors.mutedForeground, fontSize: 9 },
+
+    quoteRow: {
+      flexDirection: "row", alignItems: "center",
+      paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.muted,
+    },
+    quoteName:  { color: colors.mutedForeground, fontSize: 13, minWidth: 110 },
+    quoteValue: { color: colors.foreground, fontWeight: "700", fontSize: 13, marginRight: 8 },
+    quotePctBadge: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+    quotePct:   { fontSize: 11, fontWeight: "700" },
+    noData:     { color: colors.mutedForeground, fontSize: 13 },
+
+    biasBanner: {
+      borderRadius: 12, borderWidth: 1,
+      padding: 14, marginBottom: 12,
+      flexDirection: "row", alignItems: "center",
+    },
+    biasLabel: { fontWeight: "900", fontSize: 14 },
+    biasDesc:  { color: colors.mutedForeground, fontSize: 11, lineHeight: 16 },
+
+    narasiParagraph: {
+      color: colors.foreground, fontSize: 13, lineHeight: 20,
+    },
+
+    dxyBadge: { borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2, alignSelf: "flex-start" },
+    dxyBadgeText: { fontSize: 10, fontWeight: "600" },
+
+    roboBadge: {
+      backgroundColor: "#1e40af22", borderRadius: 5,
+      paddingHorizontal: 8, paddingVertical: 3,
+      alignSelf: "flex-start", borderWidth: 1, borderColor: "#3b82f6",
+    },
+    roboBadgeText: { color: "#60a5fa", fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
+
+    footerNote: {
+      color: colors.mutedForeground, fontSize: 10, textAlign: "center",
+      lineHeight: 16, marginTop: 4,
+    },
+  }), [colors]);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -45,6 +135,8 @@ function fmtPct(pct: number | null): string {
 // ─── VIX Fear/Greed Gauge ─────────────────────────────────────
 
 function VixGauge({ vix, fearLabel }: { vix: number | null; fearLabel: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   const info = fearLabelDisplay(fearLabel);
   const gaugeWidth = vix != null ? Math.min(Math.max(vix / 50, 0), 1) * 100 : 50;
 
@@ -55,7 +147,7 @@ function VixGauge({ vix, fearLabel }: { vix: number | null; fearLabel: string })
           <Text style={styles.cardTitle}>
             {info.icon} Fear & Greed Index (VIX)
           </Text>
-          <Text style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>
             CBOE Volatility Index · {info.range}
           </Text>
         </View>
@@ -73,7 +165,6 @@ function VixGauge({ vix, fearLabel }: { vix: number | null; fearLabel: string })
         </View>
       </View>
 
-      {/* Gauge bar */}
       <View style={styles.gaugeBg}>
         <View style={[styles.gaugeFill, {
           width: `${gaugeWidth}%` as any,
@@ -86,7 +177,6 @@ function VixGauge({ vix, fearLabel }: { vix: number | null; fearLabel: string })
         <Text style={styles.gaugeLabelText}>Extreme Greed</Text>
       </View>
 
-      {/* Note */}
       <View style={[styles.noteBox, { borderLeftColor: info.color }]}>
         <Text style={[styles.noteText, { color: info.color + "cc" }]}>{info.note}</Text>
       </View>
@@ -97,6 +187,7 @@ function VixGauge({ vix, fearLabel }: { vix: number | null; fearLabel: string })
 // ─── Quote Row ────────────────────────────────────────────────
 
 function QuoteRow({ item, prefix }: { item: QuoteItem; prefix?: string }) {
+  const styles = useStyles();
   const isUp = (item.changePct ?? 0) >= 0;
   const chgColor = isUp ? "#34d399" : "#f87171";
   const noData = item.value == null;
@@ -126,6 +217,7 @@ function QuoteRow({ item, prefix }: { item: QuoteItem; prefix?: string }) {
 // ─── Section Card ─────────────────────────────────────────────
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{title}</Text>
@@ -137,6 +229,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
 // ─── Global Bias Banner ───────────────────────────────────────
 
 function GlobalBiasBanner({ bias }: { bias: string }) {
+  const styles = useStyles();
   const map: Record<string, { label: string; color: string; bg: string; icon: string; desc: string }> = {
     RISK_OFF: {
       label: "RISK OFF",
@@ -178,11 +271,13 @@ function GlobalBiasBanner({ bias }: { bias: string }) {
 // ─── Narasi Card ──────────────────────────────────────────────
 
 function NarasiCard({ text }: { text: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   const paragraphs = text.split("\n\n");
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>📊 Analisis Makro & Sentimen Pasar</Text>
-      <Text style={{ color: "#64748b", fontSize: 10, marginTop: 2, marginBottom: 12 }}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 10, marginTop: 2, marginBottom: 12 }}>
         Dihasilkan otomatis dari data pasar real-time
       </Text>
       {paragraphs.map((p, i) => (
@@ -197,6 +292,8 @@ function NarasiCard({ text }: { text: string }) {
 // ─── Robo Commentary Card (Composite) ─────────────────────────
 
 function RoboCompositeCard({ text }: { text: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   if (!text) return null;
 
   const BADGE_RE = /^===\s*(.+?)\s*===\s*/;
@@ -222,7 +319,7 @@ function RoboCompositeCard({ text }: { text: string }) {
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>🤖 RoboCommentary — Composite</Text>
-      <Text style={{ color: "#64748b", fontSize: 10, marginTop: 2, marginBottom: 12 }}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 10, marginTop: 2, marginBottom: 12 }}>
         AI-powered analysis of the IDX Composite index
       </Text>
       {sections.map((sec, i) => (
@@ -244,6 +341,7 @@ function RoboCompositeCard({ text }: { text: string }) {
 // ─── DXY Badge ────────────────────────────────────────────────
 
 function DxyBadge({ bias }: { bias: string }) {
+  const styles = useStyles();
   const map: Record<string, { label: string; color: string }> = {
     STRONG_USD: { label: "Strong USD", color: "#f87171" },
     NEUTRAL_USD: { label: "Neutral USD", color: "#94a3b8" },
@@ -262,6 +360,8 @@ function DxyBadge({ bias }: { bias: string }) {
 export default function GlobalSentimentScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const styles = useStyles();
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["global-sentiment"],
@@ -288,7 +388,7 @@ export default function GlobalSentimentScreen() {
     : null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -301,7 +401,7 @@ export default function GlobalSentimentScreen() {
               <Text style={{ color: "#f97316", fontSize: 10 }}>⚠ Stale</Text>
             )}
             {updatedStr && (
-              <Text style={{ color: "#475569", fontSize: 10 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
                 Update {updatedStr} WIB
               </Text>
             )}
@@ -314,10 +414,10 @@ export default function GlobalSentimentScreen() {
       {isLoading ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
           <ActivityIndicator size="large" color="#60a5fa" />
-          <Text style={{ color: "#64748b", fontSize: 13 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
             Loading global market data...
           </Text>
-          <Text style={{ color: "#334155", fontSize: 11 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 11, opacity: 0.6 }}>
             Yahoo Finance · VIX · IHSG · Oil · DXY
           </Text>
         </View>
@@ -333,7 +433,6 @@ export default function GlobalSentimentScreen() {
             />
           }
         >
-          {/* VIX Gauge */}
           {data && (
             <VixGauge
               vix={data.sentiment.vix}
@@ -341,10 +440,8 @@ export default function GlobalSentimentScreen() {
             />
           )}
 
-          {/* Global Bias Banner */}
           {data && <GlobalBiasBanner bias={data.sentiment.globalBias} />}
 
-          {/* Global Indices */}
           {data && (
             <SectionCard title="🌏 Indeks Global + IHSG">
               {[...data.indices, ...data.domestic].map(item => (
@@ -353,7 +450,6 @@ export default function GlobalSentimentScreen() {
             </SectionCard>
           )}
 
-          {/* Currencies */}
           {data && (
             <SectionCard title="💱 Nilai Tukar">
               {data.currencies.map(item => (
@@ -369,7 +465,6 @@ export default function GlobalSentimentScreen() {
             </SectionCard>
           )}
 
-          {/* Commodities */}
           {data && (
             <SectionCard title="🛢 Komoditas">
               {data.commodities.map(item => (
@@ -378,15 +473,12 @@ export default function GlobalSentimentScreen() {
             </SectionCard>
           )}
 
-          {/* Narasi */}
           {narrative && <NarasiCard text={narrative} />}
 
-          {/* RoboCommentary Composite */}
           {compositeCommentary ? (
             <RoboCompositeCard text={compositeCommentary} />
           ) : null}
 
-          {/* Footer note */}
           <Text style={styles.footerNote}>
             Data from Yahoo Finance. Pull down to refresh.
             For educational purposes only — not investment advice.
@@ -396,89 +488,3 @@ export default function GlobalSentimentScreen() {
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    paddingHorizontal: 16, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: "#1e2433",
-  },
-  backBtn: { padding: 4, marginRight: 4 },
-  pageTitle: { color: "#fff", fontWeight: "900", fontSize: 20 },
-
-  scroll: { padding: 16, paddingBottom: 40 },
-
-  card: {
-    backgroundColor: "#1e2433", borderRadius: 16,
-    padding: 16, marginBottom: 12,
-  },
-  cardTitle: { color: "#fff", fontWeight: "700", fontSize: 14 },
-
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
-
-  fearBadge: {
-    borderRadius: 8, borderWidth: 1,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  fearBadgeText: { fontWeight: "700", fontSize: 12 },
-
-  vixValue: { fontWeight: "900", fontSize: 40 },
-
-  statusPill: {
-    borderRadius: 6, borderWidth: 1,
-    paddingHorizontal: 8, paddingVertical: 3,
-    marginBottom: 6, alignSelf: "flex-end",
-  },
-  statusPillText: { fontSize: 11, fontWeight: "700" },
-
-  noteBox: {
-    marginTop: 12, borderLeftWidth: 3,
-    paddingLeft: 10, paddingVertical: 4,
-  },
-  noteText: { fontSize: 12, lineHeight: 18, fontStyle: "italic" },
-
-  gaugeBg: { height: 8, backgroundColor: "#0f1629", borderRadius: 4, marginBottom: 4 },
-  gaugeFill: { height: 8, borderRadius: 4 },
-  gaugeLabels: { flexDirection: "row", justifyContent: "space-between" },
-  gaugeLabelText: { color: "#334155", fontSize: 9 },
-
-  quoteRow: {
-    flexDirection: "row", alignItems: "center",
-    paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#0f1629",
-  },
-  quoteName:  { color: "#94a3b8", fontSize: 13, minWidth: 110 },
-  quoteValue: { color: "#fff", fontWeight: "700", fontSize: 13, marginRight: 8 },
-  quotePctBadge: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
-  quotePct:   { fontSize: 11, fontWeight: "700" },
-  noData:     { color: "#334155", fontSize: 13 },
-
-  biasBanner: {
-    borderRadius: 12, borderWidth: 1,
-    padding: 14, marginBottom: 12,
-    flexDirection: "row", alignItems: "center",
-  },
-  biasLabel: { fontWeight: "900", fontSize: 14 },
-  biasDesc:  { color: "#94a3b8", fontSize: 11, lineHeight: 16 },
-
-  narasiParagraph: {
-    color: "#cbd5e1", fontSize: 13, lineHeight: 20,
-  },
-
-  dxyBadge: { borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2, alignSelf: "flex-start" },
-  dxyBadgeText: { fontSize: 10, fontWeight: "600" },
-
-  roboBadge: {
-    backgroundColor: "#1e40af22", borderRadius: 5,
-    paddingHorizontal: 8, paddingVertical: 3,
-    alignSelf: "flex-start", borderWidth: 1, borderColor: "#3b82f6",
-  },
-  roboBadgeText: { color: "#60a5fa", fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
-
-  footerNote: {
-    color: "#334155", fontSize: 10, textAlign: "center",
-    lineHeight: 16, marginTop: 4,
-  },
-});

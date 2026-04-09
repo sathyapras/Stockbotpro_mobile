@@ -148,7 +148,7 @@ function BulletItem({ ok, text, colors }: {
   colors: ReturnType<typeof useColors>;
 }) {
   const icon = ok === "warn" ? "⚠️" : ok ? "✅" : "☐";
-  const textColor = ok === "warn" ? "#fbbf24" : ok ? colors.foreground : "#64748b";
+  const textColor = ok === "warn" ? "#fbbf24" : ok ? colors.foreground : colors.mutedForeground;
   return (
     <View style={{ flexDirection: "row", gap: 8, marginBottom: 6 }}>
       <Text style={{ fontSize: 13, lineHeight: 18 }}>{icon}</Text>
@@ -270,7 +270,7 @@ function TradingPlanContent({ plan, ms, colors }: {
               borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: colors.border,
               backgroundColor: i === 1 ? "#34d39908" : i === 2 ? "#f8717108" : "transparent",
             }}>
-              <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700",
+              <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700",
                 marginBottom: 4, textAlign: "center" }}>{cell.label}</Text>
               <Text style={{ color: cell.color, fontWeight: "800", fontSize: 15,
                 textAlign: "center" }}>{cell.value}</Text>
@@ -305,7 +305,7 @@ function TradingPlanContent({ plan, ms, colors }: {
               flex: 1, padding: 12, alignItems: "center",
               borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: colors.border,
             }}>
-              <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700",
+              <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700",
                 marginBottom: 4 }}>{cell.label}</Text>
               <Text style={{ color: cell.color, fontWeight: "800", fontSize: 15 }}>{cell.value}</Text>
             </View>
@@ -343,7 +343,7 @@ function TradingPlanContent({ plan, ms, colors }: {
               <View style={{ flex: 1, borderRadius: 12, borderWidth: 1,
                 borderColor: "#34d39940", backgroundColor: "#34d39910",
                 padding: 12, alignItems: "center" }}>
-                <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
                   🟢 SUPPORT
                 </Text>
                 <Text style={{ color: "#34d399", fontWeight: "800", fontSize: 16 }}>
@@ -355,7 +355,7 @@ function TradingPlanContent({ plan, ms, colors }: {
               <View style={{ flex: 1, borderRadius: 12, borderWidth: 1,
                 borderColor: "#f8717140", backgroundColor: "#f8717110",
                 padding: 12, alignItems: "center" }}>
-                <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
                   🔴 RESISTANCE
                 </Text>
                 <Text style={{ color: "#f87171", fontWeight: "800", fontSize: 16 }}>
@@ -367,7 +367,7 @@ function TradingPlanContent({ plan, ms, colors }: {
               <View style={{ flex: 1, borderRadius: 12, borderWidth: 1,
                 borderColor: "#38BDF840", backgroundColor: "#38BDF810",
                 padding: 12, alignItems: "center" }}>
-                <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
                   💧 VWAP
                 </Text>
                 <Text style={{ color: "#38BDF8", fontWeight: "800", fontSize: 16 }}>
@@ -519,7 +519,7 @@ function FARatioRow({ label, value, note, colors }: {
       borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
       <View>
         <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{label}</Text>
-        {note ? <Text style={{ color: "#64748b", fontSize: 9 }}>{note}</Text> : null}
+        {note ? <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>{note}</Text> : null}
       </View>
       <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 13 }}>{value}</Text>
     </View>
@@ -709,7 +709,7 @@ function FinancialsTab({ quote, broker1d, masterStock, colors }: {
             <Text style={{ color: ms.beta > 1.3 ? "#f87171" : ms.beta < 0.7 ? "#34d399" : colors.foreground,
               fontWeight: "700" }}>
               {ms.beta.toFixed(2)}
-              {"  "}<Text style={{ color: "#64748b", fontSize: 9 }}>
+              {"  "}<Text style={{ color: colors.mutedForeground, fontSize: 9 }}>
                 {ms.beta > 1.3 ? "Volatil tinggi" : ms.beta < 0.7 ? "Defensif" : "Normal"}
               </Text>
             </Text>
@@ -901,7 +901,7 @@ function RadarNBSSection({ radar, currentPrice, colors }: {
                 {radar.flowState}
               </Text>
             </View>
-            <Text style={{ color: "#64748b", fontSize: 10 }}>Flow State hari ini (1D)</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>Flow State hari ini (1D)</Text>
           </View>
           <View style={{ backgroundColor: strength.color + "22", borderRadius: 8,
             paddingHorizontal: 10, paddingVertical: 6, alignItems: "center" }}>
@@ -942,7 +942,7 @@ function RadarNBSSection({ radar, currentPrice, colors }: {
             <View key={tf.label} style={{ flex: 1, backgroundColor: colors.background,
               borderRadius: 10, padding: 10, alignItems: "center",
               borderWidth: 1, borderColor: colors.border }}>
-              <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700" }}>{tf.label}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700" }}>{tf.label}</Text>
               <Text style={{ color: (tf.value ?? 0) >= 0 ? "#34d399" : "#f87171",
                 fontWeight: "800", fontSize: 15, marginTop: 4 }}>
                 {tf.value != null ? `${tf.value >= 0 ? "+" : ""}${tf.value.toFixed(1)}B` : "N/A"}
@@ -1007,7 +1007,7 @@ function RadarNBSSection({ radar, currentPrice, colors }: {
           <InfoCell label="MA TREND" value={radar.maTrend} colors={colors} />
           {radar.narrative ? (
             <View style={{ flex: 1 }}>
-              <Text style={{ color: "#64748b", fontSize: 9 }}>NARASI</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>NARASI</Text>
               <Text style={{ color: colors.mutedForeground, fontSize: 9, fontStyle: "italic" }}
                 numberOfLines={2}>{radar.narrative}</Text>
             </View>
@@ -1345,7 +1345,11 @@ function sma(closes: number[], idx: number, period: number): number | null {
   return sum / period;
 }
 
-function CandleChartSvg({ candles, containerWidth }: { candles: Candle[]; containerWidth: number }) {
+function CandleChartSvg({ candles, containerWidth, colors }: {
+  candles: Candle[];
+  containerWidth: number;
+  colors: ReturnType<typeof useColors>;
+}) {
   const n = candles.length;
   if (n === 0) return null;
 
@@ -1412,14 +1416,14 @@ function CandleChartSvg({ candles, containerWidth }: { candles: Candle[]; contai
         <Line key={`grid-${i}`}
           x1={CHART_PAD_L} y1={lv.y}
           x2={svgW - CHART_PAD_R + 4} y2={lv.y}
-          stroke="#1e293b" strokeWidth={0.5} />
+          stroke={colors.border} strokeWidth={0.5} />
       ))}
 
       {/* Y-axis price labels */}
       {yLevels.map((lv, i) => (
         <SvgText key={`yl-${i}`}
           x={svgW - 2} y={lv.y + 3}
-          fontSize={8} fill="#475569" textAnchor="end">
+          fontSize={8} fill={colors.mutedForeground} textAnchor="end">
           {lv.price >= 1000
             ? lv.price.toFixed(0)
             : lv.price.toFixed(1)}
@@ -1462,7 +1466,7 @@ function CandleChartSvg({ candles, containerWidth }: { candles: Candle[]; contai
       {/* Volume separator line */}
       <Line x1={CHART_PAD_L} y1={CANDLE_H + 2}
         x2={svgW - CHART_PAD_R + 4} y2={CANDLE_H + 2}
-        stroke="#1e293b" strokeWidth={0.5} />
+        stroke={colors.border} strokeWidth={0.5} />
 
       {/* Volume bars — centered under each candle */}
       {candles.map((c, i) => {
@@ -1481,7 +1485,7 @@ function CandleChartSvg({ candles, containerWidth }: { candles: Candle[]; contai
       {dateLabels.map(({ i, label }) => (
         <SvgText key={`dl-${i}`}
           x={xC(i)} y={CHART_TOTAL_H - 2}
-          fontSize={7} fill="#475569" textAnchor="middle">
+          fontSize={7} fill={colors.mutedForeground} textAnchor="middle">
           {label}
         </SvgText>
       ))}
@@ -1539,11 +1543,11 @@ function ChartTab({ symbol }: { symbol: string }) {
           alignItems: "center", gap: 8 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
             <View style={{ width: 12, height: 2, backgroundColor: "#60a5fa" }} />
-            <Text style={{ color: "#64748b", fontSize: 9 }}>MA10</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>MA10</Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
             <View style={{ width: 12, height: 2, backgroundColor: "#a78bfa" }} />
-            <Text style={{ color: "#64748b", fontSize: 9 }}>MA20</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>MA20</Text>
           </View>
         </View>
       </View>
@@ -1574,7 +1578,7 @@ function ChartTab({ symbol }: { symbol: string }) {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               scrollEnabled={scrollNeeded}>
               <View style={{ paddingBottom: 4 }}>
-                <CandleChartSvg candles={candles} containerWidth={containerWidth} />
+                <CandleChartSvg candles={candles} containerWidth={containerWidth} colors={colors} />
               </View>
             </ScrollView>
           </View>
@@ -1599,7 +1603,7 @@ function ChartTab({ symbol }: { symbol: string }) {
                     : `${(last.volume / 1_000).toFixed(0)}K`,            color: "#60a5fa" },
                 ].map(cell => (
                   <View key={cell.label} style={{ alignItems: "center" }}>
-                    <Text style={{ color: "#475569", fontSize: 8,
+                    <Text style={{ color: colors.mutedForeground, fontSize: 8,
                       fontWeight: "700", marginBottom: 2 }}>{cell.label}</Text>
                     <Text style={{ color: cell.color, fontWeight: "700",
                       fontSize: 11 }}>{cell.value}</Text>
@@ -1620,22 +1624,22 @@ function ChartTab({ symbol }: { symbol: string }) {
                 backgroundColor: colors.card, padding: 10,
                 flexDirection: "row", justifyContent: "space-around" }}>
                 <View style={{ alignItems: "center" }}>
-                  <Text style={{ color: "#475569", fontSize: 9 }}>HIGH {pLabel}</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>HIGH {pLabel}</Text>
                   <Text style={{ color: "#34d399", fontWeight: "700", fontSize: 13 }}>
                     {periodHigh.toLocaleString("id-ID")}
                   </Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: colors.border }} />
                 <View style={{ alignItems: "center" }}>
-                  <Text style={{ color: "#475569", fontSize: 9 }}>LOW {pLabel}</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>LOW {pLabel}</Text>
                   <Text style={{ color: "#f87171", fontWeight: "700", fontSize: 13 }}>
                     {periodLow.toLocaleString("id-ID")}
                   </Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: colors.border }} />
                 <View style={{ alignItems: "center" }}>
-                  <Text style={{ color: "#475569", fontSize: 9 }}>CANDLES</Text>
-                  <Text style={{ color: "#94a3b8", fontWeight: "700", fontSize: 13 }}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>CANDLES</Text>
+                  <Text style={{ color: colors.mutedForeground, fontWeight: "700", fontSize: 13 }}>
                     {candles.length}
                   </Text>
                 </View>
@@ -1779,7 +1783,7 @@ export default function StockDetailScreen() {
                         {isUp ? "▲" : "▼"} {Math.abs(quote.chgPct).toFixed(2)}%
                       </Text>
                       {plan?.holdDays && (
-                        <Text style={{ color: "#64748b", fontSize: 11 }}>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
                           {plan.holdDays}
                         </Text>
                       )}
@@ -1803,7 +1807,7 @@ export default function StockDetailScreen() {
                           fontSize: 13, fontWeight: "900" }}>
                           {plan.rsi.toFixed(0)}
                         </Text>
-                        <Text style={{ color: "#475569", fontSize: 7,
+                        <Text style={{ color: colors.mutedForeground, fontSize: 7,
                           fontWeight: "600" }}>RSI</Text>
                       </View>
                     )}
@@ -1817,7 +1821,7 @@ export default function StockDetailScreen() {
                           fontSize: 13, fontWeight: "900" }}>
                           {plan.stochK.toFixed(0)}
                         </Text>
-                        <Text style={{ color: "#475569", fontSize: 7,
+                        <Text style={{ color: colors.mutedForeground, fontSize: 7,
                           fontWeight: "600" }}>StochK</Text>
                       </View>
                     )}
