@@ -23,6 +23,7 @@ import {
 } from "@/services/smartMoneyService";
 import { MenuButton } from "@/components/MenuButton";
 import { hapticLight } from "@/hooks/useHaptic";
+import { useColors } from "@/hooks/useColors";
 
 // ─── Sparkline mini chart ─────────────────────────────────────
 
