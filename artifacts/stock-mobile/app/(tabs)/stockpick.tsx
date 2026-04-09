@@ -269,7 +269,6 @@ function StatusFilter({
       <View style={styles.filterRow}>
         {options.map((opt) => {
           const count = opt === "ALL" ? total : (counts[opt] ?? 0);
-          if (opt !== "ALL" && count === 0) return null;
           const cfg = opt === "ALL"
             ? { color: colors.primary }
             : STATUS_CONFIG[opt as SignalStatus] ?? { color: "#94a3b8" };
