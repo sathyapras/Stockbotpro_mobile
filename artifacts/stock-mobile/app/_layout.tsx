@@ -78,6 +78,7 @@ function RootLayoutNav() {
       <Stack.Screen name="tool/[toolId]" options={{ headerShown: false }} />
       <Stack.Screen name="market-intel" options={{ headerShown: false }} />
       <Stack.Screen name="menu" options={{ headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="affiliate" options={{ headerShown: false }} />
       <Stack.Screen name="about-us" options={{ headerShown: false }} />
       <Stack.Screen name="tutorial" options={{ headerShown: false }} />
     </Stack>

@@ -1,0 +1,403 @@
+Program Afiliasi — Panduan Implementasi Mobile
+Kode referral, komisi, statistik, dan payout request
+FLOW SCREEN
+Buka Afiliasi
+     │
+     ├── Belum punya profil → Screen: Daftar Afiliasi (form apply)
+     │
+     └── Sudah punya profil
+            ├── Status: pending  → Banner "Menunggu Persetujuan Admin"
+            └── Status: active   → Dashboard lengkap
+                    ├── Kode referral + share
+                    ├── Statistik (komisi, referral, retention)
+                    ├── Riwayat komisi
+                    └── Request Payout
+
+ENDPOINT SUMMARY
+Method	URL	Auth	Keterangan
+GET	/api/affiliate/me	✅	Profil + stats + riwayat
+POST	/api/affiliate/apply	✅	Daftar jadi afiliasi
+POST	/api/affiliate/payout-request	✅	Request pencairan komisi
+GET	/api/affiliate/commission-types	❌	Info tipe komisi (publik)
+GET /api/affiliate/me — Profil + Statistik
+GET /api/affiliate/me
+Authorization: Bearer <token>
+
+Response — Belum Daftar
+{ "hasProfile": false }
+
+Response — Sudah Daftar
+{
+  "hasProfile": true,
+  "profile": {
+    "id":             12,
+    "userId":         45,
+    "code":           "BUDI2024",
+    "status":         "active",
+    "commissionType": "percentage",
+    "commissionRate": 20,
+    "discountPct":    20,
+    "bankName":       "BCA",
+    "bankAccount":    "1234567890",
+    "bankHolder":     "Budi Santoso",
+    "totalEarned":    "450000",
+    "totalPaid":      "200000"
+  },
+  "referrals": [
+    {
+      "id":               88,
+      "commissionEarned": "40000",
+      "commissionType":   "percentage",
+      "planName":         "pro",
+      "months":           1,
+      "createdAt":        "2026-04-01T10:00:00.000Z"
+    }
+  ],
+  "payouts": [
+    {
+      "id":          5,
+      "amount":      "200000",
+      "status":      "paid",
+      "bankName":    "BCA",
+      "bankAccount": "1234567890",
+      "createdAt":   "2026-03-15T09:00:00.000Z"
+    }
+  ],
+  "totalReferrals": 12,
+  "quality": {
+    "totalUniqueUsers":   10,
+    "activeUsers":         7,
+    "churnedUsers":        3,
+    "retentionRate":      70,
+    "tierProgress":      100,
+    "tierThreshold":      70,
+    "thisMonthEarnings": 80000,
+    "lastMonthEarnings": 120000
+  }
+}
+
+Field Penting
+Field	Keterangan
+profile.code	Kode referral unik user
+profile.status	pending (menunggu) / active (aktif)
+profile.commissionRate	% komisi per transaksi (default 20%)
+profile.discountPct	% diskon yang dapat oleh referred user (default 20%)
+profile.totalEarned	Total komisi yang pernah diterima (Rp)
+profile.totalPaid	Total yang sudah dicairkan (Rp)
+quality.retentionRate	% referral yang masih aktif berlangganan
+quality.thisMonthEarnings	Komisi bulan ini (Rp)
+POST /api/affiliate/apply — Daftar Afiliasi
+POST /api/affiliate/apply
+Authorization: Bearer <token>
+Content-Type: application/json
+{
+  "marketReach":   "Trader aktif, punya 2.000 follower di Instagram dan komunitas WA 500 member",
+  "preferredCode": "BUDI2024"
+}
+
+Field	Wajib	Keterangan
+marketReach	✅	Deskripsi pangsa pasar / cara promosi
+preferredCode	❌	Kode referral pilihan (huruf kapital + angka, maks 20 karakter)
+Response Sukses (201)
+{
+  "message": "Aplikasi afiliasi berhasil dikirim. Menunggu persetujuan admin.",
+  "code": "BUDI2024"
+}
+
+POST /api/affiliate/payout-request — Request Pencairan
+POST /api/affiliate/payout-request
+Authorization: Bearer <token>
+Content-Type: application/json
+{
+  "amount":      150000,
+  "bankName":    "BCA",
+  "bankAccount": "1234567890",
+  "bankHolder":  "Budi Santoso"
+}
+
+Response Sukses
+{ "message": "Permintaan payout berhasil dikirim. Admin akan memproses dalam 1-3 hari kerja." }
+
+KOMPONEN: AfiliasiScreen
+export function AfiliasiScreen() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["affiliate-me"],
+    queryFn:  () => fetchWithAuth("/api/affiliate/me").then(r => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
+  if (isLoading) return <LoadingScreen />;
+  // Belum daftar
+  if (!data?.hasProfile) return <AfiliasiApplyScreen />;
+  // Sudah daftar
+  const { profile, quality, referrals, payouts, totalReferrals } = data;
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ padding: 20 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 22 }}>
+          🎁 Program Afiliasi
+        </Text>
+        <Text style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>
+          Ajak teman — dapat komisi {profile.commissionRate}%
+        </Text>
+      </View>
+      {/* Status pending */}
+      {profile.status === "pending" && (
+        <View style={{ marginHorizontal: 16, backgroundColor: "#1c1a08",
+          borderRadius: 12, padding: 16, borderLeftWidth: 3, borderLeftColor: "#eab308",
+          marginBottom: 16 }}>
+          <Text style={{ color: "#eab308", fontWeight: "700", fontSize: 14 }}>
+            ⏳ Menunggu Persetujuan Admin
+          </Text>
+          <Text style={{ color: "#ca8a04", fontSize: 12, marginTop: 4 }}>
+            Kode referral kamu sudah disiapkan. Kami akan review dan mengaktifkan akun afiliasi dalam 1-2 hari kerja.
+          </Text>
+        </View>
+      )}
+      {/* Kode referral */}
+      <ReferralCodeCard code={profile.code} discountPct={profile.discountPct} />
+      {/* Stats cards */}
+      <StatsRow quality={quality} profile={profile} totalReferrals={totalReferrals} />
+      {/* Komisi bulan ini */}
+      <EarningsCard quality={quality} />
+      {/* Riwayat referral */}
+      <ReferralHistory referrals={referrals} />
+      {/* Payout section */}
+      {profile.status === "active" && (
+        <PayoutSection profile={profile} payouts={payouts} />
+      )}
+    </ScrollView>
+  );
+}
+
+ReferralCodeCard — Share kode
+function ReferralCodeCard({ code, discountPct }) {
+  async function shareCode() {
+    await Share.share({
+      message: `Gunakan kode referral saya ${code} di StockBot Pro dan dapatkan diskon ${discountPct}%! Download di: https://stockbotpro.replit.app`,
+    });
+  }
+  async function copyCode() {
+    await Clipboard.setStringAsync(code);
+    // tampilkan toast "Disalin!"
+  }
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 16,
+      backgroundColor: "#1e2433", borderRadius: 14, padding: 20 }}>
+      <Text style={{ color: "#64748b", fontSize: 12, marginBottom: 8 }}>
+        KODE REFERRAL KAMU
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <Text style={{ color: "#0ea5e9", fontWeight: "900",
+          fontSize: 28, letterSpacing: 3, flex: 1 }}>
+          {code}
+        </Text>
+        <TouchableOpacity onPress={copyCode} style={{ marginRight: 12 }}>
+          <Text style={{ fontSize: 20 }}>📋</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={shareCode}
+          style={{ backgroundColor: "#0ea5e9", borderRadius: 8,
+            paddingHorizontal: 14, paddingVertical: 8 }}>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 13 }}>
+            Share
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={{ color: "#64748b", fontSize: 11, marginTop: 8 }}>
+        Referred user dapat diskon {discountPct}% · Kamu dapat komisi setiap transaksi
+      </Text>
+    </View>
+  );
+}
+
+StatsRow — 4 angka penting
+function StatsRow({ quality, profile, totalReferrals }) {
+  const pendingBalance = parseFloat(profile.totalEarned) - parseFloat(profile.totalPaid);
+  const stats = [
+    { label: "Total Referral",  value: totalReferrals,                  unit: "orang" },
+    { label: "Aktif",           value: quality.activeUsers,             unit: "orang" },
+    { label: "Retention",       value: `${quality.retentionRate}%`,     unit: "" },
+    { label: "Saldo",           value: `Rp ${pendingBalance.toLocaleString("id-ID")}`, unit: "" },
+  ];
+  return (
+    <View style={{ flexDirection: "row", marginHorizontal: 16,
+      marginBottom: 16, gap: 8 }}>
+      {stats.map(s => (
+        <View key={s.label} style={{ flex: 1, backgroundColor: "#1e2433",
+          borderRadius: 12, padding: 12, alignItems: "center" }}>
+          <Text style={{ color: "white", fontWeight: "900", fontSize: 16 }}>
+            {s.value}
+          </Text>
+          {s.unit ? (
+            <Text style={{ color: "#64748b", fontSize: 9 }}>{s.unit}</Text>
+          ) : null}
+          <Text style={{ color: "#475569", fontSize: 10, marginTop: 2 }}>{s.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+EarningsCard — Komisi bulan ini vs bulan lalu
+function EarningsCard({ quality }) {
+  const diff = quality.thisMonthEarnings - quality.lastMonthEarnings;
+  const isUp = diff >= 0;
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 16,
+      backgroundColor: "#1e2433", borderRadius: 14, padding: 16 }}>
+      <Text style={{ color: "#64748b", fontSize: 11, marginBottom: 8 }}>
+        KOMISI BULAN INI
+      </Text>
+      <Text style={{ color: "white", fontWeight: "900", fontSize: 24 }}>
+        Rp {quality.thisMonthEarnings.toLocaleString("id-ID")}
+      </Text>
+      <Text style={{ color: isUp ? "#34d399" : "#f87171", fontSize: 12, marginTop: 4 }}>
+        {isUp ? "▲" : "▼"} Rp {Math.abs(diff).toLocaleString("id-ID")} vs bulan lalu
+      </Text>
+    </View>
+  );
+}
+
+ReferralHistory — Daftar komisi masuk
+function ReferralHistory({ referrals }) {
+  if (!referrals?.length) return null;
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+      <Text style={{ color: "#64748b", fontSize: 11,
+        fontWeight: "700", marginBottom: 8 }}>
+        RIWAYAT KOMISI
+      </Text>
+      <View style={{ backgroundColor: "#1e2433", borderRadius: 14, overflow: "hidden" }}>
+        {referrals.slice(0, 10).map((r, i) => (
+          <View key={r.id}
+            style={{ flexDirection: "row", alignItems: "center",
+              paddingHorizontal: 16, paddingVertical: 12,
+              borderBottomWidth: i < Math.min(referrals.length, 10) - 1 ? 1 : 0,
+              borderBottomColor: "#0f1629" }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
+                Paket {r.planName?.toUpperCase()} · {r.months} bulan
+              </Text>
+              <Text style={{ color: "#64748b", fontSize: 11 }}>
+                {new Date(r.createdAt).toLocaleDateString("id-ID",
+                  { day: "numeric", month: "short", year: "numeric" })}
+              </Text>
+            </View>
+            <Text style={{ color: "#34d399", fontWeight: "700", fontSize: 14 }}>
+              +Rp {parseFloat(r.commissionEarned).toLocaleString("id-ID")}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+SCREEN: Daftar Afiliasi (Form Apply)
+function AfiliasiApplyScreen() {
+  const [marketReach,   setMarketReach]   = useState("");
+  const [preferredCode, setPreferredCode] = useState("");
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState("");
+  const queryClient = useQueryClient();
+  async function handleApply() {
+    if (!marketReach.trim()) {
+      setError("Deskripsi pangsa pasar wajib diisi.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetchWithAuth("/api/affiliate/apply", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          marketReach:   marketReach.trim(),
+          preferredCode: preferredCode.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error ?? "Gagal mendaftar."); return; }
+      queryClient.invalidateQueries({ queryKey: ["affiliate-me"] });
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629", padding: 20 }}>
+      <Text style={{ color: "white", fontWeight: "900", fontSize: 22, marginBottom: 8 }}>
+        🎁 Daftar Program Afiliasi
+      </Text>
+      <Text style={{ color: "#64748b", fontSize: 13, marginBottom: 24, lineHeight: 20 }}>
+        Ajak teman berlangganan StockBot Pro dan dapatkan komisi 20% setiap transaksi.
+        Referred user juga mendapat diskon 20%.
+      </Text>
+      {/* Info komisi */}
+      <View style={{ backgroundColor: "#0a1a2e", borderRadius: 12,
+        padding: 16, marginBottom: 20 }}>
+        <Text style={{ color: "#60a5fa", fontWeight: "700", marginBottom: 8 }}>
+          💰 Struktur Komisi
+        </Text>
+        <Text style={{ color: "#94a3b8", fontSize: 13, lineHeight: 20 }}>
+          • Komisi: 20% dari setiap transaksi referral{"\n"}
+          • Diskon untuk referral: 20%{"\n"}
+          • Pencairan: request manual, diproses 1-3 hari kerja
+        </Text>
+      </View>
+      {/* Form */}
+      <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 6 }}>
+        Ceritakan pangsa pasar kamu *
+      </Text>
+      <TextInput
+        placeholder="Contoh: Trader aktif, 2.000 follower Instagram, komunitas WA 500 member..."
+        placeholderTextColor="#475569"
+        value={marketReach}
+        onChangeText={setMarketReach}
+        multiline
+        numberOfLines={4}
+        style={{ backgroundColor: "#1e2433", borderRadius: 10,
+          color: "white", fontSize: 13, padding: 14,
+          textAlignVertical: "top", marginBottom: 16, minHeight: 100 }}
+      />
+      <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 6 }}>
+        Kode referral pilihan (opsional)
+      </Text>
+      <TextInput
+        placeholder="Contoh: BUDI2024"
+        placeholderTextColor="#475569"
+        value={preferredCode}
+        onChangeText={t => setPreferredCode(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+        style={{ backgroundColor: "#1e2433", borderRadius: 10,
+          color: "white", fontSize: 15, padding: 14,
+          letterSpacing: 2, marginBottom: 6 }}
+        autoCapitalize="characters"
+        maxLength={20}
+      />
+      <Text style={{ color: "#475569", fontSize: 11, marginBottom: 20 }}>
+        Huruf kapital dan angka saja. Kalau kosong, dibuat otomatis dari username.
+      </Text>
+      {error ? (
+        <Text style={{ color: "#f87171", fontSize: 12, marginBottom: 12 }}>⚠ {error}</Text>
+      ) : null}
+      <TouchableOpacity onPress={handleApply} disabled={loading}
+        style={{ backgroundColor: loading ? "#1e293b" : "#0ea5e9",
+          borderRadius: 12, paddingVertical: 16, alignItems: "center" }}>
+        {loading
+          ? <ActivityIndicator color="white" />
+          : <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>
+              Kirim Aplikasi
+            </Text>}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+RINGKASAN
+Endpoint	Auth	Keterangan
+GET /api/affiliate/me	✅	Cek status + load dashboard
+POST /api/affiliate/apply	✅	Body: marketReach + preferredCode?
+POST /api/affiliate/payout-request	✅	Body: amount, bankName, bankAccount, bankHolder
+Status profil	Tampilan
+hasProfile: false	Form daftar afiliasi
+status: "pending"	Dashboard + banner menunggu
+status: "active"	Dashboard lengkap + tombol payout

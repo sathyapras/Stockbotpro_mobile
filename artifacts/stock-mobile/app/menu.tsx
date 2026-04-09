@@ -43,7 +43,7 @@ function buildMenuGroups(router: ReturnType<typeof useRouter>): MenuGroup[] {
         {
           icon: "🎁",
           label: "Program Afiliasi",
-          onPress: () => openURL(AFFILIATE_URL),
+          onPress: () => router.push("/affiliate" as any),
         },
       ],
     },
