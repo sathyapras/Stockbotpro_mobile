@@ -47,21 +47,16 @@ function fmtPct(pct: number | null): string {
 function VixGauge({ vix, fearLabel }: { vix: number | null; fearLabel: string }) {
   const info = fearLabelDisplay(fearLabel);
   const gaugeWidth = vix != null ? Math.min(Math.max(vix / 50, 0), 1) * 100 : 50;
-  const gaugeColor =
-    fearLabel === "EXTREME_FEAR" ? "#ef4444" :
-    fearLabel === "FEAR"         ? "#f97316" :
-    fearLabel === "NEUTRAL"      ? "#fbbf24" :
-    fearLabel === "GREED"        ? "#84cc16" : "#10b981";
 
   return (
     <View style={[styles.card, { backgroundColor: info.bg }]}>
       <View style={styles.rowBetween}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.cardTitle}>
             {info.icon} Fear & Greed Index (VIX)
           </Text>
           <Text style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>
-            CBOE Volatility Index
+            CBOE Volatility Index · {info.range}
           </Text>
         </View>
         <View style={[styles.fearBadge, { borderColor: info.color }]}>
@@ -69,21 +64,31 @@ function VixGauge({ vix, fearLabel }: { vix: number | null; fearLabel: string })
         </View>
       </View>
 
-      <Text style={[styles.vixValue, { color: info.color }]}>
-        {vix?.toFixed(1) ?? "—"}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 10, marginBottom: 10 }}>
+        <Text style={[styles.vixValue, { color: info.color, marginBottom: 0 }]}>
+          {vix?.toFixed(1) ?? "—"}
+        </Text>
+        <View style={[styles.statusPill, { backgroundColor: info.color + "22", borderColor: info.color }]}>
+          <Text style={[styles.statusPillText, { color: info.color }]}>{info.status}</Text>
+        </View>
+      </View>
 
       {/* Gauge bar */}
       <View style={styles.gaugeBg}>
         <View style={[styles.gaugeFill, {
           width: `${gaugeWidth}%` as any,
-          backgroundColor: gaugeColor,
+          backgroundColor: info.color,
         }]} />
       </View>
       <View style={styles.gaugeLabels}>
         <Text style={styles.gaugeLabelText}>Extreme Fear</Text>
         <Text style={styles.gaugeLabelText}>Neutral</Text>
         <Text style={styles.gaugeLabelText}>Extreme Greed</Text>
+      </View>
+
+      {/* Note */}
+      <View style={[styles.noteBox, { borderLeftColor: info.color }]}>
+        <Text style={[styles.noteText, { color: info.color + "cc" }]}>{info.note}</Text>
       </View>
     </View>
   );
@@ -419,7 +424,20 @@ const styles = StyleSheet.create({
   },
   fearBadgeText: { fontWeight: "700", fontSize: 12 },
 
-  vixValue: { fontWeight: "900", fontSize: 40, marginBottom: 10 },
+  vixValue: { fontWeight: "900", fontSize: 40 },
+
+  statusPill: {
+    borderRadius: 6, borderWidth: 1,
+    paddingHorizontal: 8, paddingVertical: 3,
+    marginBottom: 6, alignSelf: "flex-end",
+  },
+  statusPillText: { fontSize: 11, fontWeight: "700" },
+
+  noteBox: {
+    marginTop: 12, borderLeftWidth: 3,
+    paddingLeft: 10, paddingVertical: 4,
+  },
+  noteText: { fontSize: 12, lineHeight: 18, fontStyle: "italic" },
 
   gaugeBg: { height: 8, backgroundColor: "#0f1629", borderRadius: 4, marginBottom: 4 },
   gaugeFill: { height: 8, borderRadius: 4 },

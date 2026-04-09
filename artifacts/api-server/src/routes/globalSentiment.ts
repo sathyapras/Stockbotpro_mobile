@@ -94,10 +94,10 @@ function fetchYahoo(symbol: string): Promise<{
 
 function classifyVix(vix: number | null): string {
   if (vix == null) return "NEUTRAL";
-  if (vix > 32) return "EXTREME_FEAR";
-  if (vix > 24) return "FEAR";
-  if (vix > 17) return "NEUTRAL";
-  if (vix > 12) return "GREED";
+  if (vix > 30)  return "EXTREME_FEAR";
+  if (vix >= 23) return "FEAR";
+  if (vix >= 15) return "NEUTRAL";
+  if (vix >= 12) return "GREED";
   return "EXTREME_GREED";
 }
 

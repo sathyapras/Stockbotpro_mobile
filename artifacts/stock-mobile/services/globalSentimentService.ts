@@ -121,13 +121,40 @@ export function generateNarrative(data: GlobalSentimentData): string {
 
 // ─── Fear label display helpers ────────────────────────────────
 
-export function fearLabelDisplay(label: string): { text: string; color: string; bg: string; icon: string } {
+export function fearLabelDisplay(label: string): {
+  text: string; color: string; bg: string; icon: string;
+  status: string; range: string; note: string;
+} {
   switch (label) {
-    case "EXTREME_FEAR": return { text: "Extreme Fear",  color: "#ef4444", bg: "#2d0a0a", icon: "😱" };
-    case "FEAR":         return { text: "Fear",          color: "#f87171", bg: "#2d1010", icon: "😨" };
-    case "NEUTRAL":      return { text: "Neutral",       color: "#fbbf24", bg: "#1c1500", icon: "😐" };
-    case "GREED":        return { text: "Greed",         color: "#34d399", bg: "#052e16", icon: "😊" };
-    case "EXTREME_GREED":return { text: "Extreme Greed", color: "#10b981", bg: "#042016", icon: "🤑" };
-    default:             return { text: "Neutral",       color: "#94a3b8", bg: "#1e2433", icon: "😐" };
+    case "EXTREME_FEAR": return {
+      text: "Extreme Fear",  color: "#ef4444", bg: "#2d0a0a", icon: "😱",
+      status: "Panic Selling", range: "VIX > 30",
+      note: '"Buy the Fear" opportunity for long-term investors.',
+    };
+    case "FEAR": return {
+      text: "Fear",          color: "#f87171", bg: "#2d1010", icon: "😨",
+      status: "Risk-Off", range: "VIX 23 – 30",
+      note: "Selling pressure building — foreign outflows likely.",
+    };
+    case "NEUTRAL": return {
+      text: "Neutral",       color: "#fbbf24", bg: "#1c1500", icon: "😐",
+      status: "Consolidation", range: "VIX 15 – 22",
+      note: "Normal volatility — market waiting for a catalyst.",
+    };
+    case "GREED": return {
+      text: "Greed",         color: "#34d399", bg: "#052e16", icon: "😊",
+      status: "Risk-On", range: "VIX 12 – 15",
+      note: "Ideal conditions for stock accumulation.",
+    };
+    case "EXTREME_GREED": return {
+      text: "Extreme Greed", color: "#10b981", bg: "#042016", icon: "🤑",
+      status: "Very Calm", range: "VIX < 12",
+      note: "Caution: market may be too complacent.",
+    };
+    default: return {
+      text: "Neutral",       color: "#94a3b8", bg: "#1e2433", icon: "😐",
+      status: "Consolidation", range: "VIX 15 – 22",
+      note: "Normal volatility — market waiting for a catalyst.",
+    };
   }
 }
