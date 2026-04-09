@@ -4,6 +4,7 @@ import proxyRouter from "./proxy";
 import brokerSummaryRouter from "./brokerSummary";
 import globalSentimentRouter from "./globalSentiment";
 import historicalRouter from "./historical";
+import passthroughRouter from "./passthrough";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(proxyRouter);
 router.use(brokerSummaryRouter);
 router.use(globalSentimentRouter);
 router.use(historicalRouter);
+router.use(passthroughRouter);
 
 export default router;
