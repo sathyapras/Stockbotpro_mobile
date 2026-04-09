@@ -20,6 +20,7 @@ import { useColors } from "@/hooks/useColors";
 import { fetchGlobalSentiment } from "@/services/globalSentimentService";
 import { fetchMasterStock } from "@/services/masterStockService";
 import { fetchRadarMarket } from "@/services/radarMarketService";
+import { fetchSettings } from "@/services/settingsService";
 import { fetchSmartMoneyFlow } from "@/services/smartMoneyService";
 import { fetchAllPicks } from "@/services/stockpickService";
 import { fetchScreener } from "@/services/stockToolsService";
@@ -58,6 +59,11 @@ function prefetchAll() {
     queryKey: ["stockpick-all"],
     queryFn: fetchAllPicks,
     staleTime: 30 * 60 * 1000,
+  });
+  queryClient.prefetchQuery({
+    queryKey: ["app-settings"],
+    queryFn: fetchSettings,
+    staleTime: 60 * 60 * 1000,
   });
 }
 

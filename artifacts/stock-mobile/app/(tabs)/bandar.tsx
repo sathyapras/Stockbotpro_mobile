@@ -18,17 +18,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { MenuButton } from "@/components/MenuButton";
 import {
-  type MasterStock,
-  fetchMasterStock,
-} from "@/services/masterStockService";
-import {
   type RadarMarket,
   fetchRadarMarket,
 } from "@/services/radarMarketService";
+import { AppSettings, fetchSettings } from "@/services/settingsService";
 
 // ─── Types ────────────────────────────────────────────────────
 
-type IndexFilter = "LQ45" | "IDX30" | "COMPOSITE";
+type IndexFilter = "LQ45" | "IDX30" | "JII30" | "KOMPAS100" | "COMPOSITE";
 type FilterTab   = "all" | "acc" | "dist" | "smart";
 
 // ─── Flow config ──────────────────────────────────────────────
@@ -50,21 +47,43 @@ function nbsSignal(val: number): { label: string; color: string } {
   return              { label: "NEU",  color: "#475569" };
 }
 
-// ─── Index filter helper ───────────────────────────────────────
-// Since MASTER_STOCK_DB & RADAR_MARKET have no index membership field,
-// approximate LQ45/IDX30 by top N stocks by daily turnover (TO_Rp_Bn)
+// ─── Index filter helper ──────────────────────────────────────
+// Uses real index lists from backend settings when available.
+// Falls back to turnover-based approximation when settings not loaded.
 
-function filterByIndex(radar: RadarMarket[], _stocks: MasterStock[], idx: IndexFilter): RadarMarket[] {
-  // Remove index symbols (COMPOSITE, IDXENERGY, etc.)
+function filterByIndex(
+  radar: RadarMarket[],
+  idx: IndexFilter,
+  settings: AppSettings | undefined
+): RadarMarket[] {
   const stockOnly = radar.filter(r =>
     r.ticker !== "COMPOSITE" && !r.ticker.startsWith("IDX")
   );
 
   if (idx === "COMPOSITE") return stockOnly;
 
-  // Sort by turnover descending, take top N as proxy for index membership
+  // Real list from settings
+  const listMap: Record<Exclude<IndexFilter, "COMPOSITE">, keyof AppSettings> = {
+    LQ45:     "lq45List",
+    IDX30:    "idx30List",
+    JII30:    "jii30List",
+    KOMPAS100:"kompas100List",
+  };
+
+  const listKey = listMap[idx as Exclude<IndexFilter, "COMPOSITE">];
+  const list = settings?.[listKey] as string[] | undefined;
+
+  if (list && list.length > 0) {
+    const set = new Set(list.map(t => t.toUpperCase()));
+    const matched = stockOnly.filter(r => set.has(r.ticker.toUpperCase()));
+    // If too few matched (data drift), fall back gracefully
+    if (matched.length >= 5) return matched;
+  }
+
+  // Fallback: approximate by top-N turnover
   const sorted = [...stockOnly].sort((a, b) => b.toRpBn - a.toRpBn);
-  return sorted.slice(0, idx === "LQ45" ? 45 : 30);
+  const n = idx === "LQ45" ? 45 : idx === "IDX30" ? 30 : idx === "JII30" ? 30 : 100;
+  return sorted.slice(0, n);
 }
 
 // ─── Summary bar ─────────────────────────────────────────────
@@ -200,7 +219,9 @@ function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
 const INDEX_OPTIONS: { key: IndexFilter; label: string }[] = [
   { key: "LQ45",      label: "LQ45" },
   { key: "IDX30",     label: "IDX30" },
-  { key: "COMPOSITE", label: "Semua IDX" },
+  { key: "JII30",     label: "JII30" },
+  { key: "KOMPAS100", label: "KOMPAS100" },
+  { key: "COMPOSITE", label: "Semua" },
 ];
 
 // ─── Main screen ──────────────────────────────────────────────
@@ -224,9 +245,9 @@ export default function BandarScreen() {
     gcTime:    2 * 60 * 60 * 1000,
   });
 
-  const { data: stocks = [], isLoading: loadingStocks } = useQuery({
-    queryKey: ["master-stock"],
-    queryFn:  fetchMasterStock,
+  const { data: settings } = useQuery<AppSettings>({
+    queryKey: ["app-settings"],
+    queryFn:  fetchSettings,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -234,12 +255,9 @@ export default function BandarScreen() {
 
   // ── Apply index filter then sort by |nbs1d| ──
   const indexFiltered = useMemo(() => {
-    // If master stock not loaded yet, use all radar stocks (no index filter)
-    const base = stocks.length > 0
-      ? filterByIndex(radarAll, stocks, indexFilter)
-      : radarAll.filter(r => r.ticker !== "COMPOSITE" && !r.ticker.startsWith("IDX"));
+    const base = filterByIndex(radarAll, indexFilter, settings);
     return base.sort((a, b) => Math.abs(b.nbs1d) - Math.abs(a.nbs1d));
-  }, [radarAll, stocks, indexFilter]);
+  }, [radarAll, indexFilter, settings]);
 
   // ── Smart Money = all 3 TF positive ──
   const smartList = useMemo(

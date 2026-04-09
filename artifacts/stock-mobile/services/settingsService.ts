@@ -11,12 +11,21 @@ function apiBase(): string {
 export interface AppSettings {
   telegramInviteLink: string;
   whatsappNumber: string;
+  trialDays: number;
+  showMarketRisk: boolean;
+  emitenNews: boolean;
+  autoSlide: boolean;
   mitraResmiList: Array<{
     id: string;
     name: string;
     salesCode: string;
     registerUrl: string;
   }>;
+  lq45List: string[];
+  idx30List: string[];
+  kompas100List: string[];
+  jii30List: string[];
+  bowBosApprovedList: string[];
 }
 
 export async function fetchSettings(): Promise<AppSettings> {
