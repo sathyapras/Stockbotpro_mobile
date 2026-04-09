@@ -185,6 +185,7 @@ function PhaseSummaryBar({ data }: { data: SmartMoneyItem[] }) {
 // ─── Main Screen ──────────────────────────────────────────────
 
 export default function SmartMoneyScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
