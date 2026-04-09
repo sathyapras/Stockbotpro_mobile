@@ -1,0 +1,350 @@
+Subscribe — Panduan Implementasi Mobile
+Pilih paket (native) → bayar via Midtrans WebView
+FLOW SCREEN
+Subscribe Screen
+     │
+     ├── Tampilkan paket dari API (native)
+     ├── User pilih paket + durasi (1/3/6/12 bulan)
+     ├── Klik "Bayar Sekarang"
+     │        │
+     │        └── POST /api/payments/midtrans/snap
+     │                 │
+     │                 └── Dapat snapToken + redirect URL
+     │                          │
+     │                          └── Buka WebView Midtrans Snap
+     │                                   │
+     │                                   ├── Bayar sukses → WebView ditutup → tampilkan sukses
+     │                                   └── Batal/gagal  → WebView ditutup → kembali ke pilih paket
+     └── Cek status langganan dari GET /api/auth/me
+
+ENDPOINT SUMMARY
+Method	URL	Auth	Keterangan
+GET	/api/affiliate/plans	❌	Daftar paket + harga (publik)
+GET	/api/payments/midtrans/price	❌	Hitung harga sesuai paket + durasi
+POST	/api/payments/midtrans/snap	✅	Buat transaksi → dapat snapToken
+GET	/api/payments/midtrans/status/:orderId	✅	Cek status transaksi
+GET /api/affiliate/plans — Daftar Paket
+GET /api/affiliate/plans
+(tidak butuh token)
+
+Response
+{
+  "plans": [
+    { "id": 1, "planName": "pro",        "monthlyPrice": 199000, "description": "Akses semua fitur analisa" },
+    { "id": 2, "planName": "elite",      "monthlyPrice": 399000, "description": "Pro + Smart Money + Priority" },
+    { "id": 3, "planName": "enterprise", "monthlyPrice": 799000, "description": "Elite + White Label + API" }
+  ]
+}
+
+GET /api/payments/midtrans/price — Hitung Harga
+GET /api/payments/midtrans/price?packagePlan=pro&months=3
+(tidak butuh token)
+
+Response
+{ "amount": 566850 }
+
+Diskon otomatis berdasarkan durasi:
+
+Durasi	Diskon
+1 bulan	0%
+3 bulan	5%
+6 bulan	10%
+12 bulan	15%
+POST /api/payments/midtrans/snap — Buat Transaksi
+POST /api/payments/midtrans/snap
+Authorization: Bearer <token>
+Content-Type: application/json
+{
+  "packagePlan": "pro",
+  "months": 3
+}
+
+Response
+{
+  "snapToken":    "abc123...",
+  "clientKey":    "Mid-client-xxx",
+  "isProduction": true,
+  "orderId":      "STKBT-45-1712567890123",
+  "amount":       566850
+}
+
+snapToken inilah yang digunakan untuk membuka halaman pembayaran Midtrans via WebView.
+
+IMPLEMENTASI MOBILE
+SubscribeScreen — Pilih Paket
+const DURATIONS = [
+  { months: 1,  label: "1 Bulan",  badge: null },
+  { months: 3,  label: "3 Bulan",  badge: "Hemat 5%" },
+  { months: 6,  label: "6 Bulan",  badge: "Hemat 10%" },
+  { months: 12, label: "12 Bulan", badge: "Hemat 15%" },
+];
+export function SubscribeScreen({ navigation }) {
+  const [selectedPlan,     setSelectedPlan]     = useState("pro");
+  const [selectedMonths,   setSelectedMonths]   = useState(1);
+  const [calculatedPrice,  setCalculatedPrice]  = useState(null);
+  const [loadingPrice,     setLoadingPrice]     = useState(false);
+  const [loadingCheckout,  setLoadingCheckout]  = useState(false);
+  const [error,            setError]            = useState("");
+  const { data: plansData } = useQuery({
+    queryKey: ["plans"],
+    queryFn:  () => fetch(`${BASE_URL}api/affiliate/plans`).then(r => r.json()),
+    staleTime: 60 * 60 * 1000,
+  });
+  const plans = plansData?.plans ?? [];
+  // Hitung harga saat paket/durasi berubah
+  useEffect(() => {
+    async function fetchPrice() {
+      setLoadingPrice(true);
+      try {
+        const res = await fetch(
+          `${BASE_URL}api/payments/midtrans/price?packagePlan=${selectedPlan}&months=${selectedMonths}`
+        );
+        const json = await res.json();
+        setCalculatedPrice(json.amount);
+      } finally {
+        setLoadingPrice(false);
+      }
+    }
+    fetchPrice();
+  }, [selectedPlan, selectedMonths]);
+  async function handleCheckout() {
+    setLoadingCheckout(true);
+    setError("");
+    try {
+      const res = await fetchWithAuth("/api/payments/midtrans/snap", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packagePlan: selectedPlan, months: selectedMonths }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error ?? "Gagal membuat transaksi."); return; }
+      // Buka WebView Midtrans Snap
+      navigation.navigate("MidtransWebView", {
+        snapToken:   json.snapToken,
+        orderId:     json.orderId,
+        amount:      json.amount,
+        packagePlan: selectedPlan,
+        months:      selectedMonths,
+      });
+    } finally {
+      setLoadingCheckout(false);
+    }
+  }
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ padding: 20 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 22 }}>👑 Subscribe</Text>
+        <Text style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
+          Pilih paket dan durasi berlangganan
+        </Text>
+      </View>
+      {/* Pilih Paket */}
+      <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+        paddingHorizontal: 20, marginBottom: 8 }}>PAKET</Text>
+      <View style={{ marginHorizontal: 16, gap: 10, marginBottom: 24 }}>
+        {plans.map(plan => {
+          const active = selectedPlan === plan.planName;
+          return (
+            <TouchableOpacity key={plan.planName}
+              onPress={() => setSelectedPlan(plan.planName)}
+              style={{ backgroundColor: active ? "#0c2d48" : "#1e2433",
+                borderRadius: 14, padding: 16,
+                borderWidth: 2, borderColor: active ? "#0ea5e9" : "transparent" }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between",
+                alignItems: "center" }}>
+                <Text style={{ color: "white", fontWeight: "700",
+                  fontSize: 16, textTransform: "capitalize" }}>
+                  {plan.planName}
+                </Text>
+                <Text style={{ color: "#0ea5e9", fontWeight: "700", fontSize: 14 }}>
+                  Rp {plan.monthlyPrice.toLocaleString("id-ID")}/bln
+                </Text>
+              </View>
+              {plan.description ? (
+                <Text style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>
+                  {plan.description}
+                </Text>
+              ) : null}
+              {active && (
+                <View style={{ position: "absolute", top: 12, right: 12 }}>
+                  <Text style={{ color: "#0ea5e9", fontSize: 18 }}>✓</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {/* Pilih Durasi */}
+      <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+        paddingHorizontal: 20, marginBottom: 8 }}>DURASI</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, marginBottom: 24 }}>
+        {DURATIONS.map(d => {
+          const active = selectedMonths === d.months;
+          return (
+            <TouchableOpacity key={d.months}
+              onPress={() => setSelectedMonths(d.months)}
+              style={{ backgroundColor: active ? "#0c2d48" : "#1e2433",
+                borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12,
+                borderWidth: 2, borderColor: active ? "#0ea5e9" : "transparent",
+                alignItems: "center", minWidth: 90 }}>
+              <Text style={{ color: active ? "#0ea5e9" : "white",
+                fontWeight: "700", fontSize: 14 }}>
+                {d.label}
+              </Text>
+              {d.badge && (
+                <Text style={{ color: "#34d399", fontSize: 10, marginTop: 2 }}>
+                  {d.badge}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      {/* Total Harga */}
+      <View style={{ marginHorizontal: 16, backgroundColor: "#1e2433",
+        borderRadius: 14, padding: 20, marginBottom: 16 }}>
+        <Text style={{ color: "#64748b", fontSize: 12 }}>TOTAL BAYAR</Text>
+        {loadingPrice ? (
+          <ActivityIndicator color="#0ea5e9" style={{ marginTop: 8 }} />
+        ) : (
+          <Text style={{ color: "white", fontWeight: "900", fontSize: 28, marginTop: 4 }}>
+            Rp {calculatedPrice?.toLocaleString("id-ID") ?? "—"}
+          </Text>
+        )}
+        <Text style={{ color: "#475569", fontSize: 11, marginTop: 4 }}>
+          Paket {selectedPlan} · {selectedMonths} bulan
+        </Text>
+      </View>
+      {error ? (
+        <Text style={{ color: "#f87171", fontSize: 12,
+          marginHorizontal: 16, marginBottom: 12 }}>⚠ {error}</Text>
+      ) : null}
+      {/* Tombol Bayar */}
+      <TouchableOpacity
+        onPress={handleCheckout}
+        disabled={loadingCheckout || loadingPrice || !calculatedPrice}
+        style={{ marginHorizontal: 16, marginBottom: 40,
+          backgroundColor: loadingCheckout ? "#1e293b" : "#0ea5e9",
+          borderRadius: 14, paddingVertical: 18, alignItems: "center" }}>
+        {loadingCheckout
+          ? <ActivityIndicator color="white" />
+          : <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+              Bayar Sekarang
+            </Text>}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+MidtransWebView — Halaman Pembayaran
+import { WebView } from "react-native-webview";
+export function MidtransWebViewScreen({ route, navigation }) {
+  const { snapToken, orderId, amount, packagePlan, months } = route.params;
+  const queryClient = useQueryClient();
+  // URL Midtrans Snap
+  const SNAP_URL = `https://app.midtrans.com/snap/v4/redirection/${snapToken}`;
+  // Untuk sandbox (testing): https://app.sandbox.midtrans.com/snap/v4/redirection/{snapToken}
+  function handleNavigationChange(navState) {
+    const url = navState.url ?? "";
+    // Midtrans redirect setelah pembayaran selesai/dibatalkan
+    if (url.includes("payment-confirm") || url.includes("finish")) {
+      handlePaymentFinish("success");
+    } else if (url.includes("unfinish")) {
+      handlePaymentFinish("pending");
+    } else if (url.includes("error") || url.includes("cancel")) {
+      handlePaymentFinish("cancel");
+    }
+  }
+  async function handlePaymentFinish(result) {
+    // Refresh data user (status langganan berubah)
+    queryClient.invalidateQueries({ queryKey: ["me"] });
+    if (result === "success") {
+      navigation.replace("PaymentSuccess", { orderId, amount, packagePlan, months });
+    } else if (result === "pending") {
+      navigation.replace("PaymentPending", { orderId });
+    } else {
+      navigation.goBack();
+    }
+  }
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center",
+        paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
+        backgroundColor: "#1e2433" }}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 16 }}>
+          <Text style={{ color: "#0ea5e9", fontSize: 16 }}>✕ Batal</Text>
+        </TouchableOpacity>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 16, flex: 1 }}>
+          Pembayaran
+        </Text>
+        <Text style={{ color: "#64748b", fontSize: 12 }}>
+          Rp {amount?.toLocaleString("id-ID")}
+        </Text>
+      </View>
+      {/* WebView Midtrans */}
+      <WebView
+        source={{ uri: SNAP_URL }}
+        onNavigationStateChange={handleNavigationChange}
+        startInLoadingState
+        renderLoading={() => (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center",
+            backgroundColor: "#0f1629" }}>
+            <ActivityIndicator color="#0ea5e9" size="large" />
+            <Text style={{ color: "#64748b", marginTop: 12 }}>Memuat halaman pembayaran...</Text>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+PaymentSuccess Screen
+export function PaymentSuccessScreen({ route, navigation }) {
+  const { orderId, amount, packagePlan, months } = route.params;
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629",
+      alignItems: "center", justifyContent: "center", padding: 32 }}>
+      <Text style={{ fontSize: 64, marginBottom: 20 }}>🎉</Text>
+      <Text style={{ color: "white", fontWeight: "900", fontSize: 24,
+        textAlign: "center", marginBottom: 8 }}>
+        Pembayaran Berhasil!
+      </Text>
+      <Text style={{ color: "#64748b", fontSize: 14, textAlign: "center",
+        marginBottom: 4 }}>
+        Paket {packagePlan?.toUpperCase()} · {months} bulan aktif
+      </Text>
+      <Text style={{ color: "#34d399", fontSize: 18, fontWeight: "700",
+        marginBottom: 32 }}>
+        Rp {amount?.toLocaleString("id-ID")}
+      </Text>
+      <TouchableOpacity
+        onPress={() => navigation.reset({ index: 0, routes: [{ name: "Main" }] })}
+        style={{ backgroundColor: "#0ea5e9", borderRadius: 14,
+          paddingHorizontal: 32, paddingVertical: 16 }}>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+          Mulai Gunakan Fitur Premium
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+DEPENDENCY
+Install WebView package jika belum ada:
+
+npx expo install react-native-webview
+
+RINGKASAN
+Step	Endpoint	Auth
+Load paket	GET /api/affiliate/plans	❌
+Hitung harga	GET /api/payments/midtrans/price?packagePlan=pro&months=3	❌
+Buat transaksi	POST /api/payments/midtrans/snap	✅
+Bayar	WebView → URL Snap Midtrans	—
+Setelah bayar	Refresh GET /api/auth/me	✅
+Screen	Keterangan
+SubscribeScreen	Pilih paket + durasi, tampilkan harga, tombol bayar
+MidtransWebViewScreen	WebView Midtrans Snap, deteksi URL selesai/batal
+PaymentSuccessScreen	Konfirmasi sukses + tombol kembali ke app

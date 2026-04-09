@@ -79,6 +79,10 @@ function RootLayoutNav() {
       <Stack.Screen name="market-intel" options={{ headerShown: false }} />
       <Stack.Screen name="menu" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="affiliate" options={{ headerShown: false }} />
+      <Stack.Screen name="subscribe" options={{ headerShown: false }} />
+      <Stack.Screen name="midtrans-webview" options={{ headerShown: false }} />
+      <Stack.Screen name="payment-success" options={{ headerShown: false }} />
+      <Stack.Screen name="payment-pending" options={{ headerShown: false }} />
       <Stack.Screen name="about-us" options={{ headerShown: false }} />
       <Stack.Screen name="tutorial" options={{ headerShown: false }} />
     </Stack>

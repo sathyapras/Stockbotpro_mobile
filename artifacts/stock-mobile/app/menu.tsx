@@ -78,7 +78,7 @@ function buildMenuGroups(router: ReturnType<typeof useRouter>): MenuGroup[] {
         {
           icon: "👑",
           label: "Subscribe",
-          onPress: () => openURL(SUBSCRIBE_URL),
+          onPress: () => router.push("/subscribe" as any),
         },
         {
           icon: "✉️",
