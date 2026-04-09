@@ -338,14 +338,21 @@ export default function SmartMoneyScreen() {
           </View>
 
           {/* Phase filter pills */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 6, paddingBottom: 8 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{
+              paddingHorizontal: 16, gap: 6, paddingBottom: 8,
+              alignItems: "center", flexDirection: "row",
+            }}>
             <TouchableOpacity
               onPress={() => setActivePhase(null)}
               style={{
                 paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
                 backgroundColor: !activePhase ? "#1e2433" : "transparent",
                 borderWidth: 1, borderColor: !activePhase ? "#94a3b8" : "#334155",
+                alignSelf: "flex-start",
               }}>
               <Text style={{ color: !activePhase ? "#94a3b8" : "#64748b", fontSize: 12 }}>
                 Semua {searchFiltered.length}
@@ -364,6 +371,7 @@ export default function SmartMoneyScreen() {
                     backgroundColor: active ? cfg.bg : "transparent",
                     borderWidth: 1, borderColor: active ? cfg.color : "#334155",
                     flexDirection: "row", alignItems: "center", gap: 4,
+                    alignSelf: "flex-start",
                   }}>
                   <Text style={{ fontSize: 11 }}>{cfg.icon}</Text>
                   <Text style={{

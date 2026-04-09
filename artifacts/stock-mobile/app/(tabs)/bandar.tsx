@@ -325,7 +325,8 @@ export default function BandarScreen() {
 
         {/* Index selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 6, marginBottom: 10 }}>
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ gap: 6, marginBottom: 10, alignItems: "center", flexDirection: "row" }}>
           {INDEX_OPTIONS.map(opt => {
             const active = indexFilter === opt.key;
             return (
@@ -335,6 +336,7 @@ export default function BandarScreen() {
                   paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16,
                   backgroundColor: active ? "#60a5fa25" : "#1e2433",
                   borderWidth: 1, borderColor: active ? "#60a5fa" : "#334155",
+                  alignSelf: "flex-start",
                 }}>
                 <Text style={{ color: active ? "#60a5fa" : "#64748b",
                   fontSize: 12, fontWeight: active ? "700" : "400" }}>
@@ -373,7 +375,8 @@ export default function BandarScreen() {
 
         {/* Filter tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 6, paddingBottom: 6 }}>
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ gap: 6, paddingBottom: 6, alignItems: "center", flexDirection: "row" }}>
           {FILTER_TABS.map(tab => {
             const active = filterTab === tab.key;
             return (
@@ -384,6 +387,7 @@ export default function BandarScreen() {
                   paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
                   backgroundColor: active ? tab.color + "25" : "#1e2433",
                   borderWidth: 1, borderColor: active ? tab.color : "#334155",
+                  alignSelf: "flex-start",
                 }}>
                 <Text style={{ fontSize: 12 }}>{tab.icon}</Text>
                 <Text style={{ color: active ? tab.color : "#64748b",
