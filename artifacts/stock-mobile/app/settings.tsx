@@ -14,6 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { useColors } from "@/hooks/useColors";
+import { useTheme, type ThemePreference } from "@/context/ThemeContext";
+import { useVerification } from "@/context/VerificationContext";
 import { fetchMe, clearAuthToken, type UserProfile } from "@/services/userService";
 
 // ─── Plan config ──────────────────────────────────────────────
@@ -157,6 +159,9 @@ export default function SettingsScreen() {
   const queryClient = useQueryClient();
   const topPad      = Platform.OS === "web" ? 67 : insets.top + 8;
 
+  const { preference, setPreference, effectiveScheme } = useTheme();
+  const { needsVerification, dismiss: dismissVerification } = useVerification();
+
   const { data: user, isLoading, isError, error } = useQuery<UserProfile>({
     queryKey: ["me"],
     queryFn: fetchMe,
@@ -228,6 +233,37 @@ export default function SettingsScreen() {
               <Text style={{ color: "#0ea5e9", fontWeight: "700" }}>Daftar Gratis</Text>
             </Text>
           </TouchableOpacity>
+
+          {/* Theme toggle — always visible */}
+          <View style={{ marginTop: 32, width: "100%" }}>
+            <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+              marginBottom: 8, letterSpacing: 1 }}>TAMPILAN</Text>
+            <View style={{ backgroundColor: "#1e2433", borderRadius: 14, padding: 16 }}>
+              <Text style={{ color: "#94a3b8", fontSize: 12, marginBottom: 12 }}>
+                Tema {effectiveScheme === "dark" ? "🌙 Gelap" : "☀️ Terang"}
+              </Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {(["system", "light", "dark"] as ThemePreference[]).map(opt => {
+                  const labels = { system: "Auto", light: "☀️ Terang", dark: "🌙 Gelap" };
+                  const active = preference === opt;
+                  return (
+                    <TouchableOpacity
+                      key={opt}
+                      onPress={() => setPreference(opt)}
+                      style={{ flex: 1, paddingVertical: 10, borderRadius: 10,
+                        alignItems: "center",
+                        backgroundColor: active ? "#0ea5e9" : "#0f1629",
+                        borderWidth: 1, borderColor: active ? "#0ea5e9" : "#334155" }}>
+                      <Text style={{ color: active ? "#fff" : "#64748b",
+                        fontSize: 12, fontWeight: active ? "700" : "400" }}>
+                        {labels[opt]}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
         </ScrollView>
       )}
 
@@ -236,6 +272,31 @@ export default function SettingsScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingTop: 20, paddingBottom: insets.bottom + 60 }}>
+
+          {/* Email Verification Banner */}
+          {needsVerification && (
+            <View style={{ marginHorizontal: 16, marginBottom: 14,
+              backgroundColor: "#fbbf2415", borderRadius: 14, padding: 14,
+              borderWidth: 1, borderColor: "#fbbf2440",
+              flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+              <Text style={{ fontSize: 20, marginTop: 1 }}>📧</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#fbbf24", fontWeight: "700", fontSize: 13,
+                  marginBottom: 4 }}>
+                  Verifikasi Email
+                </Text>
+                <Text style={{ color: "#92400e", fontSize: 12, lineHeight: 18 }}>
+                  Cek inbox <Text style={{ color: "#fbbf24", fontWeight: "600" }}>
+                    {user.email}
+                  </Text> dan klik link verifikasi yang kami kirim.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={dismissVerification}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Feather name="x" size={16} color="#78350f" />
+              </TouchableOpacity>
+            </View>
+          )}
 
           <ProfileCard user={user} />
 
@@ -275,6 +336,37 @@ export default function SettingsScreen() {
               onPress={() => router.push("/affiliate" as any)}
             />
           </SectionCard>
+
+          {/* Section: Tampilan */}
+          <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+            marginHorizontal: 16, marginBottom: 8, letterSpacing: 1 }}>TAMPILAN</Text>
+          <View style={{ marginHorizontal: 16, marginBottom: 14,
+            backgroundColor: "#1e2433", borderRadius: 14, padding: 16 }}>
+            <Text style={{ color: "#94a3b8", fontSize: 12, marginBottom: 12 }}>
+              Tema {effectiveScheme === "dark" ? "🌙 Gelap" : "☀️ Terang"}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {(["system", "light", "dark"] as ThemePreference[]).map(opt => {
+                const labels = { system: "Auto", light: "☀️ Terang", dark: "🌙 Gelap" };
+                const active = preference === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    onPress={() => setPreference(opt)}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10,
+                      alignItems: "center",
+                      backgroundColor: active ? "#0ea5e9" : "#0f1629",
+                      borderWidth: 1,
+                      borderColor: active ? "#0ea5e9" : "#334155" }}>
+                    <Text style={{ color: active ? "#fff" : "#64748b",
+                      fontSize: 12, fontWeight: active ? "700" : "400" }}>
+                      {labels[opt]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
           {/* Section: Bantuan */}
           <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",

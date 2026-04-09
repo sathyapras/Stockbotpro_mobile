@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { registerUser, saveAuthToken } from "@/services/userService";
+import { useVerification } from "@/context/VerificationContext";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ export default function SignUpScreen() {
   const router      = useRouter();
   const insets      = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { setNeedsVerification } = useVerification();
 
   const [name,     setName]     = useState("");
   const [username, setUsername] = useState("");
@@ -96,6 +98,7 @@ export default function SignUpScreen() {
         phone:    phone.trim() || undefined,
       });
       await saveAuthToken(token);
+      setNeedsVerification(true);
       queryClient.invalidateQueries({ queryKey: ["me"] });
       router.replace("/(tabs)");
     } catch (e: any) {

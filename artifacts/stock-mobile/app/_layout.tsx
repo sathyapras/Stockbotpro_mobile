@@ -17,6 +17,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WatchlistProvider } from "@/context/WatchlistContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { VerificationProvider } from "@/context/VerificationContext";
 import { useColors } from "@/hooks/useColors";
 import { fetchGlobalSentiment } from "@/services/globalSentimentService";
 import { fetchMasterStock } from "@/services/masterStockService";
@@ -108,7 +110,8 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
       <Stack.Screen name="notifications"    options={{ headerShown: false }} />
       <Stack.Screen name="settings"         options={{ headerShown: false }} />
       <Stack.Screen name="edit-profile"     options={{ headerShown: false }} />
-      <Stack.Screen name="change-password"  options={{ headerShown: false }} />
+      <Stack.Screen name="change-password"    options={{ headerShown: false }} />
+      <Stack.Screen name="forgot-password"    options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -145,15 +148,19 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <WatchlistProvider>
-            <NotificationProvider>
-              <GestureHandlerRootView>
-                <RootLayoutNav fontsReady={fontsReady} />
-              </GestureHandlerRootView>
-            </NotificationProvider>
-          </WatchlistProvider>
-        </QueryClientProvider>
+        <ThemeProvider>
+          <VerificationProvider>
+            <QueryClientProvider client={queryClient}>
+              <WatchlistProvider>
+                <NotificationProvider>
+                  <GestureHandlerRootView>
+                    <RootLayoutNav fontsReady={fontsReady} />
+                  </GestureHandlerRootView>
+                </NotificationProvider>
+              </WatchlistProvider>
+            </QueryClientProvider>
+          </VerificationProvider>
+        </ThemeProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

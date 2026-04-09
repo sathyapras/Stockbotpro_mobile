@@ -110,7 +110,7 @@ export default function LoginScreen() {
 
         {/* Forgot password */}
         <TouchableOpacity
-          onPress={() => router.push("/change-password" as any)}
+          onPress={() => router.push("/forgot-password" as any)}
           style={{ alignSelf: "flex-end", marginBottom: 28 }}>
           <Text style={{ color: "#0ea5e9", fontSize: 12 }}>Lupa Password?</Text>
         </TouchableOpacity>

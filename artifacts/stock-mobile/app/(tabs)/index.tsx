@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { MenuButton } from "@/components/MenuButton";
+import { VerificationBanner } from "@/components/VerificationBanner";
 import {
   type MasterStock,
   type SortKey,
@@ -1194,6 +1195,9 @@ export default function MarketScreen() {
           <>
             {/* [1] Header */}
             <HomeHeader stocks={stocks} radar={radar} />
+
+            {/* Email verification banner (shows after sign up) */}
+            <VerificationBanner />
 
             {/* [2] Command Center — live market intel */}
             <View style={{ backgroundColor: "#0f1629", paddingTop: 16, paddingBottom: 8 }}>
