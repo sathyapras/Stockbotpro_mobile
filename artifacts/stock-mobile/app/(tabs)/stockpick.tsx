@@ -262,7 +262,7 @@ function StatusFilter({
 }) {
   const colors = useColors();
   const total = Object.values(counts).reduce((s, v) => s + v, 0);
-  const options: FilterStatus[] = ["ALL", "BUY", "HOLD", "SELL", "SOLD"];
+  const options: FilterStatus[] = ["ALL", "BUY", "HOLD", "SELL"];
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
@@ -320,11 +320,17 @@ export default function StockpickScreen() {
   const currentList = useMemo(() => {
     const items = activeTab === "BOW" ? (data?.bow ?? []) : (data?.bos ?? []);
     if (filterStatus === "ALL") return items;
+    if (filterStatus === "SELL") return items.filter(i => i.status === "SELL" || i.status === "SOLD");
     return items.filter(i => i.status === filterStatus);
   }, [data, activeTab, filterStatus]);
 
-  const bowCounts = useMemo(() => countByStatus(data?.bow ?? []), [data]);
-  const bosCounts = useMemo(() => countByStatus(data?.bos ?? []), [data]);
+  function mergeSellCounts(raw: Record<string, number>): Record<string, number> {
+    const { SELL = 0, SOLD = 0, ...rest } = raw;
+    return { ...rest, SELL: SELL + SOLD };
+  }
+
+  const bowCounts = useMemo(() => mergeSellCounts(countByStatus(data?.bow ?? [])), [data]);
+  const bosCounts = useMemo(() => mergeSellCounts(countByStatus(data?.bos ?? [])), [data]);
   const currentCounts = activeTab === "BOW" ? bowCounts : bosCounts;
 
   const date = data?.bow?.[0]?.date ?? data?.bos?.[0]?.date ?? "";
