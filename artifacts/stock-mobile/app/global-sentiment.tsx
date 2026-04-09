@@ -150,7 +150,7 @@ function GlobalBiasBanner({ bias }: { bias: string }) {
       color: "#34d399",
       bg: "#052e16",
       icon: "🟢",
-      desc: "Selera risiko membaik — momentum mendukung saham growth",
+      desc: "Sentimen risk-on membaik — momentum mendukung saham growth",
     },
     MIXED: {
       label: "MIXED",
