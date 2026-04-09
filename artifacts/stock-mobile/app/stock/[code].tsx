@@ -36,6 +36,7 @@ import {
   fetchStockDetail,
 } from "@/services/stockDetailService";
 import { formatVol } from "@/services/stockToolsService";
+import { type MasterStock } from "@/services/masterStockService";
 
 // ─── Tab types ────────────────────────────────────────────────
 
@@ -192,8 +193,8 @@ function SignalSourceBadge({ plan, colors }: {
 
 // ─── Tab 1a: Trading Plan (BUY mode) ─────────────────────────
 
-function TradingPlanContent({ plan, colors }: {
-  plan: TradingPlan; colors: ReturnType<typeof useColors>;
+function TradingPlanContent({ plan, ms, colors }: {
+  plan: TradingPlan; ms: MasterStock | null; colors: ReturnType<typeof useColors>;
 }) {
   const rsi = plan.rsi ?? 50;
   const hasRR = plan.rr > 0;
@@ -284,7 +285,7 @@ function TradingPlanContent({ plan, colors }: {
         {/* Divider */}
         <View style={{ height: 1, backgroundColor: colors.border }} />
 
-        {/* Row 2: TP2 · R/R · StochK */}
+        {/* Row 2: TP2 · R/R · StochK (or Support if stochK unavailable) */}
         <View style={{ flexDirection: "row" }}>
           {[
             { label: "TP2",    value: plan.tp2 > 0 ? (() => {
@@ -293,8 +294,12 @@ function TradingPlanContent({ plan, colors }: {
               })() : "–",  color: "#60a5fa" },
             { label: "R / R",  value: hasRR ? `1 : ${plan.rr.toFixed(1)}` : "–",
               color: plan.rr >= 2 ? "#34d399" : plan.rr >= 1 ? "#fbbf24" : "#f87171" },
-            { label: "STOCHK", value: plan.stochK !== null ? plan.stochK.toFixed(0) : "–",
-              color: plan.stochK !== null && plan.stochK < 20 ? "#34d399" : "#94a3b8" },
+            plan.stochK !== null
+              ? { label: "STOCHK", value: plan.stochK.toFixed(0),
+                  color: plan.stochK < 20 ? "#34d399" : plan.stochK < 40 ? "#fbbf24" : "#94a3b8" }
+              : ms?.support && ms.support > 0
+                ? { label: "SUPPORT", value: fRp(ms.support), color: "#34d399" }
+                : { label: "STOCHK", value: "–", color: "#94a3b8" },
           ].map((cell, i) => (
             <View key={cell.label} style={{
               flex: 1, padding: 12, alignItems: "center",
@@ -327,6 +332,51 @@ function TradingPlanContent({ plan, colors }: {
             <Text style={{ color: "#34d399", fontSize: 10 }}>Reward {tp1Pct.toFixed(1)}%</Text>
           </View>
         </View>
+      )}
+
+      {/* Support & Resistance levels from MASTER_STOCK_DB */}
+      {ms && (ms.support > 0 || ms.resistance > 0) && (
+        <>
+          <SectionTitle title="SUPPORT & RESISTANCE" colors={colors} />
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {ms.support > 0 && (
+              <View style={{ flex: 1, borderRadius: 12, borderWidth: 1,
+                borderColor: "#34d39940", backgroundColor: "#34d39910",
+                padding: 12, alignItems: "center" }}>
+                <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
+                  🟢 SUPPORT
+                </Text>
+                <Text style={{ color: "#34d399", fontWeight: "800", fontSize: 16 }}>
+                  {fRp(ms.support)}
+                </Text>
+              </View>
+            )}
+            {ms.resistance > 0 && (
+              <View style={{ flex: 1, borderRadius: 12, borderWidth: 1,
+                borderColor: "#f8717140", backgroundColor: "#f8717110",
+                padding: 12, alignItems: "center" }}>
+                <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
+                  🔴 RESISTANCE
+                </Text>
+                <Text style={{ color: "#f87171", fontWeight: "800", fontSize: 16 }}>
+                  {fRp(ms.resistance)}
+                </Text>
+              </View>
+            )}
+            {ms.vwap > 0 && (
+              <View style={{ flex: 1, borderRadius: 12, borderWidth: 1,
+                borderColor: "#38BDF840", backgroundColor: "#38BDF810",
+                padding: 12, alignItems: "center" }}>
+                <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700", marginBottom: 4 }}>
+                  💧 VWAP
+                </Text>
+                <Text style={{ color: "#38BDF8", fontWeight: "800", fontSize: 16 }}>
+                  {fRp(ms.vwap)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </>
       )}
 
       {/* Bullet checklist */}
@@ -1834,7 +1884,7 @@ export default function StockDetailScreen() {
               {activeTab === "plan" && plan && (
                 isHold
                   ? <HoldModeContent plan={plan} price={quote?.price ?? 0} colors={colors} />
-                  : <TradingPlanContent plan={plan} colors={colors} />
+                  : <TradingPlanContent plan={plan} ms={data.masterStock} colors={colors} />
               )}
               {activeTab === "plan" && !plan && (
                 <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>

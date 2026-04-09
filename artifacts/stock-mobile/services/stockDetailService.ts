@@ -260,7 +260,7 @@ function bowToPlan(r: BOWRaw): TradingPlan {
     entry, entryHigh: pf(r.BuyBreak) || null,
     stopLoss: pf(r.StopLoss), slPct: pf(r.SL_pct),
     tp1, tp2: pf(r.TP2), tp1Pct, rr: pf(r.RR),
-    rsi: pf(r.RSI) || null, stochK: pf(r.StochK) || null,
+    rsi: r.RSI ? pf(r.RSI) || null : null, stochK: r.StochK ? pf(r.StochK) : null,
     holdDays: r.Days ?? "", signals: signals.slice(0, 6),
     commentary: stripCommentaryMeta(r.Commentary),
     action: r.Action ?? "", score: pf(r.Score),
