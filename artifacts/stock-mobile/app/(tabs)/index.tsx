@@ -299,14 +299,15 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
         {/* Bottom row: 3 stats */}
         <View style={{ flexDirection: "row" }}>
           {[
-            { label: "Akumulasi", value: `${marketCtx.accPct}%`,  color: "#34d399" },
-            { label: "Distribusi", value: `${marketCtx.dstPct}%`, color: "#f87171" },
-            { label: "Avg Score",  value: `${marketCtx.avgBandar}`, color: "#a78bfa" },
+            { label: "Akumulasi", value: `${marketCtx.accPct}%`,    color: "#34d399" },
+            { label: "Distribusi", value: `${marketCtx.dstPct}%`,   color: "#f87171" },
+            { label: "Avg Bandar", value: `${marketCtx.avgBandar}`, color: "#a78bfa" },
           ].map((stat, i) => (
             <View key={stat.label} style={{
               flex: 1, alignItems: "center",
               borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: colors.border,
             }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 9, marginBottom: 2 }}>{stat.label}</Text>
               <Text style={{ color: stat.color, fontWeight: "700", fontSize: 14 }}>{stat.value}</Text>
             </View>
           ))}
