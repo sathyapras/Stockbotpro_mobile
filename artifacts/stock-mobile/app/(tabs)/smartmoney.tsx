@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -199,25 +199,38 @@ export default function SmartMoneyScreen() {
   const dataAvailable = smData.length > 0;
   const latestDate = smData[0]?.date ?? null;
 
-  // Phase pill counts
+  // Search-filtered list (before phase filter)
+  const searchFiltered = useMemo(() => {
+    if (!search.trim()) return smData;
+    const q = search.trim().toUpperCase();
+    return smData.filter(s =>
+      s.ticker.includes(q) ||
+      (s.name ?? "").toUpperCase().includes(q)
+    );
+  }, [smData, search]);
+
+  // Phase counts from search-filtered data
   const phaseCounts = useMemo(() => {
     const c: Partial<Record<SmartMoneyPhase, number>> = {};
-    smData.forEach(s => { c[s.phase] = (c[s.phase] ?? 0) + 1; });
+    searchFiltered.forEach(s => { c[s.phase] = (c[s.phase] ?? 0) + 1; });
     return c;
-  }, [smData]);
+  }, [searchFiltered]);
 
   const sortedPhases = (Object.keys(PHASE_CONFIG) as SmartMoneyPhase[])
     .filter(p => (phaseCounts[p] ?? 0) > 0);
 
-  // Filtered list
+  // Final filtered list (search + phase)
   const filtered = useMemo(() => {
-    let list = activePhase ? smData.filter(s => s.phase === activePhase) : [...smData];
-    if (search.trim()) {
-      const q = search.toUpperCase();
-      list = list.filter(s => s.ticker.includes(q) || s.name.toUpperCase().includes(q));
+    if (activePhase) return searchFiltered.filter(s => s.phase === activePhase);
+    return searchFiltered;
+  }, [searchFiltered, activePhase]);
+
+  // Reset phase filter if search leaves 0 results for that phase
+  useEffect(() => {
+    if (activePhase && (phaseCounts[activePhase] ?? 0) === 0) {
+      setActivePhase(null);
     }
-    return list;
-  }, [smData, activePhase, search]);
+  }, [phaseCounts, activePhase]);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
@@ -335,7 +348,7 @@ export default function SmartMoneyScreen() {
                 borderWidth: 1, borderColor: !activePhase ? "#94a3b8" : "#334155",
               }}>
               <Text style={{ color: !activePhase ? "#94a3b8" : "#64748b", fontSize: 12 }}>
-                Semua {smData.length}
+                Semua {searchFiltered.length}
               </Text>
             </TouchableOpacity>
 
