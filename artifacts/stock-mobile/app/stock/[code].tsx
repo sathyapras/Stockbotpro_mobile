@@ -88,6 +88,50 @@ function InfoCell({ label, value, color, colors }: {
   );
 }
 
+/** Parse "=== LABEL ===" prefix + body from commentary text */
+function parseCommentary(raw: string): { badge: string | null; body: string } | null {
+  if (!raw?.trim()) return null;
+  const match = raw.trim().match(/^={2,}\s*(.*?)\s*={2,}\s*([\s\S]*)/);
+  if (match) {
+    const badge = match[1]?.trim() || null;
+    const body = match[2]?.trim() ?? "";
+    if (!body) return null; // badge only, no body — skip
+    return { badge, body };
+  }
+  return { badge: null, body: raw.trim() };
+}
+
+/** Robo Commentary block — parses and renders nicely */
+function RoboCommentary({ commentary, colors }: {
+  commentary: string;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const parsed = parseCommentary(commentary);
+  if (!parsed) return null;
+  return (
+    <>
+      <SectionTitle title="ROBO COMMENTARY" colors={colors} />
+      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+        backgroundColor: colors.card, padding: 12, gap: 8 }}>
+        {parsed.badge && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={{ width: 3, height: 16, borderRadius: 2,
+              backgroundColor: "#60a5fa" }} />
+            <Text style={{ color: "#60a5fa", fontSize: 10, fontWeight: "800",
+              letterSpacing: 0.5 }}>
+              {parsed.badge}
+            </Text>
+          </View>
+        )}
+        <Text style={{ color: colors.foreground, fontSize: 12,
+          lineHeight: 18, opacity: 0.85 }}>
+          {parsed.body}
+        </Text>
+      </View>
+    </>
+  );
+}
+
 function SectionTitle({ title, colors }: { title: string; colors: ReturnType<typeof useColors> }) {
   return (
     <Text style={{ color: colors.mutedForeground, fontSize: 10, fontWeight: "700",
@@ -295,24 +339,7 @@ function TradingPlanContent({ plan, colors }: {
       </View>
 
       {/* Commentary */}
-      {plan.commentary ? (
-        <>
-          <SectionTitle title="ROBO COMMENTARY" colors={colors} />
-          <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-            backgroundColor: colors.card, padding: 12 }}>
-            <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border,
-              paddingBottom: 6, marginBottom: 8 }}>
-              <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
-                ════════════════════════════
-              </Text>
-            </View>
-            <Text style={{ color: colors.mutedForeground, fontSize: 11,
-              fontStyle: "italic", lineHeight: 17 }}>
-              {plan.commentary}
-            </Text>
-          </View>
-        </>
-      ) : null}
+      <RoboCommentary commentary={plan.commentary} colors={colors} />
     </ScrollView>
   );
 }
@@ -425,18 +452,7 @@ function HoldModeContent({ plan, price, colors }: {
       </View>
 
       {/* Commentary */}
-      {plan.commentary ? (
-        <>
-          <SectionTitle title="ROBO COMMENTARY" colors={colors} />
-          <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-            backgroundColor: colors.card, padding: 12 }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 11,
-              fontStyle: "italic", lineHeight: 17 }}>
-              {plan.commentary}
-            </Text>
-          </View>
-        </>
-      ) : null}
+      <RoboCommentary commentary={plan.commentary} colors={colors} />
     </ScrollView>
   );
 }
