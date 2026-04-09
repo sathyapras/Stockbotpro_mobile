@@ -54,7 +54,7 @@ function buildMenuGroups(
       items: [
         {
           icon: "⚙️",
-          label: "Pengaturan",
+          label: "Setting",
           onPress: () => router.push("/settings" as any),
         },
         {
