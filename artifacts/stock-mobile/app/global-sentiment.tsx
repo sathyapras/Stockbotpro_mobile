@@ -138,21 +138,21 @@ function GlobalBiasBanner({ bias }: { bias: string }) {
       color: "#f87171",
       bg: "#2d0a0a",
       icon: "🔴",
-      desc: "Investor global defensif — hindari saham spekulatif",
+      desc: "Global investors are defensive — avoid speculative stocks",
     },
     RISK_ON: {
       label: "RISK ON",
       color: "#34d399",
       bg: "#052e16",
       icon: "🟢",
-      desc: "Selera risiko membaik — momentum mendukung saham growth",
+      desc: "Risk appetite improving — momentum supports growth stocks",
     },
     MIXED: {
       label: "MIXED",
       color: "#fbbf24",
       bg: "#1c1500",
       icon: "🟡",
-      desc: "Sinyal campuran — selektif, prioritaskan saham fundamental kuat",
+      desc: "Mixed signals — stay selective, prioritize stocks with strong fundamentals",
     },
   };
   const info = map[bias] ?? map.MIXED;
@@ -310,7 +310,7 @@ export default function GlobalSentimentScreen() {
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
           <ActivityIndicator size="large" color="#60a5fa" />
           <Text style={{ color: "#64748b", fontSize: 13 }}>
-            Mengambil data pasar global...
+            Loading global market data...
           </Text>
           <Text style={{ color: "#334155", fontSize: 11 }}>
             Yahoo Finance · VIX · IHSG · Oil · DXY
@@ -383,8 +383,8 @@ export default function GlobalSentimentScreen() {
 
           {/* Footer note */}
           <Text style={styles.footerNote}>
-            Data dari Yahoo Finance. Refresh pull-down untuk update terbaru.
-            Tujuan edukasi — bukan saran investasi.
+            Data from Yahoo Finance. Pull down to refresh.
+            For educational purposes only — not investment advice.
           </Text>
         </ScrollView>
       )}

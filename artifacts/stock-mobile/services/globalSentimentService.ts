@@ -60,7 +60,7 @@ export function generateNarrative(data: GlobalSentimentData): string {
   // 1. VIX + IHSG
   const ihsgPct = ihsg?.changePct;
   const ihsgStr = ihsgPct != null
-    ? `meskipun IHSG ${ihsgPct >= 0 ? "masih bertahan" : "tertekan"} ${ihsgPct >= 0 ? "+" : ""}${ihsgPct?.toFixed(2)}%`
+    ? `while IHSG ${ihsgPct >= 0 ? "holds" : "is under pressure"} ${ihsgPct >= 0 ? "+" : ""}${ihsgPct?.toFixed(2)}%`
     : "";
   const fearZone =
     s.fearLabel === "EXTREME_FEAR" ? "Extreme Fear" :
@@ -69,51 +69,51 @@ export function generateNarrative(data: GlobalSentimentData): string {
     s.fearLabel === "EXTREME_GREED" ? "Extreme Greed" : "Neutral";
 
   paragraphs.push(
-    `VIX ${s.vix?.toFixed(1) ?? "—"} berada di zona ${fearZone} — sentimen global ${s.fearLabel.includes("FEAR") ? "defensif" : "risk-on"}` +
+    `VIX ${s.vix?.toFixed(1) ?? "—"} is in the ${fearZone} zone — global sentiment is ${s.fearLabel.includes("FEAR") ? "defensive" : "risk-on"}` +
     (ihsgStr ? `, ${ihsgStr}.` : ".")
   );
 
   // 2. USD/IDR + DXY
   const rupiahStr =
-    (s.usdIdr ?? 0) >= 16_500 ? "melemah" :
-    (s.usdIdr ?? 0) >= 16_000 ? "stabil" : "menguat";
-  const dxyDir = s.dxyBias.includes("WEAK") ? "melemah" :
-                 s.dxyBias.includes("STRONG") ? "menguat" : "stabil";
+    (s.usdIdr ?? 0) >= 16_500 ? "weakening" :
+    (s.usdIdr ?? 0) >= 16_000 ? "stable" : "strengthening";
+  const dxyDir = s.dxyBias.includes("WEAK") ? "weakening" :
+                 s.dxyBias.includes("STRONG") ? "strengthening" : "stable";
   const emImpact = s.dxyBias.includes("WEAK")
-    ? "menjadi tailwind bagi pasar EM termasuk IDX"
-    : "memberikan tekanan pada arus modal EM";
+    ? "acting as a tailwind for EM markets including IDX"
+    : "putting pressure on EM capital flows";
 
   paragraphs.push(
-    `Di sisi nilai tukar, Rupiah ${rupiahStr} ke ${s.usdIdr?.toLocaleString("id-ID") ?? "—"} — ` +
-    `memberikan tekanan pada emiten berutang valas seperti GOTO, TLKM, dan ISAT; ` +
-    `DXY ${s.dxyValue?.toFixed(1) ?? "—"} ${dxyDir}, ${emImpact}.`
+    `On the FX side, the Rupiah is ${rupiahStr} at ${s.usdIdr?.toLocaleString("id-ID") ?? "—"} — ` +
+    `pressuring FX-indebted issuers such as GOTO, TLKM, and ISAT; ` +
+    `DXY ${s.dxyValue?.toFixed(1) ?? "—"} is ${dxyDir}, ${emImpact}.`
   );
 
-  // 3. Minyak
+  // 3. Oil
   if (wti?.value) {
     const oilDir =
-      (wti.changePct ?? 0) < -5 ? "melemah signifikan" :
-      (wti.changePct ?? 0) < 0  ? "melemah" : "menguat";
+      (wti.changePct ?? 0) < -5 ? "dropped sharply" :
+      (wti.changePct ?? 0) < 0  ? "weakened" : "strengthened";
     const oilPct = wti.changePct != null
       ? ` (${wti.changePct >= 0 ? "+" : ""}${wti.changePct?.toFixed(1)}%)`
       : "";
     const brentStr = brent?.value ? ` (Brent $${brent.value?.toFixed(1)})` : "";
     const oilImpact = (wti.changePct ?? 0) < 0
-      ? "memberikan tekanan pada saham energi (MEDC, ELSA), namun positif untuk sektor transportasi dan manufaktur yang margin-nya terbantu biaya bahan bakar lebih rendah"
-      : "menguntungkan saham energi dan tambang (MEDC, ELSA, ADRO), namun menekan margin sektor transportasi dan manufaktur";
+      ? "pressuring energy stocks (MEDC, ELSA), but positive for transportation & manufacturing as lower fuel costs ease margins"
+      : "benefiting energy & mining stocks (MEDC, ELSA, ADRO), but compressing margins in transportation & manufacturing";
 
     paragraphs.push(
-      `Harga minyak ${oilDir} — WTI $${wti.value?.toFixed(1)}${oilPct}${brentStr} ${oilImpact}.`
+      `Oil prices ${oilDir} — WTI $${wti.value?.toFixed(1)}${oilPct}${brentStr} ${oilImpact}.`
     );
   }
 
-  // 4. Kesimpulan
+  // 4. Conclusion
   const conclusion =
     s.fearLabel.includes("FEAR") || s.globalBias === "RISK_OFF"
-      ? "Secara keseluruhan, kondisi masih menantang — selektif pada saham dengan fundamental kuat, valuasi wajar, dan struktur teknikal yang bersih."
+      ? "Overall, conditions remain challenging — stay selective: focus on stocks with strong fundamentals, fair valuations, and clean technical setups."
       : s.fearLabel === "NEUTRAL" || s.globalBias === "MIXED"
-      ? "Secara keseluruhan, pasar dalam kondisi campuran — pertahankan posisi yang sudah untung, hindari FOMO pada saham spekulatif."
-      : "Secara keseluruhan, sentimen mendukung — fokus pada momentum kuat di sektor perbankan, konsumer, dan teknologi.";
+      ? "Overall, the market is mixed — hold onto profitable positions and avoid FOMO on speculative stocks."
+      : "Overall, sentiment is supportive — focus on strong momentum in banking, consumer, and technology sectors.";
 
   paragraphs.push(conclusion);
   return paragraphs.join("\n\n");
