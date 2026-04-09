@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MAX_WATCHLIST, useWatchlist } from "@/context/WatchlistContext";
 import { MenuButton } from "@/components/MenuButton";
+import { SkeletonListScreen } from "@/components/SkeletonBox";
 import {
   MasterStock,
   buildStockMap,
@@ -473,9 +474,7 @@ export default function WatchlistScreen() {
         )}
         ListEmptyComponent={
           !isLoading ? <EmptyState onAdd={() => setAddVisible(true)} /> : (
-            <View style={{ flex: 1, alignItems: "center", paddingTop: 80 }}>
-              <ActivityIndicator size="large" color="#0ea5e9" />
-            </View>
+            <SkeletonListScreen count={5} />
           )
         }
         contentContainerStyle={{

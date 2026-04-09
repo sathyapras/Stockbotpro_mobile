@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { MenuButton } from "@/components/MenuButton";
+import { SkeletonListScreen } from "@/components/SkeletonBox";
+import { hapticLight } from "@/hooks/useHaptic";
 import {
   type RadarMarket,
   fetchRadarMarket,
@@ -134,7 +136,7 @@ function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
 
   return (
     <TouchableOpacity
-      onPress={() => router.push(`/stock/${item.ticker}` as any)}
+      onPress={() => { hapticLight(); router.push(`/stock/${item.ticker}` as any); }}
       activeOpacity={0.8}
       style={{
         backgroundColor: "#1e2433", borderRadius: 12, padding: 14,
@@ -402,12 +404,7 @@ export default function BandarScreen() {
 
       {/* ── Content ── */}
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#60a5fa" />
-          <Text style={{ color: "#64748b", fontSize: 13, marginTop: 8 }}>
-            Memuat Buy/Sell Flow…
-          </Text>
-        </View>
+        <SkeletonListScreen count={6} />
       ) : isError ? (
         <View style={styles.center}>
           <Text style={{ fontSize: 32 }}>⚠️</Text>

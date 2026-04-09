@@ -22,6 +22,7 @@ import {
   fetchSmartMoneyFlow,
 } from "@/services/smartMoneyService";
 import { MenuButton } from "@/components/MenuButton";
+import { hapticLight } from "@/hooks/useHaptic";
 
 // ─── Sparkline mini chart ─────────────────────────────────────
 
@@ -52,7 +53,7 @@ function SmartMoneyCard({ stock, rank }: { stock: SmartMoneyItem; rank: number }
 
   return (
     <TouchableOpacity
-      onPress={() => router.push(`/stock/${stock.ticker}?tab=smartmoney` as any)}
+      onPress={() => { hapticLight(); router.push(`/stock/${stock.ticker}?tab=smartmoney` as any); }}
       activeOpacity={0.8}
       style={{
         backgroundColor: "#1e2433", borderRadius: 12, padding: 14,

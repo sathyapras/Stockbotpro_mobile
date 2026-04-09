@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { MenuButton } from "@/components/MenuButton";
 import { VerificationBanner } from "@/components/VerificationBanner";
+import { SkeletonListScreen } from "@/components/SkeletonBox";
+import { hapticLight } from "@/hooks/useHaptic";
 import {
   type MasterStock,
   type SortKey,
@@ -950,7 +952,7 @@ function MoverCard({ ms }: { ms: MasterStock }) {
   return (
     <TouchableOpacity
       style={{ width: 108, padding: 10, borderRadius: 12, backgroundColor: "#1e2433" }}
-      onPress={() => router.push(`/stock/${ms.symbol}` as never)}
+      onPress={() => { hapticLight(); router.push(`/stock/${ms.symbol}` as never); }}
       activeOpacity={0.7}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
         <View style={{ alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 3,
@@ -986,7 +988,7 @@ function StockCard({ ms, colors }: { ms: MasterStock; colors: ReturnType<typeof 
   return (
     <TouchableOpacity
       style={[styles.stockRow, { borderBottomColor: colors.border }]}
-      onPress={() => router.push(`/stock/${ms.symbol}` as never)}
+      onPress={() => { hapticLight(); router.push(`/stock/${ms.symbol}` as never); }}
       activeOpacity={0.7}>
       <View style={styles.stockLeft}>
         <View style={[styles.codeBadge, { backgroundColor: colors.secondary }]}>

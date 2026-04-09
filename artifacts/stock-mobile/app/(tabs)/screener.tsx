@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { MenuButton } from "@/components/MenuButton";
+import { SkeletonListScreen } from "@/components/SkeletonBox";
 import {
   ALL_TOOLS,
   CategoryDef,
@@ -193,12 +194,7 @@ export default function ScreenerScreen() {
 
         {/* ── Loading / Error ── */}
         {isLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-              Menganalisis data sinyal...
-            </Text>
-          </View>
+          <SkeletonListScreen count={6} />
         ) : isError ? (
           <View style={styles.center}>
             <Text style={{ fontSize: 32, marginBottom: 8 }}>⚠️</Text>
