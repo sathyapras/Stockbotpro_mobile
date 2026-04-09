@@ -388,7 +388,7 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
     },
     {
       icon: "📡", label: "RADAR", sub: "Market Intel",
-      color: "#38bdf8", bg: "#071624", border: "#38bdf8aa",
+      color: "#f97316", bg: "#1c0900", border: "#f97316aa",
       path: "/(tabs)/screener",
       metric: stats ? `${stats.bowCount} Ignition` : "—",
       detail: stats?.topEntry ? `↑ ${stats.topEntry.ticker}  Score ${stats.topEntry.bandarScore}` : loading ? "Loading…" : "Belum ada data",
