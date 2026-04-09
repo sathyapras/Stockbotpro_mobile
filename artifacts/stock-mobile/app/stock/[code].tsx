@@ -36,10 +36,6 @@ import {
   fetchStockDetail,
 } from "@/services/stockDetailService";
 import { formatVol } from "@/services/stockToolsService";
-import {
-  fetchRoboCommentary,
-  getCommentaryText,
-} from "@/services/roboCommentaryService";
 
 // ─── Tab types ────────────────────────────────────────────────
 
@@ -196,8 +192,8 @@ function SignalSourceBadge({ plan, colors }: {
 
 // ─── Tab 1a: Trading Plan (BUY mode) ─────────────────────────
 
-function TradingPlanContent({ plan, roboCommentary, colors }: {
-  plan: TradingPlan; roboCommentary?: string; colors: ReturnType<typeof useColors>;
+function TradingPlanContent({ plan, colors }: {
+  plan: TradingPlan; colors: ReturnType<typeof useColors>;
 }) {
   const rsi = plan.rsi ?? 50;
   const hasRR = plan.rr > 0;
@@ -343,15 +339,15 @@ function TradingPlanContent({ plan, roboCommentary, colors }: {
       </View>
 
       {/* Commentary */}
-      <RoboCommentary commentary={roboCommentary || plan.commentary} colors={colors} />
+      <RoboCommentary commentary={plan.commentary} colors={colors} />
     </ScrollView>
   );
 }
 
 // ─── Tab 1b: Hold Mode / Trading Position ────────────────────
 
-function HoldModeContent({ plan, price, roboCommentary, colors }: {
-  plan: TradingPlan; price: number; roboCommentary?: string; colors: ReturnType<typeof useColors>;
+function HoldModeContent({ plan, price, colors }: {
+  plan: TradingPlan; price: number; colors: ReturnType<typeof useColors>;
 }) {
   const pl = plan.type === "BOW" ? plan.holdPl : plan.glPct;
   const plColor = pl > 0 ? "#34d399" : pl < 0 ? "#f87171" : "#94a3b8";
@@ -456,7 +452,7 @@ function HoldModeContent({ plan, price, roboCommentary, colors }: {
       </View>
 
       {/* Commentary */}
-      <RoboCommentary commentary={roboCommentary || plan.commentary} colors={colors} />
+      <RoboCommentary commentary={plan.commentary} colors={colors} />
     </ScrollView>
   );
 }
@@ -1611,14 +1607,6 @@ export default function StockDetailScreen() {
     gcTime: 30 * 60 * 1000,
   });
 
-  const { data: roboMap } = useQuery({
-    queryKey: ["robo-commentary"],
-    queryFn: fetchRoboCommentary,
-    staleTime: 15 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
-  });
-  const roboCommentary = roboMap ? getCommentaryText(roboMap, ticker) : "";
-
   const verdict = data ? computeVerdict(data.plan, data.quote) : null;
   const quote = data?.quote;
   const plan = data?.plan;
@@ -1845,10 +1833,8 @@ export default function StockDetailScreen() {
             <View style={{ flex: 1 }}>
               {activeTab === "plan" && plan && (
                 isHold
-                  ? <HoldModeContent plan={plan} price={quote?.price ?? 0}
-                      roboCommentary={roboCommentary} colors={colors} />
-                  : <TradingPlanContent plan={plan}
-                      roboCommentary={roboCommentary} colors={colors} />
+                  ? <HoldModeContent plan={plan} price={quote?.price ?? 0} colors={colors} />
+                  : <TradingPlanContent plan={plan} colors={colors} />
               )}
               {activeTab === "plan" && !plan && (
                 <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
