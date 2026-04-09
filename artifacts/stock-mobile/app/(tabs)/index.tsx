@@ -1067,7 +1067,7 @@ export default function MarketScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
   const [query, setQuery]               = useState("");
-  const [indexFilter, setIndexFilter]   = useState<StockFilter["index"]>("");
+  const [indexFilter, setIndexFilter]   = useState<StockFilter["index"]>("LQ45");
   const [sortBy, setSortBy]             = useState<SortKey>("ret10d");
   const [showSort, setShowSort]         = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
