@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WatchlistProvider } from "@/context/WatchlistContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import { useColors } from "@/hooks/useColors";
 import { fetchGlobalSentiment } from "@/services/globalSentimentService";
 import { fetchMasterStock } from "@/services/masterStockService";
@@ -92,6 +93,7 @@ function RootLayoutNav() {
       <Stack.Screen name="contact-us" options={{ headerShown: false }} />
       <Stack.Screen name="about-us" options={{ headerShown: false }} />
       <Stack.Screen name="tutorial" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -128,9 +130,11 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <WatchlistProvider>
-            <GestureHandlerRootView>
-              <RootLayoutNav />
-            </GestureHandlerRootView>
+            <NotificationProvider>
+              <GestureHandlerRootView>
+                <RootLayoutNav />
+              </GestureHandlerRootView>
+            </NotificationProvider>
           </WatchlistProvider>
         </QueryClientProvider>
       </ErrorBoundary>
