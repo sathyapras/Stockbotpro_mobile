@@ -20,6 +20,7 @@ const UPSTREAM: Record<string, { host: string; path: string; ttl?: number }> = {
   STOCKTOOLS_SCREENER:     { host: "103.190.28.248", path: "/stockbotprodata/STOCKTOOLS_SCREENER" },
   MASTER_STOCK_DB:         { host: "103.190.28.248", path: "/stockbotprodata/MASTER_STOCK_DB",  ttl: CACHE_TTL_LONG_MS },
   RADAR_MARKET:            { host: "103.190.28.248", path: "/stockbotprodata/RADAR_MARKET",     ttl: CACHE_TTL_LONG_MS },
+  RoboCommentary:          { host: "103.190.28.248", path: "/stockbotprodata/RoboCommentary" },
 };
 
 function fetchUpstream(cfg: { host: string; path: string }): Promise<unknown> {
