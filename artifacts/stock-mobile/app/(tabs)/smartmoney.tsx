@@ -21,6 +21,7 @@ import {
   PHASE_CONFIG,
   fetchSmartMoneyFlow,
 } from "@/services/smartMoneyService";
+import { MenuButton } from "@/components/MenuButton";
 
 // ─── Sparkline mini chart ─────────────────────────────────────
 
@@ -222,10 +223,16 @@ export default function SmartMoneyScreen() {
     <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
       {/* ── Header ── */}
       <View style={{ paddingTop: topPadding, paddingHorizontal: 16, paddingBottom: 8 }}>
-        <Text style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}>💎 Smart Money Flow</Text>
-        <Text style={{ color: "#475569", fontSize: 11, marginTop: 1 }}>
-          Analisis broker · Update setelah 17:30 WIB
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "flex-start",
+          justifyContent: "space-between", marginBottom: 2 }}>
+          <View>
+            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}>💎 Smart Money Flow</Text>
+            <Text style={{ color: "#475569", fontSize: 11, marginTop: 1 }}>
+              Analisis broker · Update setelah 17:30 WIB
+            </Text>
+          </View>
+          <MenuButton />
+        </View>
 
         {latestDate && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>

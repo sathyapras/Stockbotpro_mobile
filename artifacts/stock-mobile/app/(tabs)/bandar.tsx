@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { MenuButton } from "@/components/MenuButton";
 import {
   type MasterStock,
   fetchMasterStock,
@@ -290,15 +291,18 @@ export default function BandarScreen() {
               Net Buy/Sell · VWAP · Flow Signal
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={() => router.push("/market-intel" as any)}
-            style={{ backgroundColor: "#1e2433", borderRadius: 8,
-              borderWidth: 1, borderColor: "#334155",
-              paddingHorizontal: 10, paddingVertical: 6,
-              flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Text style={{ fontSize: 12 }}>🔭</Text>
-            <Text style={{ color: "#94a3b8", fontSize: 11 }}>Intel</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => router.push("/market-intel" as any)}
+              style={{ backgroundColor: "#1e2433", borderRadius: 8,
+                borderWidth: 1, borderColor: "#334155",
+                paddingHorizontal: 10, paddingVertical: 6,
+                flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Text style={{ fontSize: 12 }}>🔭</Text>
+              <Text style={{ color: "#94a3b8", fontSize: 11 }}>Intel</Text>
+            </TouchableOpacity>
+            <MenuButton />
+          </View>
         </View>
 
         {/* Index selector */}

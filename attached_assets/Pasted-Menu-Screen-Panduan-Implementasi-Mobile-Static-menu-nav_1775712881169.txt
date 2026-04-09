@@ -1,0 +1,295 @@
+Menu Screen — Panduan Implementasi Mobile
+Static menu: navigasi, link eksternal, profil, logout
+LAYOUT SCREEN
+┌─────────────────────────────────────────────┐
+│  Menu                                       │
+│─────────────────────────────────────────────│
+│  🎁  Program Afiliasi               ›       │
+│─────────────────────────────────────────────│
+│  MORE                                       │
+│                                             │
+│  ✈️  Grup Telegram Eksklusif         ›      │
+│  💬  Hubungi via WhatsApp            ›      │
+│  📈  Buka Rekening Saham             ›      │
+│  ⚙️  Pengaturan                      ›      │
+│  ℹ️  About Us                        ›      │
+│  📖  Tutorial                        ›      │
+│  👑  Subscribe                       ›      │
+│  ✉️  Contact Us                      ›      │
+│─────────────────────────────────────────────│
+│                                             │
+│  [ 🚪 Keluar dari Akun ]  ← merah          │
+└─────────────────────────────────────────────┘
+
+DEFINISI MENU ITEMS
+import { Linking, Alert } from "react-native";
+import * as SecureStore from "expo-secure-store";
+// Isi URL/nomor aktual sebelum build
+const TELEGRAM_URL  = "https://t.me/stockbotpro";          // ganti URL grup aktual
+const WHATSAPP_URL  = "https://wa.me/628xxxxxxxxxx";        // ganti nomor aktual
+const BROKER_URL    = "https://...";                        // ganti link broker
+const CONTACT_EMAIL = "mailto:support@stockbotpro.com";    // ganti email aktual
+export function buildMenuItems(navigation) {
+  return [
+    {
+      section: null,
+      items: [
+        {
+          icon:    "🎁",
+          label:   "Program Afiliasi",
+          onPress: () => navigation.navigate("Afiliasi"),
+        },
+      ],
+    },
+    {
+      section: "MORE",
+      items: [
+        {
+          icon:    "✈️",
+          label:   "Grup Telegram Eksklusif",
+          onPress: () => Linking.openURL(TELEGRAM_URL),
+        },
+        {
+          icon:    "💬",
+          label:   "Hubungi via WhatsApp",
+          onPress: () => Linking.openURL(WHATSAPP_URL),
+        },
+        {
+          icon:    "📈",
+          label:   "Buka Rekening Saham",
+          onPress: () => Linking.openURL(BROKER_URL),
+        },
+        {
+          icon:    "⚙️",
+          label:   "Pengaturan",
+          onPress: () => navigation.navigate("Pengaturan"),
+        },
+        {
+          icon:    "ℹ️",
+          label:   "About Us",
+          onPress: () => navigation.navigate("AboutUs"),
+        },
+        {
+          icon:    "📖",
+          label:   "Tutorial",
+          onPress: () => navigation.navigate("Tutorial"),
+        },
+        {
+          icon:    "👑",
+          label:   "Subscribe",
+          onPress: () => navigation.navigate("Subscribe"),
+        },
+        {
+          icon:    "✉️",
+          label:   "Contact Us",
+          onPress: () => Linking.openURL(CONTACT_EMAIL),
+        },
+      ],
+    },
+  ];
+}
+
+KOMPONEN: MenuScreen
+export function MenuScreen({ navigation }) {
+  const menuGroups = buildMenuItems(navigation);
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      {/* Header */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 24 }}>Menu</Text>
+      </View>
+      {menuGroups.map((group, gi) => (
+        <View key={gi} style={{ marginBottom: 8 }}>
+          {/* Section label */}
+          {group.section && (
+            <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+              paddingHorizontal: 20, paddingVertical: 8, letterSpacing: 1 }}>
+              {group.section}
+            </Text>
+          )}
+          {/* Items */}
+          <View style={{ backgroundColor: "#1e2433", marginHorizontal: 16,
+            borderRadius: 14, overflow: "hidden" }}>
+            {group.items.map((item, ii) => (
+              <TouchableOpacity
+                key={ii}
+                onPress={item.onPress}
+                style={{
+                  flexDirection:   "row",
+                  alignItems:      "center",
+                  paddingHorizontal: 16,
+                  paddingVertical:   16,
+                  borderBottomWidth: ii < group.items.length - 1 ? 1 : 0,
+                  borderBottomColor: "#0f1629",
+                }}>
+                <Text style={{ fontSize: 20, marginRight: 14 }}>{item.icon}</Text>
+                <Text style={{ color: "#cbd5e1", fontSize: 15, flex: 1 }}>
+                  {item.label}
+                </Text>
+                <Text style={{ color: "#334155", fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      ))}
+      {/* Logout button */}
+      <View style={{ marginHorizontal: 16, marginTop: 24, marginBottom: 48 }}>
+        <TouchableOpacity
+          onPress={() => handleLogout(navigation)}
+          style={{ backgroundColor: "#2d0a0a", borderRadius: 14,
+            paddingVertical: 16, alignItems: "center",
+            borderWidth: 1, borderColor: "#7f1d1d" }}>
+          <Text style={{ color: "#f87171", fontWeight: "700", fontSize: 15 }}>
+            🚪 Keluar dari Akun
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+LOGOUT
+async function handleLogout(navigation) {
+  Alert.alert(
+    "Keluar dari Akun",
+    "Yakin ingin keluar?",
+    [
+      { text: "Batal", style: "cancel" },
+      {
+        text:  "Keluar",
+        style: "destructive",
+        onPress: async () => {
+          await SecureStore.deleteItemAsync("auth_token");
+          navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+        },
+      },
+    ]
+  );
+}
+
+SCREEN: Pengaturan
+Data profil dari endpoint yang sudah ada:
+
+GET /api/auth/me
+Authorization: Bearer <token>
+
+Response:
+
+{
+  "id":        "usr_xxx",
+  "name":      "Budi Santoso",
+  "email":     "budi@email.com",
+  "role":      "premium",
+  "createdAt": "2025-01-15T08:00:00.000Z"
+}
+
+export function PengaturanScreen() {
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn:  () => fetchWithAuth("/api/auth/me").then(r => r.json()),
+    staleTime: 30 * 60 * 1000,
+  });
+  const roleLabel = {
+    "premium":   "👑 Premium",
+    "admin":     "🔧 Admin",
+    "free":      "🆓 Free",
+  }[user?.role] ?? user?.role;
+  const joinDate = user?.createdAt
+    ? new Date(user.createdAt).toLocaleDateString("id-ID",
+        { day: "numeric", month: "long", year: "numeric" })
+    : "—";
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f1629", padding: 20 }}>
+      <Text style={{ color: "white", fontWeight: "900",
+        fontSize: 20, marginBottom: 24 }}>⚙️ Pengaturan</Text>
+      <View style={{ backgroundColor: "#1e2433", borderRadius: 14, overflow: "hidden" }}>
+        <SettingRow label="Nama"           value={user?.name ?? "—"} />
+        <SettingRow label="Email"          value={user?.email ?? "—"} />
+        <SettingRow label="Status Akun"    value={roleLabel ?? "—"} />
+        <SettingRow label="Bergabung"      value={joinDate} last />
+      </View>
+    </View>
+  );
+}
+function SettingRow({ label, value, last = false }) {
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "space-between",
+      alignItems: "center", paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: last ? 0 : 1, borderBottomColor: "#0f1629" }}>
+      <Text style={{ color: "#64748b", fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: "white", fontSize: 13, fontWeight: "600",
+        maxWidth: "60%", textAlign: "right" }}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+SCREEN: About Us (Static)
+export function AboutUsScreen() {
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629", padding: 20 }}>
+      <Text style={{ color: "white", fontWeight: "900", fontSize: 20, marginBottom: 16 }}>
+        ℹ️ About Us
+      </Text>
+      <View style={{ backgroundColor: "#1e2433", borderRadius: 14, padding: 20 }}>
+        <Text style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 22 }}>
+          StockBot Pro adalah platform analisa saham IDX yang menggabungkan data AFL,
+          analisis broker, dan kecerdasan buatan untuk membantu investor membuat
+          keputusan yang lebih tepat.{"\n\n"}
+          Dibuat untuk investor Indonesia yang serius.
+        </Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+SCREEN: Tutorial (Static)
+const TUTORIALS = [
+  { step: "1", title: "Login ke Akun",         desc: "Masuk menggunakan email dan password yang terdaftar." },
+  { step: "2", title: "Pantau Market di Home",  desc: "Lihat kondisi IHSG, breadth pasar, dan sinyal hari ini." },
+  { step: "3", title: "Gunakan Buy/Sell Flow",  desc: "Cek Net Buy/Sell untuk melihat tekanan beli atau jual." },
+  { step: "4", title: "Cek Smart Money Flow",   desc: "Tersedia setelah 17:30 — lihat fase broker per saham." },
+  { step: "5", title: "Tambah ke Watchlist",    desc: "Simpan saham pilihan, pantau pergerakan harian." },
+  { step: "6", title: "Gunakan Global Screener",desc: "Kombinasikan kondisi AND untuk temukan setup terbaik." },
+];
+export function TutorialScreen() {
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629", padding: 20 }}>
+      <Text style={{ color: "white", fontWeight: "900", fontSize: 20, marginBottom: 20 }}>
+        📖 Tutorial
+      </Text>
+      {TUTORIALS.map(t => (
+        <View key={t.step} style={{ flexDirection: "row", marginBottom: 20 }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16,
+            backgroundColor: "#0ea5e9", alignItems: "center",
+            justifyContent: "center", marginRight: 14, marginTop: 2 }}>
+            <Text style={{ color: "white", fontWeight: "900", fontSize: 13 }}>{t.step}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 14, marginBottom: 4 }}>
+              {t.title}
+            </Text>
+            <Text style={{ color: "#64748b", fontSize: 13, lineHeight: 20 }}>
+              {t.desc}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+RINGKASAN
+Item	Tipe	Aksi
+Program Afiliasi	Navigate	navigation.navigate("Afiliasi")
+Grup Telegram	External link	Linking.openURL(TELEGRAM_URL)
+Hubungi via WhatsApp	External link	Linking.openURL(WHATSAPP_URL)
+Buka Rekening Saham	External link	Linking.openURL(BROKER_URL)
+Pengaturan	Navigate + API	GET /api/auth/me
+About Us	Static screen	Teks statis
+Tutorial	Static screen	Step-by-step statis
+Subscribe	Navigate	navigation.navigate("Subscribe")
+Contact Us	Email	Linking.openURL("mailto:...")
+Logout	Alert + SecureStore	Hapus token → reset ke Login
+URL Telegram, WhatsApp, broker, dan email harus diisi dengan nilai aktual sebelum build.

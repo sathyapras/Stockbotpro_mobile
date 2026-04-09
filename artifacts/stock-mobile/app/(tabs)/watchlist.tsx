@@ -20,6 +20,7 @@ import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MAX_WATCHLIST, useWatchlist } from "@/context/WatchlistContext";
+import { MenuButton } from "@/components/MenuButton";
 import {
   MasterStock,
   buildStockMap,
@@ -436,6 +437,9 @@ export default function WatchlistScreen() {
               Tambah
             </Text>
           </TouchableOpacity>
+
+          {/* Hamburger */}
+          <MenuButton />
         </View>
 
         {isLoading && watchlist.length > 0 && (

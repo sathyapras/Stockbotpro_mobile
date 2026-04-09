@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { MenuButton } from "@/components/MenuButton";
 import {
   ALL_TOOLS,
   CategoryDef,
@@ -179,12 +180,15 @@ export default function ScreenerScreen() {
                 : `${ALL_TOOLS.length} strategi · ${totalSignals} sinyal aktif`}
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.refreshBtn, { borderColor: colors.border }]}
-            onPress={() => refetch()}
-          >
-            <Text style={{ color: colors.mutedForeground, fontSize: 18 }}>↻</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <TouchableOpacity
+              style={[styles.refreshBtn, { borderColor: colors.border }]}
+              onPress={() => refetch()}
+            >
+              <Text style={{ color: colors.mutedForeground, fontSize: 18 }}>↻</Text>
+            </TouchableOpacity>
+            <MenuButton color={colors.mutedForeground} />
+          </View>
         </View>
 
         {/* ── Loading / Error ── */}

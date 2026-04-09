@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { MenuButton } from "@/components/MenuButton";
 import {
   type MasterStock,
   type SortKey,
@@ -163,14 +164,17 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
 
   return (
     <View style={{ backgroundColor: "#0f1629", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
-      {/* Row 1: Greeting + LIVE */}
+      {/* Row 1: Greeting + LIVE + Hamburger */}
       <View style={{ flexDirection: "row", justifyContent: "space-between",
         alignItems: "center", marginBottom: 10 }}>
         <Text style={{ color: "#94a3b8", fontSize: 14 }}>{getGreeting()}</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6,
-          backgroundColor: "#052e16", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#34d399" }} />
-          <Text style={{ color: "#34d399", fontSize: 11, fontWeight: "700" }}>LIVE</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6,
+            backgroundColor: "#052e16", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#34d399" }} />
+            <Text style={{ color: "#34d399", fontSize: 11, fontWeight: "700" }}>LIVE</Text>
+          </View>
+          <MenuButton />
         </View>
       </View>
 
