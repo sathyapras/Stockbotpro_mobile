@@ -129,32 +129,32 @@ export function fearLabelDisplay(label: string): {
     case "EXTREME_FEAR": return {
       text: "Extreme Fear",  color: "#ef4444", bg: "#2d0a0a", icon: "😱",
       status: "Panic Selling", range: "VIX > 30",
-      note: '"Buy the Fear" opportunity for long-term investors.',
+      note: 'Momen "Buy the Fear" bagi investor jangka panjang.',
     };
     case "FEAR": return {
       text: "Fear",          color: "#f87171", bg: "#2d1010", icon: "😨",
       status: "Risk-Off", range: "VIX 23 – 30",
-      note: "Selling pressure building — foreign outflows likely.",
+      note: "Tekanan jual mulai terasa, asing biasanya outflow.",
     };
     case "NEUTRAL": return {
       text: "Neutral",       color: "#fbbf24", bg: "#1c1500", icon: "😐",
       status: "Consolidation", range: "VIX 15 – 22",
-      note: "Normal volatility — market waiting for a catalyst.",
+      note: "Volatilitas normal, pasar menunggu katalis.",
     };
     case "GREED": return {
       text: "Greed",         color: "#34d399", bg: "#052e16", icon: "😊",
       status: "Risk-On", range: "VIX 12 – 15",
-      note: "Ideal conditions for stock accumulation.",
+      note: "Kondisi ideal untuk akumulasi saham.",
     };
     case "EXTREME_GREED": return {
       text: "Extreme Greed", color: "#10b981", bg: "#042016", icon: "🤑",
       status: "Very Calm", range: "VIX < 12",
-      note: "Caution: market may be too complacent.",
+      note: "Hati-hati, pasar sudah terlalu nyaman (Complacent).",
     };
     default: return {
       text: "Neutral",       color: "#94a3b8", bg: "#1e2433", icon: "😐",
       status: "Consolidation", range: "VIX 15 – 22",
-      note: "Normal volatility — market waiting for a catalyst.",
+      note: "Volatilitas normal, pasar menunggu katalis.",
     };
   }
 }

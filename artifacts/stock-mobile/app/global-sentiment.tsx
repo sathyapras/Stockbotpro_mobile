@@ -143,21 +143,21 @@ function GlobalBiasBanner({ bias }: { bias: string }) {
       color: "#f87171",
       bg: "#2d0a0a",
       icon: "🔴",
-      desc: "Global investors are defensive — avoid speculative stocks",
+      desc: "Investor global defensif — hindari saham spekulatif",
     },
     RISK_ON: {
       label: "RISK ON",
       color: "#34d399",
       bg: "#052e16",
       icon: "🟢",
-      desc: "Risk appetite improving — momentum supports growth stocks",
+      desc: "Selera risiko membaik — momentum mendukung saham growth",
     },
     MIXED: {
       label: "MIXED",
       color: "#fbbf24",
       bg: "#1c1500",
       icon: "🟡",
-      desc: "Mixed signals — stay selective, prioritize stocks with strong fundamentals",
+      desc: "Sinyal campuran — selektif, prioritaskan saham fundamental kuat",
     },
   };
   const info = map[bias] ?? map.MIXED;
