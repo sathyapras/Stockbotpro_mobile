@@ -46,6 +46,7 @@ import {
   fearLabelDisplay,
   fetchGlobalSentiment,
 } from "@/services/globalSentimentService";
+import { fetchMe } from "@/services/userService";
 
 // ─── Greeting ─────────────────────────────────────────────────
 
@@ -110,6 +111,21 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
   const stockMap = useMemo(() => new Map(stocks.map(s => [s.symbol, s])), [stocks]);
   const radarMap = useMemo(() => new Map(radar.map(r => [r.ticker, r])), [radar]);
 
+  const { data: meData } = useQuery({
+    queryKey: ["me"],
+    queryFn: fetchMe,
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
+  const userName = meData?.name ?? meData?.username ?? null;
+
+  const { data: sentimentData } = useQuery({
+    queryKey: ["global-sentiment"],
+    queryFn: fetchGlobalSentiment,
+    staleTime: 10 * 60 * 1000,
+  });
+  const usdIdr = sentimentData?.sentiment?.usdIdr ?? null;
+
   const ihsgMs = stockMap.get("COMPOSITE");
   const ihsgRd = radarMap.get("COMPOSITE");
   const ihsgClose = ihsgMs?.close || ihsgRd?.close || 0;
@@ -171,7 +187,11 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
       {/* Row 1: Greeting + LIVE + Hamburger */}
       <View style={{ flexDirection: "row", justifyContent: "space-between",
         alignItems: "center", marginBottom: 10 }}>
-        <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>{getGreeting()}</Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>
+          {getGreeting()}{userName ? (
+            <Text style={{ color: colors.foreground, fontWeight: "600" }}> {userName}</Text>
+          ) : null}
+        </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6,
             backgroundColor: "#052e16", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
@@ -182,21 +202,33 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
         </View>
       </View>
 
-      {/* Row 2: IHSG Big */}
-      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-        <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 18 }}>IHSG</Text>
-        {ihsgClose > 0 ? (
-          <>
-            <Text style={{ color: chgColor, fontWeight: "900", fontSize: 32 }}>
-              {ihsgClose.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+      {/* Row 2: IHSG Big + USD/IDR */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between",
+        alignItems: "center", marginBottom: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
+          <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 18 }}>IHSG</Text>
+          {ihsgClose > 0 ? (
+            <>
+              <Text style={{ color: chgColor, fontWeight: "900", fontSize: 32 }}>
+                {ihsgClose.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+              </Text>
+              <Text style={{ color: chgColor, fontWeight: "700", fontSize: 16 }}>
+                {isDown ? "" : "+"}{ihsgChg.toFixed(2)}%
+              </Text>
+            </>
+          ) : (
+            <Text style={{ color: colors.mutedForeground, fontSize: 18 }}>Memuat…</Text>
+          )}
+        </View>
+        {usdIdr && usdIdr > 0 ? (
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 10, fontWeight: "600",
+              letterSpacing: 0.5 }}>USD/IDR</Text>
+            <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 16 }}>
+              {usdIdr.toLocaleString("id-ID")}
             </Text>
-            <Text style={{ color: chgColor, fontWeight: "700", fontSize: 16 }}>
-              {isDown ? "" : "+"}{ihsgChg.toFixed(2)}%
-            </Text>
-          </>
-        ) : (
-          <Text style={{ color: colors.mutedForeground, fontSize: 18 }}>Memuat…</Text>
-        )}
+          </View>
+        ) : null}
       </View>
 
       {/* Breadth Bar */}
