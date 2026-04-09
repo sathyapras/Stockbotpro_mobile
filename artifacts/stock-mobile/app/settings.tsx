@@ -43,27 +43,65 @@ function expiryText(user: UserProfile): string {
   return "Akun Gratis";
 }
 
+// ─── Theme Toggle ─────────────────────────────────────────────
+
+function ThemeToggle({ colors, preference, setPreference, effectiveScheme }: {
+  colors: Colors;
+  preference: ThemePreference;
+  setPreference: (p: ThemePreference) => void;
+  effectiveScheme: "light" | "dark";
+}) {
+  const labels: Record<ThemePreference, string> = { system: "Auto", light: "☀️ Terang", dark: "🌙 Gelap" };
+  return (
+    <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 16 }}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 12, marginBottom: 12 }}>
+        Tema aktif: {effectiveScheme === "dark" ? "🌙 Gelap" : "☀️ Terang"}
+      </Text>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {(["system", "light", "dark"] as ThemePreference[]).map(opt => {
+          const active = preference === opt;
+          return (
+            <TouchableOpacity
+              key={opt}
+              onPress={() => setPreference(opt)}
+              style={{ flex: 1, paddingVertical: 10, borderRadius: 10,
+                alignItems: "center",
+                backgroundColor: active ? "#0ea5e9" : colors.muted,
+                borderWidth: 1,
+                borderColor: active ? "#0ea5e9" : colors.border }}>
+              <Text style={{ color: active ? "#fff" : colors.mutedForeground,
+                fontSize: 12, fontWeight: active ? "700" : "400" }}>
+                {labels[opt]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 // ─── Profile Card ─────────────────────────────────────────────
 
-function ProfileCard({ user }: { user: UserProfile }) {
+function ProfileCard({ user, colors }: { user: UserProfile; colors: Colors }) {
   const initial = ((user.name ?? user.username ?? "U")[0]).toUpperCase();
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 14,
-      backgroundColor: "#1e2433", borderRadius: 16, padding: 20 }}>
+      backgroundColor: colors.card, borderRadius: 16, padding: 20 }}>
       <View style={{ width: 56, height: 56, borderRadius: 28,
         backgroundColor: "#0ea5e922", alignItems: "center",
         justifyContent: "center", marginBottom: 12 }}>
         <Text style={{ color: "#0ea5e9", fontWeight: "900", fontSize: 22 }}>{initial}</Text>
       </View>
 
-      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 18 }}>
+      <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 18 }}>
         {user.name ?? user.username}
       </Text>
-      <Text style={{ color: "#64748b", fontSize: 13, marginTop: 3 }}>{user.email}</Text>
+      <Text style={{ color: colors.mutedForeground, fontSize: 13, marginTop: 3 }}>{user.email}</Text>
       {user.phone ? (
-        <Text style={{ color: "#475569", fontSize: 12, marginTop: 3 }}>📱 {user.phone}</Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 3 }}>📱 {user.phone}</Text>
       ) : null}
-      <Text style={{ color: "#334155", fontSize: 11, marginTop: 10 }}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 10, opacity: 0.6 }}>
         Bergabung {new Date(user.createdAt).toLocaleDateString("id-ID",
           { month: "long", year: "numeric" })}
       </Text>
@@ -73,17 +111,19 @@ function ProfileCard({ user }: { user: UserProfile }) {
 
 // ─── Subscription Card ────────────────────────────────────────
 
+type Colors = ReturnType<typeof useColors>;
+
 function SubscriptionCard({
-  user, onUpgrade,
-}: { user: UserProfile; onUpgrade: () => void }) {
+  user, onUpgrade, colors,
+}: { user: UserProfile; onUpgrade: () => void; colors: Colors }) {
   const label  = planLabel(user.subscriptionPlan);
   const color  = planColor(label);
   const expiry = expiryText(user);
 
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 14,
-      backgroundColor: "#1e2433", borderRadius: 16, padding: 20 }}>
-      <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+      backgroundColor: colors.card, borderRadius: 16, padding: 20 }}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
         letterSpacing: 1, marginBottom: 12 }}>LANGGANAN</Text>
 
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
@@ -99,9 +139,9 @@ function SubscriptionCard({
               </View>
             )}
           </View>
-          <Text style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>{expiry}</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>{expiry}</Text>
           {user.isTrialActive && (
-            <Text style={{ color: "#fbbf24", fontSize: 11, marginTop: 4 }}>
+            <Text style={{ color: "#f59e0b", fontSize: 11, marginTop: 4 }}>
               ⚡ Trial masih berjalan
             </Text>
           )}
@@ -122,28 +162,28 @@ function SubscriptionCard({
 // ─── Setting Row ──────────────────────────────────────────────
 
 function SettingRow({
-  icon, label, onPress, last, danger = false,
+  icon, label, onPress, last, danger = false, colors,
 }: {
   icon: string; label: string; onPress: () => void;
-  last?: boolean; danger?: boolean;
+  last?: boolean; danger?: boolean; colors: Colors;
 }) {
   return (
     <TouchableOpacity onPress={onPress}
       style={{ flexDirection: "row", alignItems: "center",
         paddingHorizontal: 16, paddingVertical: 15,
-        borderBottomWidth: last ? 0 : 1, borderBottomColor: "#0f1629" }}>
+        borderBottomWidth: last ? 0 : 1, borderBottomColor: colors.border }}>
       <Text style={{ fontSize: 17, marginRight: 13 }}>{icon}</Text>
-      <Text style={{ color: danger ? "#f87171" : "#fff", fontSize: 14, flex: 1 }}>{label}</Text>
-      {!danger && <Text style={{ color: "#334155", fontSize: 18 }}>›</Text>}
+      <Text style={{ color: danger ? colors.destructive : colors.foreground, fontSize: 14, flex: 1 }}>{label}</Text>
+      {!danger && <Text style={{ color: colors.mutedForeground, fontSize: 18 }}>›</Text>}
     </TouchableOpacity>
   );
 }
 
 // ─── Section ──────────────────────────────────────────────────
 
-function SectionCard({ children }: { children: React.ReactNode }) {
+function SectionCard({ children, colors }: { children: React.ReactNode; colors: Colors }) {
   return (
-    <View style={{ backgroundColor: "#1e2433", borderRadius: 14,
+    <View style={{ backgroundColor: colors.card, borderRadius: 14,
       overflow: "hidden", marginHorizontal: 16, marginBottom: 14 }}>
       {children}
     </View>
@@ -190,7 +230,7 @@ export default function SettingsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* ── Header ── */}
       <View style={{ paddingTop: topPad, paddingHorizontal: 16, paddingBottom: 12,
-        borderBottomWidth: 1, borderBottomColor: "#1e2433" }}>
+        borderBottomWidth: 1, borderBottomColor: colors.border }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <TouchableOpacity onPress={() => router.back()}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -214,9 +254,9 @@ export default function SettingsScreen() {
       {(noToken || (!isLoading && !user && isError)) && (
         <ScrollView contentContainerStyle={{ padding: 24, alignItems: "center", paddingTop: 60 }}>
           <Text style={{ fontSize: 52, marginBottom: 16 }}>🔐</Text>
-          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18, textAlign: "center",
+          <Text style={{ color: colors.foreground, fontWeight: "800", fontSize: 18, textAlign: "center",
             marginBottom: 10 }}>Login Diperlukan</Text>
-          <Text style={{ color: "#64748b", fontSize: 13, textAlign: "center", lineHeight: 20,
+          <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: "center", lineHeight: 20,
             marginBottom: 32 }}>
             Login untuk melihat profil, info langganan, dan kelola akun StockBot Pro kamu.
           </Text>
@@ -228,7 +268,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push("/sign-up" as any)}
             style={{ marginTop: 12, paddingVertical: 12, width: "100%", alignItems: "center" }}>
-            <Text style={{ color: "#64748b", fontSize: 13 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
               Belum punya akun?{" "}
               <Text style={{ color: "#0ea5e9", fontWeight: "700" }}>Daftar Gratis</Text>
             </Text>
@@ -236,33 +276,9 @@ export default function SettingsScreen() {
 
           {/* Theme toggle — always visible */}
           <View style={{ marginTop: 32, width: "100%" }}>
-            <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+            <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
               marginBottom: 8, letterSpacing: 1 }}>TAMPILAN</Text>
-            <View style={{ backgroundColor: "#1e2433", borderRadius: 14, padding: 16 }}>
-              <Text style={{ color: "#94a3b8", fontSize: 12, marginBottom: 12 }}>
-                Tema {effectiveScheme === "dark" ? "🌙 Gelap" : "☀️ Terang"}
-              </Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {(["system", "light", "dark"] as ThemePreference[]).map(opt => {
-                  const labels = { system: "Auto", light: "☀️ Terang", dark: "🌙 Gelap" };
-                  const active = preference === opt;
-                  return (
-                    <TouchableOpacity
-                      key={opt}
-                      onPress={() => setPreference(opt)}
-                      style={{ flex: 1, paddingVertical: 10, borderRadius: 10,
-                        alignItems: "center",
-                        backgroundColor: active ? "#0ea5e9" : "#0f1629",
-                        borderWidth: 1, borderColor: active ? "#0ea5e9" : "#334155" }}>
-                      <Text style={{ color: active ? "#fff" : "#64748b",
-                        fontSize: 12, fontWeight: active ? "700" : "400" }}>
-                        {labels[opt]}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+            <ThemeToggle colors={colors} preference={preference} setPreference={setPreference} effectiveScheme={effectiveScheme} />
           </View>
         </ScrollView>
       )}
@@ -298,20 +314,22 @@ export default function SettingsScreen() {
             </View>
           )}
 
-          <ProfileCard user={user} />
+          <ProfileCard user={user} colors={colors} />
 
           <SubscriptionCard
             user={user}
+            colors={colors}
             onUpgrade={() => router.push("/subscribe" as any)}
           />
 
           {/* Section: Akun */}
-          <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+          <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
             marginHorizontal: 16, marginBottom: 8, letterSpacing: 1 }}>AKUN</Text>
-          <SectionCard>
+          <SectionCard colors={colors}>
             <SettingRow
               icon="✏️"
               label="Edit Profil"
+              colors={colors}
               onPress={() => router.push({
                 pathname: "/edit-profile",
                 params: {
@@ -324,6 +342,7 @@ export default function SettingsScreen() {
             <SettingRow
               icon="🔐"
               label="Ganti Password"
+              colors={colors}
               onPress={() => router.push({
                 pathname: "/change-password",
                 params: { email: user.email },
@@ -332,54 +351,33 @@ export default function SettingsScreen() {
             <SettingRow
               icon="🎁"
               label="Program Afiliasi"
+              colors={colors}
               last
               onPress={() => router.push("/affiliate" as any)}
             />
           </SectionCard>
 
           {/* Section: Tampilan */}
-          <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+          <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
             marginHorizontal: 16, marginBottom: 8, letterSpacing: 1 }}>TAMPILAN</Text>
-          <View style={{ marginHorizontal: 16, marginBottom: 14,
-            backgroundColor: "#1e2433", borderRadius: 14, padding: 16 }}>
-            <Text style={{ color: "#94a3b8", fontSize: 12, marginBottom: 12 }}>
-              Tema {effectiveScheme === "dark" ? "🌙 Gelap" : "☀️ Terang"}
-            </Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {(["system", "light", "dark"] as ThemePreference[]).map(opt => {
-                const labels = { system: "Auto", light: "☀️ Terang", dark: "🌙 Gelap" };
-                const active = preference === opt;
-                return (
-                  <TouchableOpacity
-                    key={opt}
-                    onPress={() => setPreference(opt)}
-                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10,
-                      alignItems: "center",
-                      backgroundColor: active ? "#0ea5e9" : "#0f1629",
-                      borderWidth: 1,
-                      borderColor: active ? "#0ea5e9" : "#334155" }}>
-                    <Text style={{ color: active ? "#fff" : "#64748b",
-                      fontSize: 12, fontWeight: active ? "700" : "400" }}>
-                      {labels[opt]}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          <View style={{ marginHorizontal: 16, marginBottom: 14 }}>
+            <ThemeToggle colors={colors} preference={preference} setPreference={setPreference} effectiveScheme={effectiveScheme} />
           </View>
 
           {/* Section: Bantuan */}
-          <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
+          <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
             marginHorizontal: 16, marginBottom: 8, letterSpacing: 1 }}>BANTUAN</Text>
-          <SectionCard>
+          <SectionCard colors={colors}>
             <SettingRow
               icon="📞"
               label="Hubungi Kami"
+              colors={colors}
               onPress={() => router.push("/contact-us" as any)}
             />
             <SettingRow
               icon="ℹ️"
               label="Tentang Aplikasi"
+              colors={colors}
               last
               onPress={() => router.push("/about-us" as any)}
             />
@@ -388,15 +386,15 @@ export default function SettingsScreen() {
           {/* Logout */}
           <TouchableOpacity onPress={handleLogout}
             style={{ marginHorizontal: 16, marginTop: 6,
-              backgroundColor: "#1e2433", borderRadius: 14,
+              backgroundColor: colors.card, borderRadius: 14,
               paddingVertical: 16, alignItems: "center",
-              borderWidth: 1, borderColor: "#f8717133" }}>
-            <Text style={{ color: "#f87171", fontWeight: "700", fontSize: 15 }}>
+              borderWidth: 1, borderColor: colors.destructive + "33" }}>
+            <Text style={{ color: colors.destructive, fontWeight: "700", fontSize: 15 }}>
               🚪 Keluar dari Akun
             </Text>
           </TouchableOpacity>
 
-          <Text style={{ color: "#334155", fontSize: 10, textAlign: "center", marginTop: 20 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 10, textAlign: "center", marginTop: 20, opacity: 0.6 }}>
             Stock Insight Mobile
           </Text>
         </ScrollView>
