@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { apiBase } from "@/services/subscribeService";
+import { AppSettings, fetchSettings, whatsappUrl } from "@/services/settingsService";
 
 // ─── Contact link row ─────────────────────────────────────────
 
@@ -48,6 +50,17 @@ export default function ContactUsScreen() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
+
+  const { data: settings } = useQuery<AppSettings>({
+    queryKey: ["app-settings"],
+    queryFn: fetchSettings,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const telegramUrl = settings?.telegramInviteLink ?? "https://t.me/stockbotpro";
+  const waUrl = settings?.whatsappNumber
+    ? whatsappUrl(settings.whatsappNumber)
+    : "https://wa.me/628xxxxxxxxxx";
 
   async function handleSend() {
     if (!name.trim() || !message.trim()) {
@@ -202,9 +215,9 @@ export default function ContactUsScreen() {
             ATAU HUBUNGI LANGSUNG
           </Text>
           <ContactLink icon="✈️" label="Grup Telegram"
-            onPress={() => Linking.openURL("https://t.me/stockbotpro")} />
+            onPress={() => Linking.openURL(telegramUrl)} />
           <ContactLink icon="💬" label="WhatsApp"
-            onPress={() => Linking.openURL("https://wa.me/628xxxxxxxxxx")} />
+            onPress={() => Linking.openURL(waUrl)} />
           <ContactLink icon="✉️" label="support@stockbot.id"
             onPress={() => Linking.openURL("mailto:support@stockbot.id")}
             isLast />

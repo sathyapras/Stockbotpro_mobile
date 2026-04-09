@@ -82,9 +82,15 @@ const PREFIXES = ["/affiliate", "/payments", "/auth"];
 router.use((req: Request, res: Response, next: NextFunction) => {
   const path = req.path;
 
-  // /contact (exact)
+  // /contact (exact POST)
   if (path === "/contact" && req.method === "POST") {
     forward(req, res, "/api/contact");
+    return;
+  }
+
+  // /settings (exact GET)
+  if (path === "/settings" && req.method === "GET") {
+    forward(req, res, "/api/settings");
     return;
   }
 

@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
@@ -11,15 +12,18 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const TELEGRAM_URL = "https://t.me/stockbotpro";
-const WHATSAPP_URL = "https://wa.me/6281234567890";
-const BROKER_URL   = "https://stockbotpro.replit.app";
+import { AppSettings, fetchSettings, whatsappUrl } from "@/services/settingsService";
+
+// ─── Helpers ──────────────────────────────────────────────────
 
 function openURL(url: string) {
+  if (!url) return;
   Linking.openURL(url).catch(() => {
     Alert.alert("Tidak dapat membuka link", url);
   });
 }
+
+// ─── Types ────────────────────────────────────────────────────
 
 type MenuItem = {
   icon: string;
@@ -32,7 +36,18 @@ type MenuGroup = {
   items: MenuItem[];
 };
 
-function buildMenuGroups(router: ReturnType<typeof useRouter>): MenuGroup[] {
+// ─── Menu groups builder ──────────────────────────────────────
+
+function buildMenuGroups(
+  router: ReturnType<typeof useRouter>,
+  settings: AppSettings | undefined
+): MenuGroup[] {
+  const telegramUrl = settings?.telegramInviteLink ?? "";
+  const waUrl = settings?.whatsappNumber
+    ? whatsappUrl(settings.whatsappNumber)
+    : "";
+  const brokerUrl = settings?.mitraResmiList?.[0]?.registerUrl ?? "";
+
   return [
     {
       section: null,
@@ -42,26 +57,38 @@ function buildMenuGroups(router: ReturnType<typeof useRouter>): MenuGroup[] {
           label: "Program Afiliasi",
           onPress: () => router.push("/affiliate" as any),
         },
+        {
+          icon: "👑",
+          label: "Subscribe",
+          onPress: () => router.push("/subscribe" as any),
+        },
+      ],
+    },
+    {
+      section: "KOMUNITAS",
+      items: [
+        {
+          icon: "✈️",
+          label: "Grup Telegram Eksklusif",
+          onPress: () => openURL(telegramUrl),
+        },
+        {
+          icon: "💬",
+          label: "Hubungi via WhatsApp",
+          onPress: () => openURL(waUrl),
+        },
       ],
     },
     {
       section: "MORE",
       items: [
-        {
-          icon: "✈️",
-          label: "Grup Telegram Eksklusif",
-          onPress: () => openURL(TELEGRAM_URL),
-        },
-        {
-          icon: "💬",
-          label: "Hubungi via WhatsApp",
-          onPress: () => openURL(WHATSAPP_URL),
-        },
-        {
-          icon: "📈",
-          label: "Buka Rekening Saham",
-          onPress: () => openURL(BROKER_URL),
-        },
+        ...(brokerUrl
+          ? [{
+              icon: "📈",
+              label: "Buka Rekening Saham",
+              onPress: () => openURL(brokerUrl),
+            }]
+          : []),
         {
           icon: "ℹ️",
           label: "About Us",
@@ -73,11 +100,6 @@ function buildMenuGroups(router: ReturnType<typeof useRouter>): MenuGroup[] {
           onPress: () => router.push("/tutorial" as any),
         },
         {
-          icon: "👑",
-          label: "Subscribe",
-          onPress: () => router.push("/subscribe" as any),
-        },
-        {
           icon: "✉️",
           label: "Contact Us",
           onPress: () => router.push("/contact-us" as any),
@@ -87,11 +109,21 @@ function buildMenuGroups(router: ReturnType<typeof useRouter>): MenuGroup[] {
   ];
 }
 
+// ─── Screen ───────────────────────────────────────────────────
+
 export default function MenuScreen() {
-  const router  = useRouter();
-  const insets  = useSafeAreaInsets();
-  const topPad  = Platform.OS === "web" ? 24 : insets.top + 16;
-  const groups  = buildMenuGroups(router);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 24 : insets.top + 16;
+
+  const { data: settings } = useQuery<AppSettings>({
+    queryKey: ["app-settings"],
+    queryFn: fetchSettings,
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
+  });
+
+  const groups = buildMenuGroups(router, settings);
 
   return (
     <ScrollView
