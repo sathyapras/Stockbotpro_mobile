@@ -28,6 +28,7 @@ import {
   requestPayout,
   saveAuthToken,
 } from "@/services/affiliateService";
+import { useColors } from "@/hooks/useColors";
 
 // ─── Clipboard helper ─────────────────────────────────────────
 
@@ -45,6 +46,7 @@ function TokenInputScreen({ onSaved }: { onSaved: () => void }) {
   const [saving, setSaving] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const topPad = Platform.OS === "web" ? 24 : insets.top + 16;
 
   async function handleSave() {
@@ -59,20 +61,20 @@ function TokenInputScreen({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#0f1629" }}
+    <ScrollView style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={{ padding: 20, paddingTop: topPad, paddingBottom: insets.bottom + 40 }}>
       <View style={{ flexDirection: "row", alignItems: "center",
         justifyContent: "space-between", marginBottom: 32 }}>
-        <Text style={{ color: "#fff", fontWeight: "900", fontSize: 22 }}>🔐 Login Diperlukan</Text>
+        <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 22 }}>🔐 Login Diperlukan</Text>
         <TouchableOpacity onPress={() => router.back()}
-          style={{ backgroundColor: "#1e2433", borderRadius: 20,
+          style={{ backgroundColor: colors.card, borderRadius: 20,
             width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: "#94a3b8", fontSize: 16, fontWeight: "700" }}>✕</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 16, fontWeight: "700" }}>✕</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={{ backgroundColor: "#1e2433", borderRadius: 14, padding: 20, marginBottom: 24 }}>
-        <Text style={{ color: "#94a3b8", fontSize: 13, lineHeight: 22 }}>
+      <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 22 }}>
           Program Afiliasi memerlukan akun StockBot Pro.{"\n\n"}
           Masukkan API token dari dashboard akun kamu di{" "}
           <Text style={{ color: "#0ea5e9" }}>stockbotpro.replit.app</Text>
@@ -80,14 +82,14 @@ function TokenInputScreen({ onSaved }: { onSaved: () => void }) {
         </Text>
       </View>
 
-      <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 8 }}>API Token</Text>
+      <Text style={{ color: colors.mutedForeground, fontSize: 13, marginBottom: 8 }}>API Token</Text>
       <TextInput
         placeholder="Paste token di sini..."
-        placeholderTextColor="#475569"
+        placeholderTextColor={colors.mutedForeground}
         value={token}
         onChangeText={setToken}
-        style={{ backgroundColor: "#1e2433", borderRadius: 10,
-          color: "#fff", fontSize: 13, padding: 14, marginBottom: 20 }}
+        style={{ backgroundColor: colors.card, borderRadius: 10,
+          color: colors.foreground, fontSize: 13, padding: 14, marginBottom: 20 }}
         autoCapitalize="none"
         autoCorrect={false}
         secureTextEntry
@@ -107,6 +109,7 @@ function TokenInputScreen({ onSaved }: { onSaved: () => void }) {
 // ─── Referral Code Card ───────────────────────────────────────
 
 function ReferralCodeCard({ code, discountPct }: { code: string; discountPct: number }) {
+  const colors = useColors();
   async function handleShare() {
     try {
       await Share.share({
@@ -117,8 +120,8 @@ function ReferralCodeCard({ code, discountPct }: { code: string; discountPct: nu
 
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 16,
-      backgroundColor: "#1e2433", borderRadius: 14, padding: 20 }}>
-      <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
+      backgroundColor: colors.card, borderRadius: 14, padding: 20 }}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
         letterSpacing: 1, marginBottom: 10 }}>KODE REFERRAL KAMU</Text>
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <Text style={{ color: "#0ea5e9", fontWeight: "900",
@@ -144,6 +147,7 @@ function ReferralCodeCard({ code, discountPct }: { code: string; discountPct: nu
 function StatsRow({
   quality, profile, totalReferrals,
 }: { quality: AffiliateQuality; profile: AffiliateProfile; totalReferrals: number }) {
+  const colors = useColors();
   const pendingBalance = parseFloat(profile.totalEarned) - parseFloat(profile.totalPaid);
   const stats = [
     { label: "Total Referral", value: String(totalReferrals),                              unit: "orang" },
@@ -154,11 +158,11 @@ function StatsRow({
   return (
     <View style={{ flexDirection: "row", marginHorizontal: 16, marginBottom: 16, gap: 8 }}>
       {stats.map(s => (
-        <View key={s.label} style={{ flex: 1, backgroundColor: "#1e2433",
+        <View key={s.label} style={{ flex: 1, backgroundColor: colors.card,
           borderRadius: 12, padding: 10, alignItems: "center", gap: 2 }}>
-          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 15 }}>{s.value}</Text>
-          {s.unit ? <Text style={{ color: "#64748b", fontSize: 9 }}>{s.unit}</Text> : null}
-          <Text style={{ color: "#475569", fontSize: 9, marginTop: 1, textAlign: "center" }}>
+          <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 15 }}>{s.value}</Text>
+          {s.unit ? <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>{s.unit}</Text> : null}
+          <Text style={{ color: colors.mutedForeground, fontSize: 9, marginTop: 1, textAlign: "center" }}>
             {s.label}
           </Text>
         </View>
@@ -170,28 +174,29 @@ function StatsRow({
 // ─── Earnings Card ────────────────────────────────────────────
 
 function EarningsCard({ quality }: { quality: AffiliateQuality }) {
+  const colors = useColors();
   const diff = quality.thisMonthEarnings - quality.lastMonthEarnings;
   const isUp = diff >= 0;
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 16,
-      backgroundColor: "#1e2433", borderRadius: 14, padding: 16 }}>
-      <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
+      backgroundColor: colors.card, borderRadius: 14, padding: 16 }}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
         letterSpacing: 1, marginBottom: 10 }}>KOMISI BULAN INI</Text>
-      <Text style={{ color: "#fff", fontWeight: "900", fontSize: 24 }}>
+      <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 24 }}>
         Rp {quality.thisMonthEarnings.toLocaleString("id-ID")}
       </Text>
       <Text style={{ color: isUp ? "#34d399" : "#f87171", fontSize: 12, marginTop: 6 }}>
         {isUp ? "▲" : "▼"} Rp {Math.abs(diff).toLocaleString("id-ID")} vs bulan lalu
       </Text>
       <View style={{ flexDirection: "row", marginTop: 12, gap: 8 }}>
-        <View style={{ flex: 1, backgroundColor: "#0f1629", borderRadius: 8, padding: 10 }}>
-          <Text style={{ color: "#64748b", fontSize: 10 }}>Total Earned</Text>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13, marginTop: 2 }}>
+        <View style={{ flex: 1, backgroundColor: colors.muted, borderRadius: 8, padding: 10 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>Total Earned</Text>
+          <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 13, marginTop: 2 }}>
             Rp {parseFloat(quality.thisMonthEarnings.toString()).toLocaleString("id-ID")}
           </Text>
         </View>
-        <View style={{ flex: 1, backgroundColor: "#0f1629", borderRadius: 8, padding: 10 }}>
-          <Text style={{ color: "#64748b", fontSize: 10 }}>Tier Progress</Text>
+        <View style={{ flex: 1, backgroundColor: colors.muted, borderRadius: 8, padding: 10 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>Tier Progress</Text>
           <Text style={{ color: "#0ea5e9", fontWeight: "700", fontSize: 13, marginTop: 2 }}>
             {quality.tierProgress}%
           </Text>
@@ -204,29 +209,30 @@ function EarningsCard({ quality }: { quality: AffiliateQuality }) {
 // ─── Referral History ─────────────────────────────────────────
 
 function ReferralHistory({ referrals }: { referrals: AffiliateReferral[] }) {
+  const colors = useColors();
   if (!referrals?.length) return (
     <View style={{ marginHorizontal: 16, marginBottom: 16,
-      backgroundColor: "#1e2433", borderRadius: 14, padding: 20, alignItems: "center" }}>
-      <Text style={{ color: "#475569", fontSize: 13 }}>Belum ada referral masuk</Text>
+      backgroundColor: colors.card, borderRadius: 14, padding: 20, alignItems: "center" }}>
+      <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Belum ada referral masuk</Text>
     </View>
   );
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
-      <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
+      <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
         letterSpacing: 1, marginBottom: 8 }}>RIWAYAT KOMISI</Text>
-      <View style={{ backgroundColor: "#1e2433", borderRadius: 14, overflow: "hidden" }}>
+      <View style={{ backgroundColor: colors.card, borderRadius: 14, overflow: "hidden" }}>
         {referrals.slice(0, 10).map((r, i) => (
           <View key={r.id} style={{
             flexDirection: "row", alignItems: "center",
             paddingHorizontal: 16, paddingVertical: 13,
             borderBottomWidth: i < Math.min(referrals.length, 10) - 1 ? 1 : 0,
-            borderBottomColor: "#0f1629",
+            borderBottomColor: colors.border,
           }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+              <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "600" }}>
                 Paket {r.planName?.toUpperCase()} · {r.months} bln
               </Text>
-              <Text style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>
                 {new Date(r.createdAt).toLocaleDateString("id-ID",
                   { day: "numeric", month: "short", year: "numeric" })}
               </Text>
@@ -244,27 +250,28 @@ function ReferralHistory({ referrals }: { referrals: AffiliateReferral[] }) {
 // ─── Payout History ───────────────────────────────────────────
 
 function PayoutHistory({ payouts }: { payouts: AffiliatePayout[] }) {
+  const colors = useColors();
   if (!payouts?.length) return null;
   const statusColor: Record<string, string> = {
     paid: "#34d399", pending: "#fbbf24", rejected: "#f87171",
   };
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
-      <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
+      <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
         letterSpacing: 1, marginBottom: 8 }}>RIWAYAT PENCAIRAN</Text>
-      <View style={{ backgroundColor: "#1e2433", borderRadius: 14, overflow: "hidden" }}>
+      <View style={{ backgroundColor: colors.card, borderRadius: 14, overflow: "hidden" }}>
         {payouts.slice(0, 5).map((p, i) => (
           <View key={p.id} style={{
             flexDirection: "row", alignItems: "center",
             paddingHorizontal: 16, paddingVertical: 13,
             borderBottomWidth: i < Math.min(payouts.length, 5) - 1 ? 1 : 0,
-            borderBottomColor: "#0f1629",
+            borderBottomColor: colors.border,
           }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+              <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "600" }}>
                 {p.bankName} · {p.bankAccount}
               </Text>
-              <Text style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>
                 {new Date(p.createdAt).toLocaleDateString("id-ID",
                   { day: "numeric", month: "short", year: "numeric" })}
               </Text>
@@ -293,6 +300,7 @@ function PayoutHistory({ payouts }: { payouts: AffiliatePayout[] }) {
 function PayoutSection({
   profile, payouts, onSuccess,
 }: { profile: AffiliateProfile; payouts: AffiliatePayout[]; onSuccess: () => void }) {
+  const colors = useColors();
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount]     = useState("");
   const [bank, setBank]         = useState(profile.bankName ?? "");
@@ -331,13 +339,13 @@ function PayoutSection({
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
       {/* Saldo + request button */}
-      <View style={{ backgroundColor: "#1e2433", borderRadius: 14, padding: 16, marginBottom: 10 }}>
-        <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
+      <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 16, marginBottom: 10 }}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
           letterSpacing: 1, marginBottom: 8 }}>SALDO TERSEDIA</Text>
         <Text style={{ color: "#34d399", fontWeight: "900", fontSize: 26 }}>
           Rp {pending.toLocaleString("id-ID")}
         </Text>
-        <Text style={{ color: "#475569", fontSize: 11, marginTop: 4 }}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 4 }}>
           Total earned: Rp {parseFloat(profile.totalEarned).toLocaleString("id-ID")} ·
           Dibayar: Rp {parseFloat(profile.totalPaid).toLocaleString("id-ID")}
         </Text>
@@ -358,8 +366,8 @@ function PayoutSection({
 
       {/* Payout form */}
       {showForm && (
-        <View style={{ backgroundColor: "#1e2433", borderRadius: 14, padding: 16, marginBottom: 10 }}>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15, marginBottom: 16 }}>
+        <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 16, marginBottom: 10 }}>
+          <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 15, marginBottom: 16 }}>
             Form Pencairan
           </Text>
 
@@ -370,15 +378,15 @@ function PayoutSection({
             { label: "Nama Pemegang", val: holder, set: setHolder, hint: "Sesuai nama rekening" },
           ].map(f => (
             <View key={f.label} style={{ marginBottom: 12 }}>
-              <Text style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>{f.label}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, marginBottom: 6 }}>{f.label}</Text>
               <TextInput
                 placeholder={f.hint}
-                placeholderTextColor="#475569"
+                placeholderTextColor={colors.mutedForeground}
                 value={f.val}
                 onChangeText={f.set}
                 keyboardType={f.numeric ? "numeric" : "default"}
-                style={{ backgroundColor: "#0f1629", borderRadius: 8,
-                  color: "#fff", fontSize: 14, padding: 12 }}
+                style={{ backgroundColor: colors.muted, borderRadius: 8,
+                  color: colors.foreground, fontSize: 14, padding: 12 }}
               />
             </View>
           ))}
@@ -403,6 +411,7 @@ function PayoutSection({
 // ─── Apply Screen ─────────────────────────────────────────────
 
 function AfiliasiApplyScreen({ onApplied }: { onApplied: () => void }) {
+  const colors = useColors();
   const [marketReach,   setMarketReach]   = useState("");
   const [preferredCode, setPreferredCode] = useState("");
   const [error,         setError]         = useState("");
@@ -451,13 +460,13 @@ function AfiliasiApplyScreen({ onApplied }: { onApplied: () => void }) {
         </Text>
         <TextInput
           placeholder="Contoh: Trader aktif, 2.000 follower Instagram, komunitas WA 500 member..."
-          placeholderTextColor="#475569"
+          placeholderTextColor={colors.mutedForeground}
           value={marketReach}
           onChangeText={setMarketReach}
           multiline
           numberOfLines={4}
-          style={{ backgroundColor: "#1e2433", borderRadius: 10,
-            color: "#fff", fontSize: 13, padding: 14,
+          style={{ backgroundColor: colors.card, borderRadius: 10,
+            color: colors.foreground, fontSize: 13, padding: 14,
             textAlignVertical: "top", marginBottom: 16, minHeight: 100 }}
         />
 
@@ -466,11 +475,11 @@ function AfiliasiApplyScreen({ onApplied }: { onApplied: () => void }) {
         </Text>
         <TextInput
           placeholder="Contoh: BUDI2024"
-          placeholderTextColor="#475569"
+          placeholderTextColor={colors.mutedForeground}
           value={preferredCode}
           onChangeText={t => setPreferredCode(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
-          style={{ backgroundColor: "#1e2433", borderRadius: 10,
-            color: "#fff", fontSize: 15, padding: 14, letterSpacing: 2, marginBottom: 6 }}
+          style={{ backgroundColor: colors.card, borderRadius: 10,
+            color: colors.foreground, fontSize: 15, padding: 14, letterSpacing: 2, marginBottom: 6 }}
           autoCapitalize="characters"
           maxLength={20}
         />
@@ -501,6 +510,7 @@ function AfiliasiApplyScreen({ onApplied }: { onApplied: () => void }) {
 export default function AffiliateScreen() {
   const router      = useRouter();
   const insets      = useSafeAreaInsets();
+  const colors      = useColors();
   const topPad      = Platform.OS === "web" ? 24 : insets.top + 16;
   const queryClient = useQueryClient();
   const [hasToken, setHasToken] = useState<boolean | null>(null);
@@ -530,9 +540,9 @@ export default function AffiliateScreen() {
     <View style={{ paddingHorizontal: 16, paddingTop: topPad, paddingBottom: 16,
       flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
       <View>
-        <Text style={{ color: "#fff", fontWeight: "900", fontSize: 22 }}>🎁 Program Afiliasi</Text>
+        <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 22 }}>🎁 Program Afiliasi</Text>
         {data?.profile && (
-          <Text style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>
             Ajak teman — dapat komisi {data.profile.commissionRate}%
           </Text>
         )}
@@ -545,15 +555,15 @@ export default function AffiliateScreen() {
               { text: "Hapus", style: "destructive",
                 onPress: () => clearAuthToken().then(() => setHasToken(false)) },
             ])}
-            style={{ backgroundColor: "#1e2433", borderRadius: 8,
+            style={{ backgroundColor: colors.card, borderRadius: 8,
               paddingHorizontal: 8, paddingVertical: 6 }}>
-            <Text style={{ color: "#64748b", fontSize: 11 }}>Token</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Token</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity onPress={() => router.back()}
-          style={{ backgroundColor: "#1e2433", borderRadius: 20,
+          style={{ backgroundColor: colors.card, borderRadius: 20,
             width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: "#94a3b8", fontSize: 16, fontWeight: "700" }}>✕</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 16, fontWeight: "700" }}>✕</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -562,7 +572,7 @@ export default function AffiliateScreen() {
   // ── No token ─────────────────────────────────────────────────
   if (hasToken === null) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#0f1629",
+      <View style={{ flex: 1, backgroundColor: colors.background,
         alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color="#0ea5e9" />
       </View>
@@ -571,7 +581,7 @@ export default function AffiliateScreen() {
 
   if (!hasToken) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <TokenInputScreen onSaved={() => setHasToken(true)} />
       </View>
     );
@@ -580,11 +590,11 @@ export default function AffiliateScreen() {
   // ── Loading ───────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Header />
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
           <ActivityIndicator size="large" color="#0ea5e9" />
-          <Text style={{ color: "#64748b", fontSize: 13 }}>Memuat data afiliasi...</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Memuat data afiliasi...</Text>
         </View>
       </View>
     );
@@ -593,7 +603,7 @@ export default function AffiliateScreen() {
   // ── Error ─────────────────────────────────────────────────────
   if (isError) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Header />
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center",
           padding: 32, gap: 12 }}>
@@ -614,11 +624,11 @@ export default function AffiliateScreen() {
   // ── Belum daftar ──────────────────────────────────────────────
   if (!data?.hasProfile) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Header />
-        <Text style={{ color: "#fff", fontWeight: "900", fontSize: 20,
+        <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 20,
           paddingHorizontal: 16, marginBottom: 8 }}>Daftar Program Afiliasi</Text>
-        <Text style={{ color: "#64748b", fontSize: 13, paddingHorizontal: 16,
+        <Text style={{ color: colors.mutedForeground, fontSize: 13, paddingHorizontal: 16,
           marginBottom: 20, lineHeight: 20 }}>
           Ajak teman berlangganan StockBot Pro dan dapatkan komisi 20% setiap transaksi.
           Referred user juga mendapat diskon 20%.
@@ -634,7 +644,7 @@ export default function AffiliateScreen() {
 
   // ── Dashboard ─────────────────────────────────────────────────
   return (
-    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header />
       <ScrollView showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>

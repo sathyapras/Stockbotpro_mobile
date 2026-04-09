@@ -47,6 +47,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 
 function SmartMoneyCard({ stock, rank }: { stock: SmartMoneyItem; rank: number }) {
   const router = useRouter();
+  const colors = useColors();
   const cfg    = PHASE_CONFIG[stock.phase] ?? PHASE_CONFIG.CHURNING;
   const isUp   = (stock.mom3d ?? 0) >= 0;
   const momColor = isUp ? "#34d399" : "#f87171";
@@ -56,7 +57,7 @@ function SmartMoneyCard({ stock, rank }: { stock: SmartMoneyItem; rank: number }
       onPress={() => { hapticLight(); router.push(`/stock/${stock.ticker}?tab=smartmoney` as any); }}
       activeOpacity={0.8}
       style={{
-        backgroundColor: "#1e2433", borderRadius: 12, padding: 14,
+        backgroundColor: colors.card, borderRadius: 12, padding: 14,
         borderLeftWidth: 3, borderLeftColor: cfg.color,
       }}>
 
@@ -65,7 +66,7 @@ function SmartMoneyCard({ stock, rank }: { stock: SmartMoneyItem; rank: number }
         <Text style={{ color: "#475569", fontSize: 11, width: 22 }}>{rank}</Text>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{stock.ticker}</Text>
+            <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 15 }}>{stock.ticker}</Text>
             <View style={{
               backgroundColor: cfg.bg, borderRadius: 4,
               paddingHorizontal: 6, paddingVertical: 1,
@@ -95,7 +96,7 @@ function SmartMoneyCard({ stock, rank }: { stock: SmartMoneyItem; rank: number }
 
       {/* Row 2: Flow score bar + Momentum arrow */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <View style={{ flex: 1, height: 4, backgroundColor: "#0f1629", borderRadius: 2, overflow: "hidden" }}>
+        <View style={{ flex: 1, height: 4, backgroundColor: colors.muted, borderRadius: 2, overflow: "hidden" }}>
           <View style={{
             height: "100%", borderRadius: 2,
             width: `${Math.min(100, stock.flowScore ?? 0)}%` as any,
@@ -234,14 +235,14 @@ export default function SmartMoneyScreen() {
   }, [phaseCounts, activePhase]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* ── Header ── */}
       <View style={{ paddingTop: topPadding, paddingHorizontal: 16, paddingBottom: 8 }}>
         <View style={{ flexDirection: "row", alignItems: "flex-start",
           justifyContent: "space-between", marginBottom: 2 }}>
           <View>
-            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}>💎 Smart Money Flow</Text>
-            <Text style={{ color: "#475569", fontSize: 11, marginTop: 1 }}>
+            <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 20 }}>💎 Smart Money Flow</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}>
               Analisis broker · Update setelah 17:30 WIB
             </Text>
           </View>
@@ -292,19 +293,19 @@ export default function SmartMoneyScreen() {
       {!isLoading && !isError && !dataAvailable && (
         <View style={styles.center}>
           <Text style={{ fontSize: 40, marginBottom: 16 }}>🕐</Text>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16,
+          <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 16,
             textAlign: "center", marginBottom: 8 }}>
             Data Belum Tersedia
           </Text>
-          <Text style={{ color: "#64748b", fontSize: 13, textAlign: "center", lineHeight: 20 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: "center", lineHeight: 20 }}>
             Smart Money Flow diproses setelah market tutup.{"\n"}
             Coba lagi setelah jam 17:30 WIB.
           </Text>
           <TouchableOpacity
-            style={{ backgroundColor: "#1e2433", borderRadius: 10, borderWidth: 1,
-              borderColor: "#334155", paddingHorizontal: 24, paddingVertical: 10, marginTop: 16 }}
+            style={{ backgroundColor: colors.card, borderRadius: 10, borderWidth: 1,
+              borderColor: colors.border, paddingHorizontal: 24, paddingVertical: 10, marginTop: 16 }}
             onPress={() => refetch()}>
-            <Text style={{ color: "#94a3b8", fontWeight: "600" }}>🔄 Refresh</Text>
+            <Text style={{ color: colors.mutedForeground, fontWeight: "600" }}>🔄 Refresh</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -319,16 +320,16 @@ export default function SmartMoneyScreen() {
 
           {/* Search */}
           <View style={{ marginHorizontal: 16, marginBottom: 8,
-            backgroundColor: "#1e2433", borderRadius: 10,
-            borderWidth: 1, borderColor: "#334155",
+            backgroundColor: colors.card, borderRadius: 10,
+            borderWidth: 1, borderColor: colors.border,
             flexDirection: "row", alignItems: "center", paddingHorizontal: 12 }}>
-            <Text style={{ color: "#475569", marginRight: 8 }}>🔍</Text>
+            <Text style={{ color: colors.mutedForeground, marginRight: 8 }}>🔍</Text>
             <TextInput
               placeholder="Cari ticker…"
-              placeholderTextColor="#475569"
+              placeholderTextColor={colors.mutedForeground}
               value={search}
               onChangeText={setSearch}
-              style={{ flex: 1, color: "#fff", fontSize: 13, paddingVertical: 10 }}
+              style={{ flex: 1, color: colors.foreground, fontSize: 13, paddingVertical: 10 }}
               autoCapitalize="characters"
             />
             {search.length > 0 && (
@@ -351,11 +352,11 @@ export default function SmartMoneyScreen() {
               onPress={() => setActivePhase(null)}
               style={{
                 paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-                backgroundColor: !activePhase ? "#1e2433" : "transparent",
-                borderWidth: 1, borderColor: !activePhase ? "#94a3b8" : "#334155",
+                backgroundColor: !activePhase ? colors.card : "transparent",
+                borderWidth: 1, borderColor: !activePhase ? colors.mutedForeground : colors.border,
                 alignSelf: "flex-start",
               }}>
-              <Text style={{ color: !activePhase ? "#94a3b8" : "#64748b", fontSize: 12 }}>
+              <Text style={{ color: !activePhase ? colors.foreground : colors.mutedForeground, fontSize: 12 }}>
                 Semua {searchFiltered.length}
               </Text>
             </TouchableOpacity>

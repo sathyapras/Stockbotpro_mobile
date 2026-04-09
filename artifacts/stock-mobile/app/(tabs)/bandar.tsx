@@ -117,6 +117,7 @@ function SummaryBar({ data }: { data: RadarMarket[] }) {
 
 function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
   const router = useRouter();
+  const colors = useColors();
   const flow   = getFlowConfig(item.flowState);
   const isUp   = item.chgPct >= 0;
   const chgColor = isUp ? "#34d399" : "#f87171";
@@ -139,18 +140,18 @@ function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
       onPress={() => { hapticLight(); router.push(`/stock/${item.ticker}` as any); }}
       activeOpacity={0.8}
       style={{
-        backgroundColor: "#1e2433", borderRadius: 12, padding: 14,
+        backgroundColor: colors.card, borderRadius: 12, padding: 14,
         borderLeftWidth: 3, borderLeftColor: flow.color,
       }}>
 
       {/* Row 1: Rank + Dot + Ticker + Badge + Change + NBS1D + Score */}
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-        <Text style={{ color: "#475569", fontSize: 11, width: 20 }}>{rank}</Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 11, width: 20 }}>{rank}</Text>
         <View style={{ width: 8, height: 8, borderRadius: 4,
           backgroundColor: flow.dot, marginRight: 8 }} />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{item.ticker}</Text>
+            <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 15 }}>{item.ticker}</Text>
             <View style={{ backgroundColor: flow.bg, borderRadius: 4,
               paddingHorizontal: 6, paddingVertical: 1,
               borderWidth: 1, borderColor: flow.color + "50" }}>
@@ -160,7 +161,7 @@ function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
               {isUp ? "▲" : "▼"}{Math.abs(item.chgPct).toFixed(2)}%
             </Text>
           </View>
-          <Text style={{ color: "#475569", fontSize: 10 }} numberOfLines={1}>{item.company}</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 10 }} numberOfLines={1}>{item.company}</Text>
         </View>
         {/* NBS 1D (right) */}
         <View style={{ alignItems: "flex-end", marginRight: 10 }}>
@@ -168,14 +169,14 @@ function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
             fontWeight: "700", fontSize: 14 }}>
             {item.nbs1d >= 0 ? "+" : ""}{item.nbs1d.toFixed(1)}B
           </Text>
-          <Text style={{ color: "#475569", fontSize: 9 }}>NBS 1D</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>NBS 1D</Text>
         </View>
         {/* Score */}
         <View style={{ alignItems: "flex-end" }}>
           <Text style={{ color: "#a78bfa", fontWeight: "900", fontSize: 18 }}>
             {Math.round(item.bandarScore)}
           </Text>
-          <Text style={{ color: "#475569", fontSize: 9 }}>score</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>score</Text>
         </View>
       </View>
 
@@ -198,13 +199,13 @@ function FlowStockCard({ item, rank }: { item: RadarMarket; rank: number }) {
           return (
             <View key={tf.label} style={{
               flex: 1, alignItems: "center",
-              backgroundColor: "#0f1629", borderRadius: 8, padding: 8,
+              backgroundColor: colors.muted, borderRadius: 8, padding: 8,
             }}>
               <Text style={{ color: up ? "#34d399" : "#f87171",
                 fontWeight: "700", fontSize: 13 }}>
                 {up ? "+" : ""}{tf.val.toFixed(1)}B
               </Text>
-              <Text style={{ color: "#475569", fontSize: 9 }}>{tf.label}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>{tf.label}</Text>
               <View style={{ width: 14, height: 14, borderRadius: 3,
                 backgroundColor: sig.color, marginTop: 4 }} />
               <Text style={{ color: sig.color, fontSize: 8, marginTop: 2 }}>{sig.label}</Text>
@@ -299,27 +300,27 @@ export default function BandarScreen() {
   }, [indexFiltered, smartList, filterTab, search]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#0f1629" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* ── Header ── */}
       <View style={{ paddingTop: topPadding, paddingHorizontal: 16, paddingBottom: 8 }}>
         {/* Title row */}
         <View style={{ flexDirection: "row", justifyContent: "space-between",
           alignItems: "flex-start", marginBottom: 10 }}>
           <View>
-            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}>📊 Buy/Sell Flow</Text>
-            <Text style={{ color: "#475569", fontSize: 11, marginTop: 1 }}>
+            <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 20 }}>📊 Buy/Sell Flow</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}>
               Net Buy/Sell · VWAP · Flow Signal
             </Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <TouchableOpacity
               onPress={() => router.push("/market-intel" as any)}
-              style={{ backgroundColor: "#1e2433", borderRadius: 8,
-                borderWidth: 1, borderColor: "#334155",
+              style={{ backgroundColor: colors.card, borderRadius: 8,
+                borderWidth: 1, borderColor: colors.border,
                 paddingHorizontal: 10, paddingVertical: 6,
                 flexDirection: "row", alignItems: "center", gap: 4 }}>
               <Text style={{ fontSize: 12 }}>🔭</Text>
-              <Text style={{ color: "#94a3b8", fontSize: 11 }}>Intel</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Intel</Text>
             </TouchableOpacity>
             <MenuButton />
           </View>
@@ -336,11 +337,11 @@ export default function BandarScreen() {
                 onPress={() => setIndexFilter(opt.key)}
                 style={{
                   paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16,
-                  backgroundColor: active ? "#60a5fa25" : "#1e2433",
-                  borderWidth: 1, borderColor: active ? "#60a5fa" : "#334155",
+                  backgroundColor: active ? "#60a5fa25" : colors.card,
+                  borderWidth: 1, borderColor: active ? "#60a5fa" : colors.border,
                   alignSelf: "flex-start",
                 }}>
-                <Text style={{ color: active ? "#60a5fa" : "#64748b",
+                <Text style={{ color: active ? "#60a5fa" : colors.mutedForeground,
                   fontSize: 12, fontWeight: active ? "700" : "400" }}>
                   {opt.label}
                 </Text>
@@ -356,21 +357,21 @@ export default function BandarScreen() {
 
         {/* Search */}
         <View style={{ flexDirection: "row", alignItems: "center",
-          backgroundColor: "#1e2433", borderRadius: 10,
-          borderWidth: 1, borderColor: "#334155",
+          backgroundColor: colors.card, borderRadius: 10,
+          borderWidth: 1, borderColor: colors.border,
           paddingHorizontal: 12, marginBottom: 10 }}>
-          <Text style={{ color: "#475569", marginRight: 8 }}>🔍</Text>
+          <Text style={{ color: colors.mutedForeground, marginRight: 8 }}>🔍</Text>
           <TextInput
             placeholder="Cari ticker atau nama..."
-            placeholderTextColor="#475569"
+            placeholderTextColor={colors.mutedForeground}
             value={search}
             onChangeText={setSearch}
-            style={{ flex: 1, color: "#fff", fontSize: 13, paddingVertical: 10 }}
+            style={{ flex: 1, color: colors.foreground, fontSize: 13, paddingVertical: 10 }}
             autoCapitalize="characters"
           />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Text style={{ color: "#475569", fontSize: 16, paddingLeft: 6 }}>✕</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 16, paddingLeft: 6 }}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -387,12 +388,12 @@ export default function BandarScreen() {
                 style={{
                   flexDirection: "row", alignItems: "center", gap: 4,
                   paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
-                  backgroundColor: active ? tab.color + "25" : "#1e2433",
-                  borderWidth: 1, borderColor: active ? tab.color : "#334155",
+                  backgroundColor: active ? tab.color + "25" : colors.card,
+                  borderWidth: 1, borderColor: active ? tab.color : colors.border,
                   alignSelf: "flex-start",
                 }}>
                 <Text style={{ fontSize: 12 }}>{tab.icon}</Text>
-                <Text style={{ color: active ? tab.color : "#64748b",
+                <Text style={{ color: active ? tab.color : colors.mutedForeground,
                   fontSize: 11, fontWeight: active ? "700" : "400" }}>
                   {tab.label} {counts[tab.key]}
                 </Text>

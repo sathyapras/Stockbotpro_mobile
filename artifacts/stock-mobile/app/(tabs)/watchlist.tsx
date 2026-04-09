@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MAX_WATCHLIST, useWatchlist } from "@/context/WatchlistContext";
 import { MenuButton } from "@/components/MenuButton";
 import { SkeletonListScreen } from "@/components/SkeletonBox";
+import { useColors } from "@/hooks/useColors";
 import {
   MasterStock,
   buildStockMap,
@@ -88,6 +89,7 @@ function WatchlistCard({
   onDelete: () => void;
 }) {
   const swipeRef = useRef<Swipeable>(null);
+  const colors = useColors();
   const isUp = item.changePercent >= 0;
   const chgColor = isUp ? "#34d399" : "#f87171";
   const smLabel = item.smfPhase ? SM_LABELS[item.smfPhase] : null;
@@ -116,20 +118,20 @@ function WatchlistCard({
       <TouchableOpacity
         onPress={() => router.push(`/stock/${item.symbol}` as never)}
         activeOpacity={0.8}
-        style={[styles.card, { backgroundColor: "#1e2433" }]}
+        style={[styles.card, { backgroundColor: colors.card }]}
       >
         {/* Row 1: ticker · price · change% */}
         <View style={styles.cardRow1}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.symbol, { color: "#fff" }]}>
+            <Text style={[styles.symbol, { color: colors.foreground }]}>
               {item.symbol}
             </Text>
-            <Text style={styles.companyName} numberOfLines={1}>
+            <Text style={[styles.companyName, { color: colors.mutedForeground }]} numberOfLines={1}>
               {item.name}
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={[styles.price, { color: "#fff" }]}>
+            <Text style={[styles.price, { color: colors.foreground }]}>
               {item.price > 0 ? item.price.toLocaleString("id-ID") : "—"}
             </Text>
             <View style={[styles.changeBadge, { backgroundColor: chgColor + "22" }]}>
@@ -151,7 +153,7 @@ function WatchlistCard({
           )}
 
           {!!smLabel && (
-            <View style={styles.smBadge}>
+            <View style={[styles.smBadge, { backgroundColor: colors.muted }]}>
               <Text style={styles.smBadgeText}>
                 SM: {smLabel} · {item.smfScore}
               </Text>
@@ -192,6 +194,7 @@ function AddModal({
 }) {
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const colors = useColors();
 
   const suggestions = useMemo(() => {
     if (query.length < 1) return [];
@@ -230,22 +233,22 @@ function AddModal({
         activeOpacity={1}
         onPress={handleClose}
       />
-      <View style={styles.modal}>
-        <View style={styles.modalHandle} />
-        <Text style={styles.modalTitle}>Tambah ke Watchlist</Text>
-        <Text style={styles.modalSub}>
+      <View style={[styles.modal, { backgroundColor: colors.card }]}>
+        <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+        <Text style={[styles.modalTitle, { color: colors.foreground }]}>Tambah ke Watchlist</Text>
+        <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
           {watchlist.length}/{MAX_WATCHLIST} saham terpantau
         </Text>
 
         {/* Search input */}
-        <View style={styles.searchBox}>
-          <Feather name="search" size={16} color="#475569" style={{ marginRight: 8 }} />
+        <View style={[styles.searchBox, { backgroundColor: colors.muted }]}>
+          <Feather name="search" size={16} color={colors.mutedForeground} style={{ marginRight: 8 }} />
           <TextInput
             placeholder="Kode saham (contoh: BBCA)"
-            placeholderTextColor="#475569"
+            placeholderTextColor={colors.mutedForeground}
             value={query}
             onChangeText={t => { setQuery(t.toUpperCase()); setError(""); }}
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.foreground }]}
             autoCapitalize="characters"
             autoCorrect={false}
           />
@@ -271,8 +274,8 @@ function AddModal({
               style={styles.suggestion}
             >
               <View style={{ flex: 1 }}>
-                <Text style={styles.suggestionSymbol}>{s.symbol}</Text>
-                <Text style={styles.suggestionName} numberOfLines={1}>{s.name}</Text>
+                <Text style={[styles.suggestionSymbol, { color: colors.foreground }]}>{s.symbol}</Text>
+                <Text style={[styles.suggestionName, { color: colors.mutedForeground }]} numberOfLines={1}>{s.name}</Text>
               </View>
               {already ? (
                 <View style={styles.alreadyBadge}>
@@ -303,13 +306,14 @@ function AddModal({
 // ─── Empty State ──────────────────────────────────────────────
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
+  const colors = useColors();
   return (
     <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
         <Text style={{ fontSize: 40 }}>★</Text>
       </View>
-      <Text style={styles.emptyTitle}>Watchlist Kosong</Text>
-      <Text style={styles.emptyDesc}>
+      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Watchlist Kosong</Text>
+      <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
         Tambahkan saham yang ingin dipantau.{"\n"}Maksimum {MAX_WATCHLIST} saham.
       </Text>
       <TouchableOpacity style={styles.emptyAddBtn} onPress={onAdd}>
@@ -324,6 +328,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 
 export default function WatchlistScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist();
   const [addVisible, setAddVisible] = useState(false);
 
@@ -391,15 +396,15 @@ export default function WatchlistScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: "#0f1629" }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: topPadding }]}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.headerTitle, { color: "#fff" }]}>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>
               ★ Watchlist
             </Text>
-            <Text style={[styles.headerSub, { color: "#64748b" }]}>
+            <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
               {watchlist.length} / {MAX_WATCHLIST} saham
             </Text>
           </View>
@@ -430,7 +435,7 @@ export default function WatchlistScreen() {
             disabled={isFull}
             style={[
               styles.addBtn,
-              { backgroundColor: isFull ? "#1e2433" : "#0ea5e9" },
+              { backgroundColor: isFull ? colors.card : "#0ea5e9" },
             ]}
           >
             <Feather name="plus" size={14} color={isFull ? "#475569" : "#fff"} />
@@ -446,7 +451,7 @@ export default function WatchlistScreen() {
         {isLoading && watchlist.length > 0 && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
             <ActivityIndicator size="small" color="#0ea5e9" />
-            <Text style={{ color: "#64748b", fontSize: 12 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
               Memuat data saham...
             </Text>
           </View>

@@ -105,6 +105,7 @@ const INDICES = [
 ] as const;
 
 function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMarket[] }) {
+  const colors = useColors();
   const breadth = useMemo(() => calcBreadth(stocks), [stocks]);
   const stockMap = useMemo(() => new Map(stocks.map(s => [s.symbol, s])), [stocks]);
   const radarMap = useMemo(() => new Map(radar.map(r => [r.ticker, r])), [radar]);
@@ -166,11 +167,11 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
   }, [radar, breadth, ihsgChg]);
 
   return (
-    <View style={{ backgroundColor: "#0f1629", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+    <View style={{ backgroundColor: colors.background, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
       {/* Row 1: Greeting + LIVE + Hamburger */}
       <View style={{ flexDirection: "row", justifyContent: "space-between",
         alignItems: "center", marginBottom: 10 }}>
-        <Text style={{ color: "#94a3b8", fontSize: 14 }}>{getGreeting()}</Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>{getGreeting()}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6,
             backgroundColor: "#052e16", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
@@ -183,7 +184,7 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
 
       {/* Row 2: IHSG Big */}
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-        <Text style={{ color: "#fff", fontWeight: "900", fontSize: 18 }}>IHSG</Text>
+        <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 18 }}>IHSG</Text>
         {ihsgClose > 0 ? (
           <>
             <Text style={{ color: chgColor, fontWeight: "900", fontSize: 32 }}>
@@ -194,7 +195,7 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
             </Text>
           </>
         ) : (
-          <Text style={{ color: "#475569", fontSize: 18 }}>Memuat…</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 18 }}>Memuat…</Text>
         )}
       </View>
 
@@ -216,7 +217,7 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
 
       {/* ── Market Context Card (replaces redundant IDX COMPOSITE card) ── */}
       <View style={{
-        backgroundColor: "#131d2e", borderRadius: 14,
+        backgroundColor: colors.card, borderRadius: 14,
         borderWidth: 1, borderColor: marketCtx.riskColor + "30",
         padding: 12, marginBottom: 8,
       }}>
@@ -251,7 +252,7 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
         </View>
 
         {/* Score bar */}
-        <View style={{ height: 4, backgroundColor: "#0f1629", borderRadius: 2,
+        <View style={{ height: 4, backgroundColor: colors.muted, borderRadius: 2,
           overflow: "hidden", marginBottom: 10 }}>
           <View style={{ position: "absolute", flexDirection: "row", width: "100%", height: "100%" }}>
             <View style={{ flex: 4, backgroundColor: "#34d399" }} />
@@ -260,7 +261,7 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
           </View>
           <View style={{ position: "absolute", right: 0, top: 0, bottom: 0,
             width: `${100 - (marketCtx.finalScore / 10 * 100)}%` as any,
-            backgroundColor: "#131d2e" }} />
+            backgroundColor: colors.card }} />
         </View>
 
         {/* Bottom row: 3 stats */}
@@ -272,9 +273,9 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
           ].map((stat, i) => (
             <View key={stat.label} style={{
               flex: 1, alignItems: "center",
-              borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: "#1e293b",
+              borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: colors.border,
             }}>
-              <Text style={{ color: "#475569", fontSize: 9, marginBottom: 2 }}>{stat.label}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 9, marginBottom: 2 }}>{stat.label}</Text>
               <Text style={{ color: stat.color, fontWeight: "700", fontSize: 14 }}>{stat.value}</Text>
             </View>
           ))}
@@ -290,12 +291,12 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
             return (
               <View key={idx.key} style={{
                 flex: 1, minWidth: "45%",
-                backgroundColor: "#1a2233", borderRadius: 12,
-                borderWidth: 1, borderColor: "#1e293b",
+                backgroundColor: colors.card, borderRadius: 12,
+                borderWidth: 1, borderColor: colors.border,
                 padding: 10,
               }}>
-                <Text style={{ color: "#475569", fontSize: 9, marginBottom: 2 }}>{idx.label}</Text>
-                <Text style={{ color: "#e2e8f0", fontWeight: "700", fontSize: 14 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 9, marginBottom: 2 }}>{idx.label}</Text>
+                <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 14 }}>
                   {idx.val.toLocaleString("id-ID", { maximumFractionDigits: 1 })}
                 </Text>
                 <Text style={{ color: col, fontSize: 11, fontWeight: "600" }}>
@@ -504,6 +505,7 @@ function filterByTab(radar: RadarMarket[], tab: SnapTab): RadarMarket[] {
 }
 
 function SignalSnapshotSection({ radar }: { radar: RadarMarket[] }) {
+  const colors = useColors();
   const [activeTab, setActiveTab] = useState<SnapTab>("acc");
 
   const stocksOnly = useMemo(
@@ -525,13 +527,13 @@ function SignalSnapshotSection({ radar }: { radar: RadarMarket[] }) {
   const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 
   return (
-    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12 }]}>
+    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12, backgroundColor: colors.card }]}>
       {/* Header */}
       <View style={{ flexDirection: "row", justifyContent: "space-between",
         alignItems: "center", marginBottom: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={{ fontSize: 16 }}>🎯</Text>
-          <Text style={styles.cardTitle}>Signal Snapshot</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Signal Snapshot</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#34d399" }} />
             <Text style={{ color: "#64748b", fontSize: 10 }}>{today}</Text>
@@ -647,9 +649,10 @@ function buildPhaseStats(radar: RadarMarket[]) {
 }
 
 function PhaseDistributionSection({ radar }: { radar: RadarMarket[] }) {
+  const colors = useColors();
   const stats = useMemo(() => buildPhaseStats(radar), [radar]);
   return (
-    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12 }]}>
+    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12, backgroundColor: colors.card }]}>
       <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
         letterSpacing: 1, marginBottom: 10 }}>
         PHASE DISTRIBUTION · {stats.total} SAHAM
@@ -690,6 +693,7 @@ function PhaseDistributionSection({ radar }: { radar: RadarMarket[] }) {
 // ─── [5] Sentimen Global Card ─────────────────────────────────
 
 function SentimenGlobalCard() {
+  const colors = useColors();
   const { data, isLoading } = useQuery({
     queryKey: ["global-sentiment"],
     queryFn: fetchGlobalSentiment,
@@ -701,8 +705,8 @@ function SentimenGlobalCard() {
   const s        = data?.sentiment;
   const fearInfo = fearLabelDisplay(s?.fearLabel ?? "NEUTRAL");
 
-  const cardBg     = s ? fearInfo.bg     : "#1e2433";
-  const borderCol  = s ? fearInfo.color + "55" : "#2d3748";
+  const cardBg     = s ? fearInfo.bg     : colors.card;
+  const borderCol  = s ? fearInfo.color + "55" : colors.border;
 
   const biasBadge =
     s?.globalBias === "RISK_OFF" ? { text: "RISK OFF", color: "#f87171", bg: "#2d0a0a" } :
@@ -725,7 +729,7 @@ function SentimenGlobalCard() {
         justifyContent: "space-between", marginBottom: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={{ fontSize: 15 }}>🌍</Text>
-          <Text style={styles.cardTitle}>Sentimen Global</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Sentimen Global</Text>
           {s && (
             <View style={{ backgroundColor: biasBadge.bg, borderRadius: 6,
               paddingHorizontal: 8, paddingVertical: 2,
@@ -852,12 +856,13 @@ function calcRiskScore(radar: RadarMarket[], breadth: ReturnType<typeof calcBrea
 function MarketRiskCard({ radar, breadth }: {
   radar: RadarMarket[]; breadth: ReturnType<typeof calcBreadth>;
 }) {
+  const colors = useColors();
   const [expanded, setExpanded] = useState(false);
   const risk = useMemo(() => calcRiskScore(radar, breadth), [radar, breadth]);
   const visibleComponents = expanded ? risk.components : risk.components.slice(0, 2);
 
   return (
-    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12 }]}>
+    <View style={[styles.card, { marginHorizontal: 16, marginBottom: 12, backgroundColor: colors.card }]}>
       {/* Score + label header */}
       <View style={{ flexDirection: "row", justifyContent: "space-between",
         alignItems: "flex-start", marginBottom: 10 }}>
@@ -877,14 +882,14 @@ function MarketRiskCard({ radar, breadth }: {
 
       {/* Gradient bar */}
       <View style={{ marginBottom: 12 }}>
-        <View style={{ height: 8, backgroundColor: "#0f1629", borderRadius: 4, overflow: "hidden" }}>
+        <View style={{ height: 8, backgroundColor: colors.muted, borderRadius: 4, overflow: "hidden" }}>
           <View style={{ position: "absolute", flexDirection: "row", width: "100%", height: "100%" }}>
             <View style={{ flex: 4, backgroundColor: "#34d399" }} />
             <View style={{ flex: 3, backgroundColor: "#f97316" }} />
             <View style={{ flex: 3, backgroundColor: "#dc2626" }} />
           </View>
           <View style={{ position: "absolute", right: 0, top: 0, bottom: 0,
-            width: `${100 - (risk.score / 10 * 100)}%` as any, backgroundColor: "#0f1629" }} />
+            width: `${100 - (risk.score / 10 * 100)}%` as any, backgroundColor: colors.muted }} />
         </View>
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 3 }}>
           <Text style={{ color: "#475569", fontSize: 9 }}>0 LOW</Text>
@@ -946,12 +951,13 @@ function MarketRiskCard({ radar, breadth }: {
 // ─── Mover card ───────────────────────────────────────────────
 
 function MoverCard({ ms }: { ms: MasterStock }) {
+  const colors = useColors();
   const isUp = ms.changePercent >= 0;
   const chgColor = isUp ? "#34d399" : "#f87171";
   const badges = getIndexBadges(ms.indexCategory);
   return (
     <TouchableOpacity
-      style={{ width: 108, padding: 10, borderRadius: 12, backgroundColor: "#1e2433" }}
+      style={{ width: 108, padding: 10, borderRadius: 12, backgroundColor: colors.card }}
       onPress={() => { hapticLight(); router.push(`/stock/${ms.symbol}` as never); }}
       activeOpacity={0.7}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
@@ -1202,13 +1208,13 @@ export default function MarketScreen() {
             <VerificationBanner />
 
             {/* [2] Command Center — live market intel */}
-            <View style={{ backgroundColor: "#0f1629", paddingTop: 16, paddingBottom: 8 }}>
+            <View style={{ backgroundColor: colors.background, paddingTop: 16, paddingBottom: 8 }}>
               <CommandCenter radar={radar} loading={loadingRadar} sectors={sectorStats} />
             </View>
 
             {/* [3]-[6] Smart sections — from radar */}
             {radarReady ? (
-              <View style={{ backgroundColor: "#0f1629", paddingTop: 8 }}>
+              <View style={{ backgroundColor: colors.background, paddingTop: 8 }}>
                 <SignalSnapshotSection radar={radar} />
                 <PhaseDistributionSection radar={radar} />
                 <SentimenGlobalCard />
@@ -1216,7 +1222,7 @@ export default function MarketScreen() {
               </View>
             ) : loadingRadar ? (
               <View style={{ marginHorizontal: 16, marginVertical: 8, padding: 14,
-                backgroundColor: "#1e2433", borderRadius: 16, alignItems: "center" }}>
+                backgroundColor: colors.card, borderRadius: 16, alignItems: "center" }}>
                 <ActivityIndicator size="small" color="#60a5fa" />
                 <Text style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
                   Memuat Market Intelligence…
