@@ -367,7 +367,7 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
   const cards: CCCard[] = [
     {
       icon: "🎯", label: "STOCKPICK", sub: "BOW & BOS",
-      color: "#00F2FF", bg: "#002B2B", border: "#00F2FFaa",
+      color: "#00A3DA", bg: "#0B1A27", border: "#00A3DAaa",
       path: "/(tabs)/stockpick",
       metric: stats ? `${stats.bowCount} Entry` : "—",
       detail: stats?.topEntry ? `Hot: ${stats.topEntry.ticker}  ${stats.topEntry.trendScore}/100` : loading ? "Loading…" : "Belum ada data",
