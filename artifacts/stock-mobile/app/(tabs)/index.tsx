@@ -389,6 +389,7 @@ function CommandMiniCard({ card }: { card: CCCard }) {
 }
 
 function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; loading: boolean; sectors: SectorData[] }) {
+  const colors = useColors();
   const stocksOnly = useMemo(
     () => radar.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE"),
     [radar]
