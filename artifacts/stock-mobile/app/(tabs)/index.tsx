@@ -469,7 +469,9 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
           activeOpacity={0.8}
           style={{
             borderRadius: 14, padding: 13,
-            backgroundColor: "#0e1520", borderWidth: 1, borderColor: "#fb923c25",
+            backgroundColor: colors.card,
+            borderWidth: 1, borderColor: colors.border,
+            borderLeftWidth: 3, borderLeftColor: "#fb923c",
             flexDirection: "row", alignItems: "center", gap: 12,
           }}>
           <View style={{ flex: 1 }}>
@@ -478,10 +480,10 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
               <View>
                 <Text style={{ color: "#fb923c", fontSize: 10, fontWeight: "800",
                   letterSpacing: 0.5 }}>SECTOR ROTATION</Text>
-                <Text style={{ color: "#475569", fontSize: 8 }}>Market Breadth</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 8 }}>Market Breadth</Text>
               </View>
             </View>
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
+            <Text style={{ color: colors.foreground, fontWeight: "800", fontSize: 15 }}>
               {sectorSummary
                 ? `${sectorSummary.leadingCount} Leading  ·  ${sectorSummary.laggingCount} Lagging`
                 : loading ? "Loading…" : "—"}
@@ -500,7 +502,7 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
                   {SECTOR_PHASE_CFG[sectorSummary.top.phase].emoji} {sectorSummary.top.phase}
                 </Text>
               </View>
-              <Text style={{ color: "#94a3b8", fontSize: 11, fontWeight: "600" }}
+              <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "600" }}
                 numberOfLines={1}>
                 {sectorSummary.top.sector}
               </Text>
