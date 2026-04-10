@@ -345,9 +345,9 @@ export default function SmartMoneyScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
+            style={{ flexShrink: 0, marginBottom: 4 }}
             contentContainerStyle={{
-              paddingHorizontal: 16, gap: 6, paddingBottom: 8,
+              paddingHorizontal: 16, paddingVertical: 6, gap: 6,
               alignItems: "center", flexDirection: "row",
             }}>
             <TouchableOpacity
@@ -356,7 +356,6 @@ export default function SmartMoneyScreen() {
                 paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
                 backgroundColor: !activePhase ? colors.card : "transparent",
                 borderWidth: 1, borderColor: !activePhase ? colors.mutedForeground : colors.border,
-                alignSelf: "flex-start",
               }}>
               <Text style={{ color: !activePhase ? colors.foreground : colors.mutedForeground, fontSize: 12 }}>
                 Semua {searchFiltered.length}
@@ -373,13 +372,12 @@ export default function SmartMoneyScreen() {
                   style={{
                     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
                     backgroundColor: active ? cfg.bg : "transparent",
-                    borderWidth: 1, borderColor: active ? cfg.color : "#334155",
+                    borderWidth: 1, borderColor: active ? cfg.color : colors.border,
                     flexDirection: "row", alignItems: "center", gap: 4,
-                    alignSelf: "flex-start",
                   }}>
                   <Text style={{ fontSize: 11 }}>{cfg.icon}</Text>
                   <Text style={{
-                    color: active ? cfg.color : "#64748b", fontSize: 12,
+                    color: active ? cfg.color : colors.mutedForeground, fontSize: 12,
                     fontWeight: active ? "700" : "400",
                   }}>
                     {cfg.display} {phaseCounts[phase] ?? 0}
