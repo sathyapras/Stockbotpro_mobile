@@ -124,7 +124,8 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
     queryFn: fetchGlobalSentiment,
     staleTime: 10 * 60 * 1000,
   });
-  const usdIdr = sentimentData?.sentiment?.usdIdr ?? null;
+  const usdIdr    = sentimentData?.sentiment?.usdIdr ?? null;
+  const usdIdrChg = sentimentData?.currencies?.find(c => c.symbol === "USDIDR=X")?.changePct ?? null;
 
   const ihsgMs = stockMap.get("COMPOSITE");
   const ihsgRd = radarMap.get("COMPOSITE");
@@ -224,9 +225,19 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
           <View style={{ alignItems: "flex-end" }}>
             <Text style={{ color: colors.mutedForeground, fontSize: 10, fontWeight: "600",
               letterSpacing: 0.5 }}>USD/IDR</Text>
-            <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 16 }}>
-              {usdIdr.toLocaleString("id-ID")}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 16 }}>
+                {usdIdr.toLocaleString("id-ID")}
+              </Text>
+              {usdIdrChg != null && (
+                <Text style={{
+                  fontSize: 13, fontWeight: "700",
+                  color: usdIdrChg >= 0 ? "#f87171" : "#34d399",
+                }}>
+                  {usdIdrChg >= 0 ? "▲" : "▼"}
+                </Text>
+              )}
+            </View>
           </View>
         ) : null}
       </View>
