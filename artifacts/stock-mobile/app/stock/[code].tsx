@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  Animated,
+  Easing,
   ScrollView,
   StyleSheet,
   Text,
@@ -1555,9 +1556,11 @@ function ChartTab({ symbol }: { symbol: string }) {
       {/* Chart area */}
       {isLoading ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <Animated.View style={{ opacity: 1 }}>
+            <Text style={{ color: colors.primary, fontSize: 20 }}>📊</Text>
+          </Animated.View>
           <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-            Memuat data historis…
+            Memuat chart historis…
           </Text>
         </View>
       ) : candles.length === 0 ? (
@@ -1652,6 +1655,196 @@ function ChartTab({ symbol }: { symbol: string }) {
   );
 }
 
+// ─── AI Loading Animation ─────────────────────────────────────
+
+const CANDLE_DATA = [
+  { color: "#34d399", bodyH: 32, wickT: 12, wickB: 6 },
+  { color: "#f87171", bodyH: 22, wickT: 7,  wickB: 10 },
+  { color: "#34d399", bodyH: 44, wickT: 10, wickB: 5  },
+  { color: "#f87171", bodyH: 18, wickT: 5,  wickB: 8  },
+  { color: "#34d399", bodyH: 36, wickT: 14, wickB: 6  },
+  { color: "#f87171", bodyH: 28, wickT: 6,  wickB: 12 },
+  { color: "#34d399", bodyH: 48, wickT: 8,  wickB: 4  },
+];
+
+function StockLoadingAnimation({ ticker }: { ticker: string }) {
+  const colors = useColors();
+  const CHART_H = 80;
+
+  const bodyAnims = useRef(
+    CANDLE_DATA.map(d => new Animated.Value(d.bodyH))
+  ).current;
+  const scanAnim  = useRef(new Animated.Value(0)).current;
+  const dot1      = useRef(new Animated.Value(0.2)).current;
+  const dot2      = useRef(new Animated.Value(0.2)).current;
+  const dot3      = useRef(new Animated.Value(0.2)).current;
+  const glowAnim  = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const candleAnims = bodyAnims.map((anim, i) => {
+      const target = CANDLE_DATA[i].bodyH;
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 120),
+          Animated.timing(anim, {
+            toValue: target * 1.5,
+            duration: 500 + i * 60,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: false,
+          }),
+          Animated.timing(anim, {
+            toValue: target * 0.55,
+            duration: 500 + i * 60,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: false,
+          }),
+          Animated.timing(anim, {
+            toValue: target,
+            duration: 350,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: false,
+          }),
+        ])
+      );
+    });
+
+    const scan = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanAnim, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: false,
+        }),
+        Animated.delay(200),
+        Animated.timing(scanAnim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+
+    const makeDot = (anim: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: 1, duration: 350, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0.2, duration: 350, useNativeDriver: true }),
+          Animated.delay(700),
+        ])
+      );
+
+    const glow = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+
+    candleAnims.forEach(a => a.start());
+    scan.start();
+    makeDot(dot1, 0).start();
+    makeDot(dot2, 300).start();
+    makeDot(dot3, 600).start();
+    glow.start();
+
+    return () => {
+      candleAnims.forEach(a => a.stop());
+      scan.stop();
+    };
+  }, []);
+
+  const CHART_WIDTH = CANDLE_DATA.length * 24;
+
+  return (
+    <View style={{
+      flex: 1, alignItems: "center", justifyContent: "center",
+      backgroundColor: colors.background, gap: 28,
+    }}>
+      {/* Chart box */}
+      <View style={{
+        backgroundColor: colors.card,
+        borderRadius: 20, padding: 20,
+        borderWidth: 1, borderColor: colors.border,
+        alignItems: "center",
+        shadowColor: "#34d399", shadowOpacity: 0.08,
+        shadowRadius: 20, elevation: 4,
+      }}>
+        {/* Grid lines */}
+        <View style={{ position: "absolute", top: 20, left: 20, right: 20, height: CHART_H,
+          justifyContent: "space-between", pointerEvents: "none" }}>
+          {[0,1,2,3].map(i => (
+            <View key={i} style={{ height: 1, backgroundColor: colors.border, opacity: 0.5 }} />
+          ))}
+        </View>
+
+        {/* Candles */}
+        <View style={{ flexDirection: "row", alignItems: "flex-end", height: CHART_H,
+          gap: 8, width: CHART_WIDTH, overflow: "hidden" }}>
+          {CANDLE_DATA.map((d, i) => (
+            <View key={i} style={{ alignItems: "center", justifyContent: "flex-end",
+              height: CHART_H, flex: 1 }}>
+              <View style={{ width: 2, height: d.wickT, backgroundColor: d.color,
+                opacity: 0.7, borderRadius: 1 }} />
+              <Animated.View style={{
+                width: 14, height: bodyAnims[i],
+                backgroundColor: d.color,
+                borderRadius: 3,
+                shadowColor: d.color, shadowOpacity: 0.5,
+                shadowRadius: 4, elevation: 2,
+              }} />
+              <View style={{ width: 2, height: d.wickB, backgroundColor: d.color,
+                opacity: 0.7, borderRadius: 1 }} />
+            </View>
+          ))}
+        </View>
+
+        {/* Scan line */}
+        <Animated.View style={{
+          position: "absolute",
+          left: scanAnim.interpolate({ inputRange: [0, 1], outputRange: [20, CHART_WIDTH + 20] }),
+          top: 20,
+          width: 2,
+          height: CHART_H,
+          backgroundColor: "#34d399",
+          opacity: 0.8,
+          borderRadius: 1,
+          shadowColor: "#34d399", shadowOpacity: 1, shadowRadius: 8,
+        }} />
+
+        {/* Bottom axis line */}
+        <View style={{ height: 1, width: CHART_WIDTH, backgroundColor: colors.border,
+          marginTop: 4, opacity: 0.8 }} />
+      </View>
+
+      {/* Text block */}
+      <View style={{ alignItems: "center", gap: 6 }}>
+        <Animated.Text style={{
+          color: colors.mutedForeground, fontSize: 12,
+          letterSpacing: 2, fontWeight: "600", textTransform: "uppercase",
+          opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
+        }}>
+          Processing Insight for
+        </Animated.Text>
+        <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 22,
+          letterSpacing: 1 }}>
+          {ticker}
+        </Text>
+        <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
+          {[dot1, dot2, dot3].map((d, i) => (
+            <Animated.View key={i} style={{
+              width: 7, height: 7, borderRadius: 4,
+              backgroundColor: "#34d399",
+              opacity: d,
+            }} />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main screen ─────────────────────────────────────────────
 
 export default function StockDetailScreen() {
@@ -1697,12 +1890,7 @@ export default function StockDetailScreen() {
       />
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {isLoading ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 10 }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
-              Mengambil data {ticker}...
-            </Text>
-          </View>
+          <StockLoadingAnimation ticker={ticker} />
         ) : isError || !data ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 24 }}>
             <Text style={{ fontSize: 32 }}>⚠️</Text>
