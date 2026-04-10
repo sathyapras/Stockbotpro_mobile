@@ -62,14 +62,27 @@ function fetchYahoo(symbol: string): Promise<{
       res.on("end", () => {
         try {
           const json = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          const meta = json?.chart?.result?.[0]?.meta;
+          const result = json?.chart?.result?.[0];
+          const meta   = result?.meta;
           if (!meta) {
             resolve({ value: null, change: null, changePct: null });
             return;
           }
-          const value = meta.regularMarketPrice ?? null;
-          const prev = meta.chartPreviousClose ?? meta.previousClose ?? null;
-          const change = value != null && prev != null ? value - prev : null;
+          const value = (meta.regularMarketPrice as number | undefined) ?? null;
+
+          // Use last 2 closing prices from the chart array for accurate daily change.
+          // meta.chartPreviousClose is the *start* of the range, not yesterday's close.
+          const closes: (number | null)[] =
+            result?.indicators?.quote?.[0]?.close ?? [];
+          const validCloses = closes.filter((c): c is number => c != null);
+          const lastClose = validCloses.length >= 1 ? validCloses[validCloses.length - 1] : null;
+          const prevClose = validCloses.length >= 2 ? validCloses[validCloses.length - 2] : null;
+
+          // Prefer chart-derived prev close; fall back to meta fields if only 1 bar exists
+          const prev = prevClose ?? (meta.chartPreviousClose as number | undefined) ?? null;
+          const cur  = lastClose ?? value;
+
+          const change = cur != null && prev != null ? cur - prev : null;
           const changePct =
             change != null && prev != null && prev !== 0
               ? (change / prev) * 100
