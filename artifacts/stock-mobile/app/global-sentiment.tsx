@@ -480,7 +480,7 @@ export default function GlobalSentimentScreen() {
           ) : null}
 
           <Text style={styles.footerNote}>
-            Data from Yahoo Finance. Pull down to refresh.
+            Pull down to refresh.
             For educational purposes only — not investment advice.
           </Text>
         </ScrollView>
