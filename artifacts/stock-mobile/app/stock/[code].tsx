@@ -1192,7 +1192,7 @@ function SmartMoneyTab({ sm, radar, currentPrice, colors }: {
             </View>
 
             {/* Top broker labels */}
-            {(sm.top1Label || sm.top3Label) && (
+            {(sm.top1Label || sm.top3Label || sm.top5Label) && (
               <View style={{ marginTop: 10, gap: 4 }}>
                 {sm.top1Label ? (
                   <Text style={{ color: colors.foreground, fontSize: 11 }}>
@@ -1202,6 +1202,11 @@ function SmartMoneyTab({ sm, radar, currentPrice, colors }: {
                 {sm.top3Label ? (
                   <Text style={{ color: colors.foreground, fontSize: 11 }}>
                     Smart Money 3: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{sm.top3Label}</Text>
+                  </Text>
+                ) : null}
+                {sm.top5Label ? (
+                  <Text style={{ color: colors.foreground, fontSize: 11 }}>
+                    Smart Money 5: <Text style={{ color: "#34d399", fontWeight: "700" }}>{sm.top5Label}</Text>
                   </Text>
                 ) : null}
                 {sm.latestVwap ? (

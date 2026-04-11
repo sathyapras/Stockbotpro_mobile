@@ -247,11 +247,23 @@ function SmartMoneyCard({ stock, rank }: { stock: SmartMoneyItem; rank: number }
             </View>
           )}
         </View>
-        {stock.top1Label && stock.top1Label !== "—" && (
-          <Text style={{ color: "#475569", fontSize: 10 }}>
-            pola: <Text style={{ color: "#94a3b8" }}>{stock.top1Label}</Text>
-          </Text>
-        )}
+        <View style={{ gap: 1, alignItems: "flex-end" }}>
+          {stock.top1Label && stock.top1Label !== "—" && (
+            <Text style={{ color: "#475569", fontSize: 10 }}>
+              SM1: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{stock.top1Label}</Text>
+            </Text>
+          )}
+          {stock.top3Label && stock.top3Label !== "—" && (
+            <Text style={{ color: "#475569", fontSize: 10 }}>
+              SM3: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{stock.top3Label}</Text>
+            </Text>
+          )}
+          {stock.top5Label && stock.top5Label !== "—" && (
+            <Text style={{ color: "#475569", fontSize: 10 }}>
+              SM5: <Text style={{ color: "#34d399", fontWeight: "700" }}>{stock.top5Label}</Text>
+            </Text>
+          )}
+        </View>
       </View>
 
       {/* Phase description */}

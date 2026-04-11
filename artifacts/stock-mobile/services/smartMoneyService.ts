@@ -40,6 +40,7 @@ export interface SmartMoneyItem {
   deltaNetVal: number;
   top1Label: string;
   top3Label: string;
+  top5Label: string;
   latestAccDist: number;
   latestAvgPrice: number;
 }
