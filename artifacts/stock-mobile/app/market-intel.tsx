@@ -152,7 +152,7 @@ function MarketPulseCard({ stocks }: { stocks: RadarMarket[] }) {
 
       <View style={styles.statsRow}>
         {[
-          { label: "SM Acc%",        value: `${pulse.smAccPct}%`,        sub: `${pulse.total} saham` },
+          { label: "B/S",             value: `${pulse.smAccPct}%`,        sub: `${pulse.total} saham` },
           { label: "Avg Flow Score", value: `${pulse.avgFlowScore}/100`, sub: "Rata-rata bandar score" },
           { label: "SM Pulse",       value: `${pulse.smBrokPulse}/100`,  sub: "60% Acc + 40% Score" },
         ].map(s => (
@@ -198,7 +198,7 @@ function FlowStateCard({ stocks }: { stocks: RadarMarket[] }) {
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>👥 Flow State</Text>
       </View>
-      <Text style={styles.cardSubtitle}>Primary Truth — Smart Money ngapain?</Text>
+      <Text style={styles.cardSubtitle}>Primary Truth — HakaHaki Power</Text>
       {flows.map(f => (
         <View key={f.key} style={[styles.row, { gap: 8, marginBottom: 8 }]}>
           <Text style={[styles.flowLabel, { color: f.color }]}>{f.label}</Text>
