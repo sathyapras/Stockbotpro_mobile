@@ -417,7 +417,7 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
       detail: stats?.topEntry ? `Hot: ${stats.topEntry.ticker}  ${stats.topEntry.trendScore}/100` : loading ? "Loading…" : "Belum ada data",
     },
     {
-      icon: "📊", label: "FLOW", sub: "Bandar Activity",
+      icon: "⚡", label: "FLOW", sub: "Bandar Activity",
       color: "#a78bfa", bg: "#1a1030", border: "#a78bfaaa",
       path: "/(tabs)/bandar",
       metric: stats ? `${stats.accCount} ACC  ·  ${stats.distCount} DIST` : "—",
