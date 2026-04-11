@@ -330,6 +330,163 @@ function HakaHakiFlowCard({ stocks }: { stocks: RadarMarket[] }) {
   );
 }
 
+// ─── Signal Synthesis Card ────────────────────────────────────
+
+type SynthScenario =
+  | "BULLISH_CONFIRM"
+  | "BEARISH_CONFIRM"
+  | "HIDDEN_DIST"
+  | "BUYER_TRAP";
+
+function computeSynthesis(
+  brokerFlow: BrokerFlowAggregate | undefined,
+  stocks: RadarMarket[],
+): {
+  scenario: SynthScenario;
+  title: string;
+  emoji: string;
+  color: string;
+  bg: string;
+  border: string;
+  headline: string;
+  explanation: string;
+  action: string;
+  brokerLabel: string;
+  brokerColor: string;
+  hakaLabel: string;
+  hakaColor: string;
+  confidence: "TINGGI" | "SEDANG";
+} | null {
+  if (!brokerFlow) return null;
+
+  const nbs5d = stocks.reduce((s, r) => s + (r.nbs5d ?? 0), 0);
+  const brokerBullish = brokerFlow.netDir === "INFLOW";
+  const hakaBullish   = nbs5d >= 0;
+
+  let scenario: SynthScenario;
+  if (brokerBullish && hakaBullish)   scenario = "BULLISH_CONFIRM";
+  else if (!brokerBullish && !hakaBullish) scenario = "BEARISH_CONFIRM";
+  else if (brokerBullish && !hakaBullish) scenario = "HIDDEN_DIST";
+  else scenario = "BUYER_TRAP";
+
+  const brokerLabel = brokerBullish ? `↑ ${brokerFlow.netStr} INFLOW` : `↓ ${brokerFlow.netStr} OUTFLOW`;
+  const brokerColor = brokerBullish ? "#34d399" : "#f87171";
+
+  const absNbs = Math.abs(nbs5d);
+  const nbsStr = absNbs >= 1000 ? `${(absNbs / 1000).toFixed(1)}T` : `${absNbs.toFixed(0)}B`;
+  const hakaLabel = hakaBullish ? `↑ +${nbsStr} Haka` : `↓ -${nbsStr} Haki`;
+  const hakaColor = hakaBullish ? "#34d399" : "#f87171";
+
+  switch (scenario) {
+    case "BULLISH_CONFIRM":
+      return {
+        scenario, emoji: "✅", color: "#34d399", bg: "#052e16", border: "#16a34a",
+        title: "KONFIRMASI BULLISH",
+        headline: "Kedua sinyal sepakat: uang masuk & agresif beli",
+        explanation:
+          "Broker (institusi) net beli & pasar aktif Haka. Tekanan beli genuine — bukan jebakan. Momentum mendukung posisi long.",
+        action: "Boleh masuk dengan stop loss ketat. Favorit setup untuk swing.",
+        confidence: "TINGGI",
+        brokerLabel, brokerColor, hakaLabel, hakaColor,
+      };
+    case "BEARISH_CONFIRM":
+      return {
+        scenario, emoji: "🔴", color: "#f87171", bg: "#2d0a0a", border: "#dc2626",
+        title: "KONFIRMASI BEARISH",
+        headline: "Kedua sinyal sepakat: uang keluar & tekanan jual dominan",
+        explanation:
+          "Broker net jual & pasar aktif Haki. Distribusi aktif berlangsung. Tidak ada support dari institusi.",
+        action: "Hindari posisi baru. Kalau pegang saham, evaluasi cut loss.",
+        confidence: "TINGGI",
+        brokerLabel, brokerColor, hakaLabel, hakaColor,
+      };
+    case "HIDDEN_DIST":
+      return {
+        scenario, emoji: "⚠️", color: "#f97316", bg: "#1c0a00", border: "#ea580c",
+        title: "DISTRIBUSI TERSEMBUNYI",
+        headline: "Broker net beli tapi pasar aktif Haki — waspadai jebakan",
+        explanation:
+          "Institusi sudah akumulasi (net beli secara nilai), namun saat ini pasar aktif Haki — artinya ada tekanan jual agresif. Bisa jadi institusi sedang unload ke retail, atau distribusi tahap awal.",
+        action: "Jangan FOMO ikut beli. Tunggu konfirmasi arah sebelum masuk.",
+        confidence: "SEDANG",
+        brokerLabel, brokerColor, hakaLabel, hakaColor,
+      };
+    case "BUYER_TRAP":
+      return {
+        scenario, emoji: "⚠️", color: "#fbbf24", bg: "#1c1500", border: "#d97706",
+        title: "BUYER TRAP",
+        headline: "Retail aktif Haka tapi institusi sudah net jual",
+        explanation:
+          "Pasar sedang agresif beli (Haka), tapi broker (institusi) sudah net outflow. Institusi sedang keluar sementara retail masuk. Ini sinyal bahaya klasik distribusi.",
+        action: "Hati-hati. Momentum naik sementara bisa menjebak. Tight stop loss.",
+        confidence: "SEDANG",
+        brokerLabel, brokerColor, hakaLabel, hakaColor,
+      };
+  }
+}
+
+function SignalSynthesisCard({
+  brokerFlow,
+  stocks,
+}: {
+  brokerFlow: BrokerFlowAggregate | undefined;
+  stocks: RadarMarket[];
+}) {
+  const syn = computeSynthesis(brokerFlow, stocks);
+  if (!syn) return null;
+
+  return (
+    <View style={[styles.card, { borderWidth: 1.5, borderColor: syn.border }]}>
+      {/* Header */}
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>🔀 Signal Synthesis</Text>
+        <View style={[styles.confBadge, {
+          backgroundColor: syn.confidence === "TINGGI" ? "#052e16" : "#1c1500",
+          borderColor: syn.confidence === "TINGGI" ? "#16a34a" : "#d97706",
+        }]}>
+          <Text style={[styles.confText, {
+            color: syn.confidence === "TINGGI" ? "#34d399" : "#fbbf24",
+          }]}>
+            {syn.confidence === "TINGGI" ? "🟢 KONFIRMASI KUAT" : "🟡 SINYAL CAMPURAN"}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.cardSubtitle}>Broker Net Flow × Haka/Haki — Combined Intelligence</Text>
+
+      {/* Scenario verdict box */}
+      <View style={[styles.verdictBox, { backgroundColor: syn.bg, borderColor: syn.border }]}>
+        <Text style={styles.verdictEmoji}>{syn.emoji}</Text>
+        <Text style={[styles.verdictTitle, { color: syn.color }]}>{syn.title}</Text>
+        <Text style={[styles.verdictHeadline, { color: syn.color + "cc" }]}>{syn.headline}</Text>
+      </View>
+
+      {/* Two signal pills */}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+        <View style={[styles.signalPill, { borderColor: syn.brokerColor + "55", backgroundColor: syn.brokerColor + "11" }]}>
+          <Text style={styles.signalPillLabel}>💰 Broker Flow</Text>
+          <Text style={[styles.signalPillValue, { color: syn.brokerColor }]}>{syn.brokerLabel}</Text>
+        </View>
+        <View style={[styles.signalPill, { borderColor: syn.hakaColor + "55", backgroundColor: syn.hakaColor + "11" }]}>
+          <Text style={styles.signalPillLabel}>🎯 Haka/Haki 5D</Text>
+          <Text style={[styles.signalPillValue, { color: syn.hakaColor }]}>{syn.hakaLabel}</Text>
+        </View>
+      </View>
+
+      {/* Explanation */}
+      <View style={styles.explainBox}>
+        <Text style={styles.explainTitle}>📖 Interpretasi</Text>
+        <Text style={styles.explainText}>{syn.explanation}</Text>
+      </View>
+
+      {/* Action */}
+      <View style={[styles.actionBox, { borderLeftColor: syn.color }]}>
+        <Text style={styles.actionLabel}>💡 Saran Tindakan</Text>
+        <Text style={styles.actionText}>{syn.action}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────
 
 export default function MarketIntelScreen() {
@@ -389,6 +546,7 @@ export default function MarketIntelScreen() {
           <FlowStateCard stocks={stocks} />
           <BrokerNetFlowCard data={brokerFlow} />
           <HakaHakiFlowCard stocks={stocks} />
+          <SignalSynthesisCard brokerFlow={brokerFlow} stocks={stocks} />
         </ScrollView>
       )}
     </View>
@@ -451,6 +609,34 @@ const styles = StyleSheet.create({
   flowBoxLabel: { color: "#64748b", fontSize: 10, marginBottom: 4 },
   flowBoxValue: { fontWeight: "900", fontSize: 22 },
   flowBoxSub:   { fontSize: 10, marginTop: 2 },
+
+  // Signal Synthesis
+  confBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  confText: { fontSize: 9, fontWeight: "700" },
+  verdictBox: {
+    borderRadius: 12, padding: 14, marginBottom: 12,
+    borderWidth: 1, alignItems: "center",
+  },
+  verdictEmoji: { fontSize: 28, marginBottom: 4 },
+  verdictTitle: { fontWeight: "900", fontSize: 16, letterSpacing: 0.5, marginBottom: 4 },
+  verdictHeadline: { fontSize: 11, textAlign: "center" },
+  signalPill: {
+    flex: 1, borderRadius: 10, borderWidth: 1,
+    padding: 10, alignItems: "center",
+  },
+  signalPillLabel: { color: "#64748b", fontSize: 9, marginBottom: 4, fontWeight: "600" },
+  signalPillValue: { fontSize: 13, fontWeight: "800" },
+  explainBox: {
+    backgroundColor: "#0f1629", borderRadius: 10, padding: 12, marginBottom: 10,
+  },
+  explainTitle: { color: "#64748b", fontSize: 10, fontWeight: "700", marginBottom: 6 },
+  explainText: { color: "#94a3b8", fontSize: 12, lineHeight: 18 },
+  actionBox: {
+    backgroundColor: "#0f1629", borderRadius: 10, padding: 12,
+    borderLeftWidth: 3,
+  },
+  actionLabel: { color: "#64748b", fontSize: 10, fontWeight: "700", marginBottom: 4 },
+  actionText: { color: "#cbd5e1", fontSize: 12, lineHeight: 17 },
 
   // Broker Net Flow specific
   netFlowBox: {
