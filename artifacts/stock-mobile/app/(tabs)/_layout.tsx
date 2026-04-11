@@ -103,6 +103,7 @@ function ClassicTabLayout() {
         options={{
           title: "Flow",
           tabBarButton: () => null,
+          tabBarItemStyle: { display: "none", width: 0, overflow: "hidden" },
         }}
       />
       <Tabs.Screen
