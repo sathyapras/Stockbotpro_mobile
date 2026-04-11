@@ -14,10 +14,10 @@ export interface Candle {
 export type PeriodKey = "1mo" | "3mo" | "6mo" | "1y";
 
 export const PERIODS: { key: PeriodKey; label: string; days: number }[] = [
-  { key: "1mo", label: "1B",  days: 30  },
-  { key: "3mo", label: "3B",  days: 90  },
-  { key: "6mo", label: "6B",  days: 180 },
-  { key: "1y",  label: "1T",  days: 365 },
+  { key: "1mo", label: "1 Bln",  days: 30  },
+  { key: "3mo", label: "3 Bln",  days: 90  },
+  { key: "6mo", label: "6 Bln",  days: 180 },
+  { key: "1y",  label: "1 Thn",  days: 365 },
 ];
 
 // ─── API URL ───────────────────────────────────────────────────

@@ -1474,7 +1474,7 @@ function CandleChartSvg({ candles, containerWidth, colors }: {
   );
 }
 
-function ChartTab({ symbol }: { symbol: string }) {
+function ChartTab({ symbol, commentary }: { symbol: string; commentary?: string }) {
   const { width } = useWindowDimensions();
   const colors = useColors();
   const [period, setPeriod] = useState<"1mo" | "3mo" | "6mo" | "1y">("3mo");
@@ -1618,16 +1618,16 @@ function ChartTab({ symbol }: { symbol: string }) {
                     {periodLow.toLocaleString("id-ID")}
                   </Text>
                 </View>
-                <View style={{ width: 1, backgroundColor: colors.border }} />
-                <View style={{ alignItems: "center" }}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 9 }}>CANDLES</Text>
-                  <Text style={{ color: colors.mutedForeground, fontWeight: "700", fontSize: 13 }}>
-                    {candles.length}
-                  </Text>
-                </View>
               </View>
             );
           })()}
+
+          {/* RoboCommentary */}
+          {commentary && (
+            <View style={{ marginHorizontal: 16, marginTop: 8 }}>
+              <RoboCommentary commentary={commentary} colors={colors} />
+            </View>
+          )}
         </ScrollView>
       )}
     </View>
@@ -2115,7 +2115,7 @@ export default function StockDetailScreen() {
                 />
               )}
               {activeTab === "chart" && (
-                <ChartTab symbol={ticker} />
+                <ChartTab symbol={ticker} commentary={data?.plan?.commentary} />
               )}
               {activeTab === "levels" && (
                 <PriceLevelsTab quote={quote} colors={colors} />
