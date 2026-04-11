@@ -356,7 +356,7 @@ export default function MarketIntelScreen() {
     [radarAll]
   );
 
-  const isLoading = radarLoading && brokerLoading;
+  const isLoading = radarLoading || brokerLoading;
 
   const today = new Date().toLocaleDateString("id-ID", {
     weekday: "short", day: "numeric", month: "short", year: "numeric",

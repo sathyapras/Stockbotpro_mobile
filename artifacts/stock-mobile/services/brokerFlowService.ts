@@ -1,5 +1,3 @@
-import { getApiBaseUrl } from "./stockData";
-
 export interface BrokerFlowAggregate {
   date: string | null;
   total: number;
@@ -18,9 +16,14 @@ export interface BrokerFlowAggregate {
   brokerBuyDominance: number;
 }
 
+function getApiBase(): string {
+  const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+  if (d) return `https://${d}/api`;
+  return "http://localhost:8080/api";
+}
+
 export async function fetchBrokerFlowAggregate(): Promise<BrokerFlowAggregate> {
-  const base = getApiBaseUrl();
-  const res = await fetch(`${base}/broker-summary/market-aggregate`);
+  const res = await fetch(`${getApiBase()}/broker-summary/market-aggregate`);
   if (!res.ok) throw new Error(`Broker aggregate error: ${res.status}`);
   return res.json() as Promise<BrokerFlowAggregate>;
 }
