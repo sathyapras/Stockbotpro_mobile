@@ -1,0 +1,281 @@
+Trading Log — Panduan Implementasi Mobile
+Jurnal sinyal BOW/BOS per device — React Native
+KONSEP
+Trading Log adalah fitur pencatatan sinyal trading yang diambil user dari platform StockBot Pro. User mencatat entry berdasarkan sinyal BOW atau BOS, kemudian menutup posisi saat sudah exit. Data disimpan di server berdasarkan device_id (UUID unik per device).
+
+Tidak butuh login — identifikasi cukup dengan device_id yang disimpan di expo-secure-store.
+
+SETUP DEVICE ID
+import * as SecureStore from "expo-secure-store";
+import "react-native-get-random-values";
+import { v4 as uuidv4 } from "uuid";
+// Panggil sekali saat app pertama kali dibuka
+async function getOrCreateDeviceId(): Promise<string> {
+  const KEY = "sbp_device_id";
+  let id = await SecureStore.getItemAsync(KEY);
+  if (!id) {
+    id = uuidv4();
+    await SecureStore.setItemAsync(KEY, id);
+  }
+  return id;
+}
+
+Simpan device_id di context/store global supaya bisa dipakai semua screen.
+
+BASE URL
+const BASE_URL = "https://stockbotpro.replit.app/api";
+
+TIPE DATA
+export type SignalType = "BOW" | "BOS";
+export type TradeStatus = "OPEN" | "CLOSED";
+export interface TradingLogEntry {
+  id:          number;
+  deviceId:    string;
+  ticker:      string;
+  signalType:  SignalType;
+  entryPrice:  string;   // decimal string, misal "4200.00"
+  slPrice:     string;
+  tp1Price:    string;
+  tp2Price:    string;
+  entryDate:   string;   // "YYYY-MM-DD"
+  exitPrice:   string | null;
+  exitDate:    string | null;
+  status:      TradeStatus;
+  notes:       string | null;
+  createdAt:   string;   // ISO timestamp
+}
+export interface TradingSummary {
+  ok:            boolean;
+  totalTrades:   number;
+  winRate:       number;  // persen, misal 66.7
+  totalPnl:      number;  // kumulatif % P&L dari semua CLOSED trade
+  avgHoldDays:   number;
+  openPositions: number;
+}
+
+API ENDPOINTS
+1. GET — Ambil semua trade
+GET /api/trading-log?device_id=<uuid>
+
+async function getTrades(deviceId: string): Promise<TradingLogEntry[]> {
+  const res = await fetch(`${BASE_URL}/trading-log?device_id=${deviceId}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error);
+  return json.data; // urut terbaru di atas
+}
+
+Response:
+
+{
+  "ok": true,
+  "data": [
+    {
+      "id": 4,
+      "deviceId": "abc-123",
+      "ticker": "BBRI",
+      "signalType": "BOW",
+      "entryPrice": "4200.00",
+      "slPrice": "3990.00",
+      "tp1Price": "4600.00",
+      "tp2Price": "5000.00",
+      "entryDate": "2026-04-01",
+      "exitPrice": null,
+      "exitDate": null,
+      "status": "OPEN",
+      "notes": "Akumulasi terlihat di SM",
+      "createdAt": "2026-04-01T08:00:00.000Z"
+    }
+  ]
+}
+
+2. POST — Tambah trade baru
+POST /api/trading-log
+Content-Type: application/json
+
+async function addTrade(deviceId: string, trade: {
+  ticker:      string;
+  signal_type: "BOW" | "BOS";
+  entry_price: number;
+  sl_price:    number;
+  tp1_price:   number;
+  tp2_price:   number;
+  entry_date:  string;  // "YYYY-MM-DD"
+  notes?:      string;
+}): Promise<TradingLogEntry> {
+  const res = await fetch(`${BASE_URL}/trading-log`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device_id: deviceId, ...trade }),
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error);
+  return json.data;
+}
+
+Body yang dikirim:
+
+{
+  "device_id":   "abc-123",
+  "ticker":      "BBRI",
+  "signal_type": "BOW",
+  "entry_price": 4200,
+  "sl_price":    3990,
+  "tp1_price":   4600,
+  "tp2_price":   5000,
+  "entry_date":  "2026-04-01",
+  "notes":       "Opsional, catatan bebas"
+}
+
+Validasi wajib:
+
+ticker, signal_type ("BOW" atau "BOS"), entry_price, sl_price, tp1_price, tp2_price, entry_date — semuanya wajib
+notes — opsional
+3. PATCH — Tutup posisi
+PATCH /api/trading-log/:id/close?device_id=<uuid>
+Content-Type: application/json
+
+async function closeTrade(deviceId: string, tradeId: number, data: {
+  exit_price: number;
+  exit_date:  string;   // "YYYY-MM-DD"
+  notes?:     string;
+}): Promise<TradingLogEntry> {
+  const res = await fetch(
+    `${BASE_URL}/trading-log/${tradeId}/close?device_id=${deviceId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }
+  );
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error);
+  return json.data;
+}
+
+Body yang dikirim:
+
+{
+  "exit_price": 4650,
+  "exit_date":  "2026-04-10",
+  "notes":      "TP1 tercapai, exit sebagian"
+}
+
+Setelah berhasil, status trade berubah dari OPEN → CLOSED.
+
+4. DELETE — Hapus trade
+DELETE /api/trading-log/:id?device_id=<uuid>
+
+async function deleteTrade(deviceId: string, tradeId: number): Promise<void> {
+  const res = await fetch(
+    `${BASE_URL}/trading-log/${tradeId}?device_id=${deviceId}`,
+    { method: "DELETE" }
+  );
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error);
+}
+
+Response:
+
+{ "ok": true, "message": "Trade berhasil dihapus." }
+
+Hanya bisa hapus trade milik device_id sendiri. Jika ID tidak ditemukan → 404.
+
+5. GET Summary — Statistik performa
+GET /api/trading-log/summary?device_id=<uuid>
+
+async function getTradingSummary(deviceId: string): Promise<TradingSummary> {
+  const res = await fetch(`${BASE_URL}/trading-log/summary?device_id=${deviceId}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error);
+  return json;
+}
+
+Response:
+
+{
+  "ok":            true,
+  "totalTrades":   12,
+  "winRate":       66.7,
+  "totalPnl":      18.4,
+  "avgHoldDays":   8,
+  "openPositions": 3
+}
+
+Field	Keterangan
+winRate	% trade CLOSED yang profit (exit > entry)
+totalPnl	Kumulatif % P&L dari semua trade CLOSED
+avgHoldDays	Rata-rata hari dari entry ke exit
+openPositions	Jumlah trade masih OPEN
+CONTOH UI FLOW
+Screen: Trading Log List
+┌─────────────────────────────────────┐
+│  📊 Trading Log              [+ Add] │
+│                                     │
+│  ┌─ Summary Bar ──────────────────┐ │
+│  │  12 Trade  |  66.7% Win  |  +18.4% │
+│  └───────────────────────────────┘ │
+│                                     │
+│  [OPEN]  BBRI  BOW                  │
+│  Entry: 4.200  SL: 3.990            │
+│  TP1: 4.600   TP2: 5.000            │
+│  📅 01 Apr 2026          [Tutup] [🗑] │
+│                                     │
+│  [CLOSED ✅]  TLKM  BOS             │
+│  Entry: 3.800  Exit: 4.150  +9.2%   │
+│  Hold: 16 hari          20 Mar–5 Apr │
+└─────────────────────────────────────┘
+
+Screen: Tambah Trade (Modal/Sheet)
+Ticker    : [BBRI      ]
+Signal    : [BOW ▼] atau [BOS ▼]
+Entry     : [4200      ]
+Stop Loss : [3990      ]
+TP1       : [4600      ]
+TP2       : [5000      ]
+Tanggal   : [01/04/2026]
+Catatan   : [opsional  ]
+         [ SIMPAN TRADE ]
+
+Screen: Tutup Posisi (Modal)
+Tutup Posisi BBRI
+Exit Price : [4650      ]
+Tanggal    : [10/04/2026]
+Catatan    : [TP1 tercapai]
+         [ KONFIRMASI TUTUP ]
+
+KALKULASI P&L DI SISI MOBILE
+Untuk tampilan P&L per trade (sebelum ditutup, sebagai preview):
+
+function calcPnlPct(entryPrice: number, currentOrExitPrice: number): number {
+  return ((currentOrExitPrice - entryPrice) / entryPrice) * 100;
+}
+// Warna indikator
+function pnlColor(pnl: number): string {
+  return pnl > 0 ? "#22c55e" : pnl < 0 ? "#ef4444" : "#94a3b8";
+}
+
+ERROR HANDLING
+Semua endpoint mengembalikan { error: "..." } jika ada masalah.
+
+try {
+  const trades = await getTrades(deviceId);
+} catch (err) {
+  Alert.alert("Gagal", err.message || "Terjadi kesalahan");
+}
+
+RINGKASAN ENDPOINT
+Method	URL	Auth	Keterangan
+GET	/api/trading-log?device_id=xxx	Tidak	List semua trade
+POST	/api/trading-log	Tidak	Tambah trade baru
+PATCH	/api/trading-log/:id/close?device_id=xxx	Tidak	Tutup posisi
+DELETE	/api/trading-log/:id?device_id=xxx	Tidak	Hapus trade
+GET	/api/trading-log/summary?device_id=xxx	Tidak	Statistik performa
+Add documentation for integrating trading log feature into mobile app
+
+
+
+Show previous messages
+
+24 messages & 75 actions
+
+Checkpoint made

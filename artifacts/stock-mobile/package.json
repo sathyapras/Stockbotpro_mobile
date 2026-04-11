@@ -56,7 +56,11 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@types/uuid": "^11.0.0",
     "expo-av": "^16.0.8",
-    "react-native-webview": "^13.16.1"
+    "expo-secure-store": "^15.0.8",
+    "react-native-get-random-values": "^1.11.0",
+    "react-native-webview": "^13.16.1",
+    "uuid": "^13.0.0"
   }
 }
