@@ -2034,26 +2034,52 @@ export default function StockDetailScreen() {
               )}
 
               {/* Metrics strip */}
-              {quote && (
-                <View style={{ flexDirection: "row", justifyContent: "space-between",
-                  marginBottom: 8 }}>
-                  {[
-                    { label: "Trend 20", val: fRp(quote.ma20) },
-                    { label: "Trend 50", val: fRp(quote.ma50) },
-                    { label: "52W H", val: fRp(quote.high52w) },
-                    { label: "VOL", val: formatVol(quote.volK) },
-                  ].map(({ label, val }) => (
-                    <View key={label} style={{ alignItems: "center" }}>
-                      <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "600" }}>
-                        {label}
-                      </Text>
-                      <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "700" }}>
-                        {val}
+              {quote && (() => {
+                const price = quote.price ?? 0;
+                const t20 = quote.ma20 > 0
+                  ? price >= quote.ma20
+                    ? { label: "▲ Uptrend", color: "#34d399" }
+                    : { label: "▼ Downtrend", color: "#f87171" }
+                  : null;
+                const t50 = quote.ma50 > 0
+                  ? price >= quote.ma50
+                    ? { label: "▲ Uptrend", color: "#34d399" }
+                    : { label: "▼ Downtrend", color: "#f87171" }
+                  : null;
+                return (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between",
+                    marginBottom: 8 }}>
+                    {/* Trend 20 */}
+                    <View style={{ alignItems: "center" }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "600" }}>Trend 20</Text>
+                      <Text style={{ color: t20?.color ?? colors.foreground, fontSize: 11, fontWeight: "700" }}>
+                        {t20?.label ?? "—"}
                       </Text>
                     </View>
-                  ))}
-                </View>
-              )}
+                    {/* Trend 50 */}
+                    <View style={{ alignItems: "center" }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "600" }}>Trend 50</Text>
+                      <Text style={{ color: t50?.color ?? colors.foreground, fontSize: 11, fontWeight: "700" }}>
+                        {t50?.label ?? "—"}
+                      </Text>
+                    </View>
+                    {/* 52W High */}
+                    <View style={{ alignItems: "center" }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "600" }}>52W H</Text>
+                      <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "700" }}>
+                        {fRp(quote.high52w)}
+                      </Text>
+                    </View>
+                    {/* Volume */}
+                    <View style={{ alignItems: "center" }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "600" }}>VOL</Text>
+                      <Text style={{ color: colors.foreground, fontSize: 11, fontWeight: "700" }}>
+                        {formatVol(quote.volK)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()}
 
               {/* Tab bar */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
