@@ -527,6 +527,30 @@ function FARatioRow({ label, value, note, colors }: {
   );
 }
 
+// ─── Fundamental Narrative Generator ─────────────────────────
+
+function generateFundamentalInsight(pe: number, peg: number, roe: number) {
+  let analysis = "";
+  let action: "BUY / ACCUMULATE" | "WAIT / AVOID ENTRY" | "NEUTRAL" = "NEUTRAL";
+
+  if (pe > 30 && peg > 2) {
+    analysis = "Valuasi saham tergolong mahal dan tidak didukung pertumbuhan yang sebanding.";
+    action = "WAIT / AVOID ENTRY";
+  } else if (pe < 20 && roe > 15) {
+    analysis = "Valuasi relatif menarik dengan profitabilitas yang baik.";
+    action = "BUY / ACCUMULATE";
+  } else {
+    analysis = "Kondisi fundamental berada di area netral tanpa keunggulan yang jelas.";
+    action = "NEUTRAL";
+  }
+
+  if (roe > 15) {
+    analysis += " Perusahaan memiliki efisiensi profit yang cukup kuat.";
+  }
+
+  return { analysis, action };
+}
+
 // ─── ADX Calculator ───────────────────────────────────────────
 
 function calcADX(candles: Candle[], period = 14): number {
@@ -844,6 +868,31 @@ function FinancialsTab({ ticker, quote, broker1d, masterStock, colors }: {
             <FARatioRow label="Dividend Yield" value={`${ms.dyPct.toFixed(2)}%`}
               colors={colors} />
           )}
+
+          {/* Fundamental Narrative */}
+          {ms.per > 0 && ms.peg > 0 && ms.roe > 0 && (() => {
+            const insight = generateFundamentalInsight(ms.per, ms.peg, ms.roe);
+            const actionColor = insight.action === "BUY / ACCUMULATE" ? "#34d399"
+              : insight.action === "WAIT / AVOID ENTRY" ? "#f87171"
+              : "#94a3b8";
+            return (
+              <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: colors.border,
+                paddingTop: 10, gap: 6 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 9,
+                  letterSpacing: 0.5 }}>ANALISA FUNDAMENTAL</Text>
+                <Text style={{ color: colors.foreground, fontSize: 12, lineHeight: 18 }}>
+                  {insight.analysis}
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                  <View style={{ width: 4, height: 4, borderRadius: 2,
+                    backgroundColor: actionColor }} />
+                  <Text style={{ color: actionColor, fontWeight: "700", fontSize: 11 }}>
+                    {insight.action}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
         </View>
       )}
 
