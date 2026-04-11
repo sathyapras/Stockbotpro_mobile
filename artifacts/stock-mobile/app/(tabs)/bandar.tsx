@@ -313,15 +313,6 @@ export default function BandarScreen() {
             </Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <TouchableOpacity
-              onPress={() => router.push("/market-intel" as any)}
-              style={{ backgroundColor: colors.card, borderRadius: 8,
-                borderWidth: 1, borderColor: colors.border,
-                paddingHorizontal: 10, paddingVertical: 6,
-                flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <Text style={{ fontSize: 12 }}>🔭</Text>
-              <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Intel</Text>
-            </TouchableOpacity>
             <MenuButton />
           </View>
         </View>

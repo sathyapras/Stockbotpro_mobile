@@ -464,55 +464,88 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
           <CommandMiniCard card={cards[3]} />
         </View>
 
-        {/* Sector card — full width */}
-        <TouchableOpacity
-          onPress={() => router.push("/sector-rotation" as any)}
-          activeOpacity={0.8}
-          style={{
-            borderRadius: 14, padding: 13,
-            backgroundColor: colors.card,
-            borderWidth: 1, borderColor: colors.border,
-            borderLeftWidth: 3, borderLeftColor: "#fb923c",
-            flexDirection: "row", alignItems: "center", gap: 12,
-          }}>
-          <View style={{ flex: 1 }}>
+        {/* Bottom row: Sector Rotation + Market Intel side by side */}
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {/* Sector Rotation */}
+          <TouchableOpacity
+            onPress={() => router.push("/sector-rotation" as any)}
+            activeOpacity={0.8}
+            style={{
+              flex: 1, borderRadius: 14, padding: 13,
+              backgroundColor: colors.card,
+              borderWidth: 1, borderColor: colors.border,
+              borderLeftWidth: 3, borderLeftColor: "#fb923c",
+            }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <Text style={{ fontSize: 16 }}>🔄</Text>
+              <Text style={{ fontSize: 15 }}>🔄</Text>
               <View>
-                <Text style={{ color: "#fb923c", fontSize: 10, fontWeight: "800",
+                <Text style={{ color: "#fb923c", fontSize: 9, fontWeight: "800",
                   letterSpacing: 0.5 }}>SECTOR ROTATION</Text>
                 <Text style={{ color: colors.mutedForeground, fontSize: 8 }}>Market Breadth</Text>
               </View>
             </View>
-            <Text style={{ color: colors.foreground, fontWeight: "800", fontSize: 15 }}>
+            <Text style={{ color: colors.foreground, fontWeight: "800", fontSize: 14 }}>
               {sectorSummary
-                ? `${sectorSummary.leadingCount} Leading  ·  ${sectorSummary.laggingCount} Lagging`
+                ? `${sectorSummary.leadingCount} Leading`
                 : loading ? "Loading…" : "—"}
             </Text>
-          </View>
-          {sectorSummary?.top && (
-            <View style={{ alignItems: "flex-end" }}>
+            {sectorSummary && (
+              <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}>
+                {sectorSummary.laggingCount} Lagging
+              </Text>
+            )}
+            {sectorSummary?.top && (
               <View style={{
-                paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+                marginTop: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5,
                 backgroundColor: SECTOR_PHASE_CFG[sectorSummary.top.phase].bg,
-                borderWidth: 1, borderColor: SECTOR_PHASE_CFG[sectorSummary.top.phase].color + "60",
-                marginBottom: 4,
+                alignSelf: "flex-start",
               }}>
                 <Text style={{ color: SECTOR_PHASE_CFG[sectorSummary.top.phase].color,
-                  fontSize: 10, fontWeight: "700" }}>
-                  {SECTOR_PHASE_CFG[sectorSummary.top.phase].emoji} {sectorSummary.top.phase}
+                  fontSize: 9, fontWeight: "700" }} numberOfLines={1}>
+                  {SECTOR_PHASE_CFG[sectorSummary.top.phase].emoji} {sectorSummary.top.sector}
                 </Text>
               </View>
-              <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "600" }}
-                numberOfLines={1}>
-                {sectorSummary.top.sector}
-              </Text>
-              <Text style={{ color: "#a78bfa", fontSize: 10 }}>
-                Score {Math.round(sectorSummary.top.avgBandarScore)}/100
-              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Market Intel */}
+          <TouchableOpacity
+            onPress={() => router.push("/market-intel" as any)}
+            activeOpacity={0.8}
+            style={{
+              flex: 1, borderRadius: 14, padding: 13,
+              backgroundColor: "#031014",
+              borderWidth: 1, borderColor: "#06b6d4aa",
+              borderLeftWidth: 3, borderLeftColor: "#06b6d4",
+            }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <Text style={{ fontSize: 15 }}>🔭</Text>
+              <View>
+                <Text style={{ color: "#06b6d4", fontSize: 9, fontWeight: "800",
+                  letterSpacing: 0.5 }}>MARKET INTEL</Text>
+                <Text style={{ color: "#94a3b8", fontSize: 8 }}>Broker · Flow · Radar</Text>
+              </View>
             </View>
-          )}
-        </TouchableOpacity>
+            <Text style={{ color: "#f1f5f9", fontWeight: "800", fontSize: 14 }}>
+              {stats ? `${stats.accCount} ACC` : loading ? "Loading…" : "—"}
+            </Text>
+            {stats && (
+              <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }}>
+                {stats.distCount} DIST
+              </Text>
+            )}
+            {stats?.topEntry && (
+              <View style={{
+                marginTop: 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5,
+                backgroundColor: "#06b6d420", alignSelf: "flex-start",
+              }}>
+                <Text style={{ color: "#06b6d4", fontSize: 9, fontWeight: "700" }}>
+                  🔭 {stats.topEntry.ticker}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
