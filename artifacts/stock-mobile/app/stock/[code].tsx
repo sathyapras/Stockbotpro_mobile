@@ -527,18 +527,70 @@ function FARatioRow({ label, value, note, colors }: {
   );
 }
 
+// ─── ADX Calculator ───────────────────────────────────────────
+
+function calcADX(candles: Candle[], period = 14): number {
+  if (candles.length < period + 2) return 0;
+  const trs: number[] = [], pDMs: number[] = [], mDMs: number[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    const { high: h, low: l } = candles[i];
+    const pc = candles[i - 1].close, ph = candles[i - 1].high, pl = candles[i - 1].low;
+    trs.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
+    const up = h - ph, dn = pl - l;
+    pDMs.push(up > dn && up > 0 ? up : 0);
+    mDMs.push(dn > up && dn > 0 ? dn : 0);
+  }
+  let atr = trs.slice(0, period).reduce((a, b) => a + b, 0);
+  let pDI = pDMs.slice(0, period).reduce((a, b) => a + b, 0);
+  let mDI = mDMs.slice(0, period).reduce((a, b) => a + b, 0);
+  const dxs: number[] = [];
+  const dp0 = pDI / atr, dm0 = mDI / atr;
+  dxs.push(100 * Math.abs(dp0 - dm0) / ((dp0 + dm0) || 1));
+  for (let i = period; i < trs.length; i++) {
+    atr = atr - atr / period + trs[i];
+    pDI = pDI - pDI / period + pDMs[i];
+    mDI = mDI - mDI / period + mDMs[i];
+    const dp = pDI / atr, dm = mDI / atr;
+    dxs.push(100 * Math.abs(dp - dm) / ((dp + dm) || 1));
+  }
+  const slice = dxs.slice(-period);
+  return slice.reduce((a, b) => a + b, 0) / slice.length;
+}
+
 // ─── Tab 2: Financials ────────────────────────────────────────
 
-function FinancialsTab({ quote, broker1d, masterStock, colors }: {
+function FinancialsTab({ ticker, quote, broker1d, masterStock, colors }: {
+  ticker: string;
   quote: NonNullable<any>;
   broker1d: any;
   masterStock: any;
   colors: ReturnType<typeof useColors>;
 }) {
-  const rsi = quote.rsi;
-  const rsiColor = rsi < 30 ? "#34d399" : rsi > 70 ? "#f87171" : "#60a5fa";
-  const rsiLabel = rsi < 30 ? "Oversold" : rsi > 70 ? "Overbought" : "Normal";
   const price = quote.price;
+
+  // ── Candles for ADX ──────────────────────────────────────────
+  const { data: allCandles = [] } = useQuery({
+    queryKey: ["ohlcv", ticker],
+    queryFn: () => fetchHistorical(ticker),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+  });
+  const adx = calcADX(allCandles.slice(-60)); // use last 60 candles
+  const adxLabel = adx < 15 ? "Sideways / Lemah" : adx < 25 ? "Mulai Trending" : adx < 35 ? "Trending" : "Trend Kuat";
+  const adxColor = adx < 15 ? "#94a3b8" : adx < 25 ? "#60a5fa" : adx < 35 ? "#a78bfa" : "#f59e0b";
+
+  // ── MA50 Distance ────────────────────────────────────────────
+  const ma50 = quote.ma50 ?? 0;
+  const ma50Dist = ma50 > 0 ? ((price - ma50) / ma50) * 100 : null;
+  const ma50Color = ma50Dist === null ? "#94a3b8" : ma50Dist >= 0 ? "#34d399" : "#f87171";
+  const ma50Label = ma50Dist === null ? "–"
+    : ma50Dist >= 15 ? "Jauh di atas MA50 — hati-hati"
+    : ma50Dist >= 5 ? "Di atas MA50 — bullish"
+    : ma50Dist >= 0 ? "Tepat di atas MA50"
+    : ma50Dist >= -5 ? "Tepat di bawah MA50"
+    : ma50Dist >= -15 ? "Di bawah MA50 — bearish"
+    : "Jauh di bawah MA50 — oversold";
 
   // 52W range — use masterStock if available, else approximate
   const high52w = masterStock?.high52w || quote.high52w;
@@ -665,31 +717,76 @@ function FinancialsTab({ quote, broker1d, masterStock, colors }: {
         </View>
       </View>
 
-      {/* RSI */}
+      {/* Long-Term Trend Indicators */}
       <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-        backgroundColor: colors.card, padding: 12, gap: 8 }}>
-        <SectionTitle title="TECHNICAL INDICATORS" colors={colors} />
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>RSI (10)</Text>
-          <Text style={{ color: rsiColor, fontWeight: "800", fontSize: 16 }}>{rsi.toFixed(1)}</Text>
-        </View>
-        <View style={{ height: 8, borderRadius: 4, overflow: "visible",
-          flexDirection: "row", position: "relative" }}>
-          <View style={{ flex: 30, height: 8, backgroundColor: "#34d39940" }} />
-          <View style={{ flex: 40, height: 8, backgroundColor: "#60a5fa30" }} />
-          <View style={{ flex: 30, height: 8, backgroundColor: "#f8717140" }} />
-          <View style={{ position: "absolute", top: -3,
-            left: `${Math.min(99, Math.max(1, rsi))}%` as any,
-            width: 14, height: 14, borderRadius: 7, backgroundColor: rsiColor, marginLeft: -7 }} />
-        </View>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 9, color: "#34d399" }}>Oversold 30</Text>
-          <Text style={{ fontSize: 9, color: rsiColor, fontWeight: "600" }}>{rsiLabel}</Text>
-          <Text style={{ fontSize: 9, color: "#f87171" }}>Overbought 70</Text>
+        backgroundColor: colors.card, padding: 12, gap: 12 }}>
+        <SectionTitle title="LONG-TERM TREND" colors={colors} />
+
+        {/* MA50 Distance */}
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>MA50 Distance</Text>
+            <Text style={{ color: ma50Color, fontWeight: "800", fontSize: 16 }}>
+              {ma50Dist !== null ? `${ma50Dist >= 0 ? "+" : ""}${ma50Dist.toFixed(1)}%` : "–"}
+            </Text>
+          </View>
+          {/* Bar: -25% left ... 0 center ... +25% right */}
+          <View style={{ height: 8, borderRadius: 4, overflow: "hidden", position: "relative",
+            flexDirection: "row" }}>
+            <View style={{ flex: 1, backgroundColor: "#f8717130" }} />
+            <View style={{ flex: 1, backgroundColor: "#34d39930" }} />
+          </View>
+          <View style={{ position: "relative", height: 0 }}>
+            {ma50Dist !== null && (() => {
+              const clamp = Math.min(25, Math.max(-25, ma50Dist));
+              const pct = (clamp + 25) / 50 * 100;
+              return (
+                <View style={{ position: "absolute", top: -18,
+                  left: `${Math.min(97, Math.max(3, pct))}%` as any,
+                  width: 14, height: 14, borderRadius: 7, backgroundColor: ma50Color, marginLeft: -7 }} />
+              );
+            })()}
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: -4 }}>
+            <Text style={{ fontSize: 9, color: "#f87171" }}>−25%</Text>
+            <Text style={{ fontSize: 9, color: ma50Color, fontWeight: "600" }}>{ma50Label}</Text>
+            <Text style={{ fontSize: 9, color: "#34d399" }}>+25%</Text>
+          </View>
         </View>
 
-        {/* BB % */}
-        <View style={{ marginTop: 4 }}>
+        {/* ADX */}
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>ADX (14) — Kekuatan Trend</Text>
+            <Text style={{ color: adxColor, fontWeight: "800", fontSize: 16 }}>
+              {adx > 0 ? adx.toFixed(1) : "–"}
+            </Text>
+          </View>
+          <View style={{ height: 8, borderRadius: 4, overflow: "hidden", flexDirection: "row" }}>
+            <View style={{ flex: 15, height: 8, backgroundColor: "#94a3b840" }} />
+            <View style={{ flex: 10, height: 8, backgroundColor: "#60a5fa40" }} />
+            <View style={{ flex: 10, height: 8, backgroundColor: "#a78bfa40" }} />
+            <View style={{ flex: 15, height: 8, backgroundColor: "#f59e0b40" }} />
+          </View>
+          <View style={{ position: "relative", height: 0 }}>
+            {adx > 0 && (() => {
+              const pct = Math.min(98, (adx / 60) * 100);
+              return (
+                <View style={{ position: "absolute", top: -18,
+                  left: `${Math.max(2, pct)}%` as any,
+                  width: 14, height: 14, borderRadius: 7, backgroundColor: adxColor, marginLeft: -7 }} />
+              );
+            })()}
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: -4 }}>
+            <Text style={{ fontSize: 9, color: "#94a3b8" }}>Sideways</Text>
+            <Text style={{ fontSize: 9, color: adxColor, fontWeight: "600" }}>{adxLabel}</Text>
+            <Text style={{ fontSize: 9, color: "#f59e0b" }}>Trend Kuat</Text>
+          </View>
+        </View>
+
+        {/* BB % — short term context */}
+        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Bollinger Band %</Text>
             <Text style={{ color: colors.foreground, fontWeight: "700" }}>
@@ -705,7 +802,7 @@ function FinancialsTab({ quote, broker1d, masterStock, colors }: {
 
         {/* Beta from master */}
         {ms?.beta > 0 && (
-          <View style={{ marginTop: 4, flexDirection: "row", justifyContent: "space-between" }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Beta (22D)</Text>
             <Text style={{ color: ms.beta > 1.3 ? "#f87171" : ms.beta < 0.7 ? "#34d399" : colors.foreground,
               fontWeight: "700" }}>
@@ -2120,6 +2217,7 @@ export default function StockDetailScreen() {
               )}
               {activeTab === "financials" && quote && (
                 <FinancialsTab
+                  ticker={ticker}
                   quote={quote}
                   broker1d={data.broker1d}
                   masterStock={data.masterStock}
