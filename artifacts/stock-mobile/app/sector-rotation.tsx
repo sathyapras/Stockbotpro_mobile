@@ -193,7 +193,8 @@ export default function SectorRotationScreen() {
 
       {/* ── Phase Filter Pills ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 10 }}>
+        style={{ flexShrink: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 6 }}>
         <TouchableOpacity
           onPress={() => setFilterPhase(null)}
           style={{

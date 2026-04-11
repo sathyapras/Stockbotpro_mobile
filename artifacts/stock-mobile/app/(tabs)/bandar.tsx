@@ -328,8 +328,8 @@ export default function BandarScreen() {
 
         {/* Index selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={{ gap: 6, marginBottom: 10, alignItems: "center", flexDirection: "row" }}>
+          style={{ flexShrink: 0 }}
+          contentContainerStyle={{ gap: 6, paddingVertical: 6, paddingHorizontal: 4, alignItems: "center", flexDirection: "row" }}>
           {INDEX_OPTIONS.map(opt => {
             const active = indexFilter === opt.key;
             return (
@@ -378,8 +378,8 @@ export default function BandarScreen() {
 
         {/* Filter tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={{ gap: 6, paddingBottom: 6, alignItems: "center", flexDirection: "row" }}>
+          style={{ flexShrink: 0 }}
+          contentContainerStyle={{ gap: 6, paddingVertical: 6, paddingHorizontal: 4, alignItems: "center", flexDirection: "row" }}>
           {FILTER_TABS.map(tab => {
             const active = filterTab === tab.key;
             return (
