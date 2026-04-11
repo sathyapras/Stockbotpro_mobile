@@ -959,7 +959,7 @@ function FinancialsTab({ ticker, quote, broker1d, masterStock, colors }: {
           <InfoCell label="RS vs IHSG" colors={colors}
             value={quote.rs.toFixed(3)} color={quote.rs > 1 ? "#34d399" : "#f87171"} />
           <InfoCell label="RS MA" value={quote.rsMa.toFixed(3)} colors={colors} />
-          <InfoCell label="SCORE" value={String(quote.totalScore)} color="#a78bfa" colors={colors} />
+          <InfoCell label="TA SCORE" value={String(quote.totalScore)} color="#a78bfa" colors={colors} />
         </View>
       </View>
 
@@ -2124,7 +2124,7 @@ export default function StockDetailScreen() {
                   <View style={{ alignItems: "center", gap: 2 }}>
                     <ScoreRing score={verdict.score} color={verdict.color} />
                     <Text style={{ color: colors.mutedForeground, fontSize: 7,
-                      fontWeight: "700", letterSpacing: 0.5 }}>SCORE</Text>
+                      fontWeight: "700", letterSpacing: 0.5 }}>TA SCORE</Text>
                     {plan?.rsi !== null && plan?.rsi !== undefined && (
                       <View style={{ alignItems: "center", marginTop: 4,
                         paddingHorizontal: 8, paddingVertical: 3,
