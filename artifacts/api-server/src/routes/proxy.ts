@@ -20,7 +20,7 @@ const UPSTREAM: Record<string, { host: string; path: string; ttl?: number }> = {
   STOCKTOOLS_SCREENER:     { host: "103.190.28.248", path: "/stockbotprodata/STOCKTOOLS_SCREENER" },
   MASTER_STOCK_DB:         { host: "103.190.28.248", path: "/stockbotprodata/MASTER_STOCK_DB",  ttl: CACHE_TTL_LONG_MS },
   RADAR_MARKET:            { host: "103.190.28.248", path: "/stockbotprodata/RADAR_MARKET",     ttl: CACHE_TTL_LONG_MS },
-  RoboCommentary:          { host: "103.190.28.248", path: "/stockbotprodata/RoboCommentary" },
+  RoboCommentary:          { host: "103.190.28.45",  path: "/files/Robocommentary.json" },
 };
 
 function fetchUpstream(cfg: { host: string; path: string }): Promise<unknown> {
@@ -94,6 +94,40 @@ router.get("/proxy/:name", async (req: Request, res: Response) => {
       res.status(502).json({ error: "Upstream error", detail: msg });
     }
   }
+});
+
+/** GET /api/robocommentary/:ticker — returns {ticker,date,commentary} for that stock */
+router.get("/robocommentary/:ticker", async (req: Request, res: Response) => {
+  const ticker = (req.params.ticker ?? "").toUpperCase();
+  const cfg = UPSTREAM["RoboCommentary"];
+  const now = Date.now();
+  let list: { ticker: string; date: string; commentary: string }[];
+
+  const entry = cache.get("RoboCommentary");
+  if (entry && now - entry.cachedAt < CACHE_TTL_MS) {
+    list = entry.data as typeof list;
+  } else {
+    try {
+      const data = await fetchUpstream(cfg);
+      cache.set("RoboCommentary", { data, cachedAt: now });
+      list = data as typeof list;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (entry) {
+        list = entry.data as typeof list;
+      } else {
+        res.status(502).json({ error: "Upstream error", detail: msg });
+        return;
+      }
+    }
+  }
+
+  const found = list.find(r => r.ticker === ticker);
+  if (!found) {
+    res.status(404).json({ error: "Not found", ticker });
+    return;
+  }
+  res.json(found);
 });
 
 export default router;

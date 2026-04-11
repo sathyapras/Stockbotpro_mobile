@@ -1474,10 +1474,26 @@ function CandleChartSvg({ candles, containerWidth, colors }: {
   );
 }
 
-function ChartTab({ symbol, commentary }: { symbol: string; commentary?: string }) {
+function apiBase(): string {
+  const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+  return `https://${d}/api`;
+}
+
+function ChartTab({ symbol }: { symbol: string }) {
   const { width } = useWindowDimensions();
   const colors = useColors();
   const [period, setPeriod] = useState<"1mo" | "3mo" | "6mo" | "1y">("3mo");
+
+  const { data: roboData } = useQuery<{ ticker: string; date: string; commentary: string }>({
+    queryKey: ["robocommentary", symbol],
+    queryFn: async () => {
+      const res = await fetch(`${apiBase()}/robocommentary/${encodeURIComponent(symbol)}`);
+      if (!res.ok) throw new Error("not found");
+      return res.json();
+    },
+    staleTime: 15 * 60 * 1000,
+    retry: 1,
+  });
 
   const { data: allCandles = [], isLoading } = useQuery({
     queryKey: ["ohlcv", symbol],
@@ -1623,9 +1639,13 @@ function ChartTab({ symbol, commentary }: { symbol: string; commentary?: string 
           })()}
 
           {/* RoboCommentary */}
-          {commentary && (
+          {roboData?.commentary && (
             <View style={{ marginHorizontal: 16, marginTop: 8 }}>
-              <RoboCommentary commentary={commentary} colors={colors} />
+              <Text style={{ color: colors.mutedForeground, fontSize: 9,
+                marginBottom: 4, letterSpacing: 0.5 }}>
+                ROBO COMMENTARY · {roboData.date}
+              </Text>
+              <RoboCommentary commentary={roboData.commentary} colors={colors} />
             </View>
           )}
         </ScrollView>
@@ -2115,7 +2135,7 @@ export default function StockDetailScreen() {
                 />
               )}
               {activeTab === "chart" && (
-                <ChartTab symbol={ticker} commentary={data?.plan?.commentary} />
+                <ChartTab symbol={ticker} />
               )}
               {activeTab === "levels" && (
                 <PriceLevelsTab quote={quote} colors={colors} />
