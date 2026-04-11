@@ -25,6 +25,125 @@ import { MenuButton } from "@/components/MenuButton";
 import { hapticLight } from "@/hooks/useHaptic";
 import { useColors } from "@/hooks/useColors";
 
+// ─── Tutorial / Hints ─────────────────────────────────────────
+
+const TUTORIAL_ITEMS = [
+  {
+    icon: "🔥",
+    title: "Phase (Fase Broker)",
+    body: "Ignition = akumulasi kuat baru mulai. Accumulation = broker masih beli. Distribution = broker mulai jual. Churning = sinyal campur, hati-hati.",
+  },
+  {
+    icon: "📊",
+    title: "Flow Score (0–100)",
+    body: "Skor kekuatan akumulasi broker. Di atas 60 = akumulasi sehat. Di bawah 30 = distribusi atau lemah. Semakin tinggi, semakin banyak broker big money masuk.",
+  },
+  {
+    icon: "💹",
+    title: "B/S — Net Buy/Sell",
+    body: "Nilai bersih aliran dana broker dalam Miliar Rp. Positif (+) = broker net beli. Negatif (−) = broker net jual. Ini bukan jumlah broker, tapi nilai rupiahnya.",
+  },
+  {
+    icon: "🏦",
+    title: "Smart Money 1 & 3",
+    body: "Broker dominan dengan volume terbesar di saham itu. SM1 = broker #1 terbesar, SM3 = top 3 broker. Label seperti 'Big Acc' artinya akumulasi besar.",
+  },
+  {
+    icon: "📏",
+    title: "VWAP Big Money",
+    body: "Rata-rata harga masuk broker besar (volume-weighted). Jika harga sekarang di bawah VWAP → posisi broker masih untung dan cenderung hold.",
+  },
+  {
+    icon: "📈",
+    title: "Histogram 15 Hari",
+    body: "Batang hijau = hari net inflow (nilai Rp positif). Batang merah = hari net outflow. Semakin tinggi batang = semakin besar nilai aliran dana hari itu.",
+  },
+  {
+    icon: "⚠️",
+    title: "B:x / S:x vs Histogram",
+    body: "B:11 / S:31 = 11 broker beli, 31 broker jual (jumlah). Tapi histogram bisa hijau jika 11 broker beli lebih besar nilainya. Selalu perhatikan nilai Rp, bukan hanya jumlah broker.",
+  },
+  {
+    icon: "📅",
+    title: "AVG 3D / 5D / 15D",
+    body: "Rata-rata net flow per periode. AVG 3D paling sensitif (jangka pendek). AVG 15D menunjukkan tren akumulasi jangka menengah.",
+  },
+];
+
+function SmartMoneyTutorial() {
+  const colors = useColors();
+  const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 10 }}>
+      <TouchableOpacity
+        onPress={() => { setOpen(v => !v); setActiveIdx(null); }}
+        activeOpacity={0.8}
+        style={{
+          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+          backgroundColor: open ? "#1e1b4b" : colors.card,
+          borderRadius: 12, borderWidth: 1,
+          borderColor: open ? "#818cf8aa" : colors.border,
+          paddingHorizontal: 14, paddingVertical: 10,
+        }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 16 }}>💡</Text>
+          <View>
+            <Text style={{ color: open ? "#a5b4fc" : colors.foreground,
+              fontWeight: "700", fontSize: 13 }}>Cara Baca Smart Money</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
+              {open ? "Ketuk item untuk detail" : "Panduan membaca semua metrik"}
+            </Text>
+          </View>
+        </View>
+        <Text style={{ color: open ? "#818cf8" : colors.mutedForeground, fontSize: 18, fontWeight: "300" }}>
+          {open ? "▲" : "▼"}
+        </Text>
+      </TouchableOpacity>
+
+      {open && (
+        <View style={{
+          marginTop: 2, backgroundColor: "#0f0f1a",
+          borderRadius: 12, borderWidth: 1, borderColor: "#818cf830",
+          overflow: "hidden",
+        }}>
+          {TUTORIAL_ITEMS.map((item, i) => (
+            <TouchableOpacity
+              key={i}
+              onPress={() => setActiveIdx(activeIdx === i ? null : i)}
+              activeOpacity={0.75}
+              style={{
+                paddingHorizontal: 14, paddingVertical: 11,
+                borderBottomWidth: i < TUTORIAL_ITEMS.length - 1 ? 1 : 0,
+                borderBottomColor: "#1e2040",
+                backgroundColor: activeIdx === i ? "#1e1b4b" : "transparent",
+              }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Text style={{ fontSize: 17 }}>{item.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: activeIdx === i ? "#a5b4fc" : colors.foreground,
+                    fontWeight: "700", fontSize: 12 }}>
+                    {item.title}
+                  </Text>
+                  {activeIdx === i && (
+                    <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 4, lineHeight: 17 }}>
+                      {item.body}
+                    </Text>
+                  )}
+                </View>
+                <Text style={{ color: "#475569", fontSize: 12 }}>
+                  {activeIdx === i ? "▲" : "▶"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ─── Sparkline mini chart ─────────────────────────────────────
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
@@ -315,6 +434,9 @@ export default function SmartMoneyScreen() {
       {/* ── Data available ── */}
       {!isLoading && dataAvailable && (
         <>
+          {/* Tutorial hints */}
+          <SmartMoneyTutorial />
+
           {/* Summary bar */}
           <View style={{ paddingHorizontal: 16 }}>
             <PhaseSummaryBar data={smData} />
