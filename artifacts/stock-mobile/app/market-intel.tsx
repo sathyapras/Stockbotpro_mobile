@@ -12,9 +12,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { type BrokerFlowAggregate, fetchBrokerFlowAggregate } from "@/services/brokerFlowService";
 import { type RadarMarket, fetchRadarMarket } from "@/services/radarMarketService";
 
-// ─── Phase map (AFL phase codes → display) ────────────────────
+// ─── Phase map ────────────────────────────────────────────────
 
 const PHASE_MAP: Record<string, { label: string; color: string }> = {
   IGNITION:     { label: "Markup",        color: "#60a5fa" },
@@ -102,7 +103,7 @@ function buildFlowState(stocks: RadarMarket[]) {
   }));
 }
 
-function buildSmartMoneyFlow(stocks: RadarMarket[]) {
+function buildHakaHakiFlow(stocks: RadarMarket[]) {
   let total5d = 0, total10d = 0;
   for (const r of stocks) {
     total5d  += r.nbs5d  ?? 0;
@@ -117,8 +118,8 @@ function buildSmartMoneyFlow(stocks: RadarMarket[]) {
   return {
     nbs5d: total5d,   nbs5dStr:  formatT(total5d),
     nbs10d: total10d, nbs10dStr: formatT(total10d),
-    label5d:  total5d  >= 0 ? "Net beli (akumulasi)" : "Net jual (distribusi)",
-    label10d: total10d >= 0 ? "Net beli (akumulasi)" : "Net jual (distribusi)",
+    label5d:  total5d  >= 0 ? "Haka dominan (Akumulasi)" : "Haki dominan (Distribusi)",
+    label10d: total10d >= 0 ? "Haka dominan (Akumulasi)" : "Haki dominan (Distribusi)",
     color5d:  total5d  >= 0 ? "#34d399" : "#f87171",
     color10d: total10d >= 0 ? "#34d399" : "#f87171",
   };
@@ -214,18 +215,109 @@ function FlowStateCard({ stocks }: { stocks: RadarMarket[] }) {
   );
 }
 
-function SmartMoneyFlowCard({ stocks }: { stocks: RadarMarket[] }) {
-  const flow = buildSmartMoneyFlow(stocks);
+// ─── NEW: Broker Net Flow Card ─────────────────────────────────
+
+function BrokerNetFlowCard({ data }: { data: BrokerFlowAggregate | undefined }) {
+  if (!data) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>💰 Broker Net Flow</Text>
+        <Text style={[styles.descText, { marginTop: 8 }]}>Data tidak tersedia</Text>
+      </View>
+    );
+  }
+
+  const isInflow = data.netDir === "INFLOW";
+  const netColor   = isInflow ? "#34d399" : "#f87171";
+  const netBg      = isInflow ? "#052e16" : "#2d0a0a";
+  const netVerdict = isInflow
+    ? "Uang institusi NET MASUK ke pasar"
+    : "Uang institusi NET KELUAR dari pasar";
+
+  const accPct  = data.accPct;
+  const distPct = data.distPct;
+  const maxBar  = Math.max(accPct, distPct, 1);
+
+  const bbPct = data.brokerBuyDominance;
+  const bsPct = 100 - bbPct;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>↘ Smart Money Flow</Text>
-        <Text style={styles.cardSub}>Net Buy/Sell 5D & 10D</Text>
+        <Text style={styles.cardTitle}>💰 Broker Net Flow</Text>
+        <Text style={styles.cardSub}>{data.total} saham · Real money</Text>
       </View>
+      <Text style={styles.cardSubtitle}>Transaksi nyata antar broker — tanpa identitas broker</Text>
+
+      {/* Total net value */}
+      <View style={[styles.netFlowBox, { backgroundColor: netBg, borderColor: netColor + "55" }]}>
+        <Text style={[styles.netFlowValue, { color: netColor }]}>{data.netStr}</Text>
+        <View style={[styles.netDirBadge, { backgroundColor: netColor + "22", borderColor: netColor }]}>
+          <Text style={[styles.netDirText, { color: netColor }]}>
+            {isInflow ? "▲ INFLOW" : "▼ OUTFLOW"}
+          </Text>
+        </View>
+        <Text style={[styles.netVerdict, { color: netColor + "cc" }]}>{netVerdict}</Text>
+      </View>
+
+      {/* Acc vs Dist bar */}
+      <Text style={styles.sectionMini}>Distribusi Saham</Text>
+      <View style={{ gap: 8, marginBottom: 12 }}>
+        {[
+          { label: "Akumulasi", count: data.accCount,  pct: accPct,  color: "#34d399" },
+          { label: "Distribusi", count: data.distCount, pct: distPct, color: "#f87171" },
+        ].map(item => (
+          <View key={item.label}>
+            <View style={styles.rowBetween}>
+              <Text style={[styles.phaseLabel, { color: item.color }]}>{item.label.toUpperCase()}</Text>
+              <Text style={styles.phaseStat}>{item.pct}%  ·  {item.count} saham</Text>
+            </View>
+            <View style={styles.barBg}>
+              <View style={[styles.barFill, {
+                width: `${(item.pct / maxBar) * 100}%` as any,
+                backgroundColor: item.color + "cc",
+              }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Broker count stats */}
+      <Text style={styles.sectionMini}>Jumlah Broker Aktif</Text>
+      <View style={styles.statsRow}>
+        {[
+          { label: "Beli",     value: data.totalBuyBrokers.toLocaleString(),  sub: `${bbPct}% dominan`,  color: "#34d399" },
+          { label: "Jual",     value: data.totalSellBrokers.toLocaleString(), sub: `${bsPct}% dominan`,  color: "#f87171" },
+          { label: "Inflow ↑", value: `${data.inflowCount}`,                  sub: "saham net beli",     color: "#60a5fa" },
+        ].map(s => (
+          <View key={s.label} style={{ alignItems: "center", flex: 1 }}>
+            <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
+            <Text style={styles.statLabel}>{s.label}</Text>
+            <Text style={styles.statSub}>{s.sub}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Haka/Haki Flow Card (renamed from SmartMoneyFlowCard) ────
+
+function HakaHakiFlowCard({ stocks }: { stocks: RadarMarket[] }) {
+  const flow = buildHakaHakiFlow(stocks);
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>🎯 Haka/Haki Flow</Text>
+        <Text style={styles.cardSub}>Offer vs Bid 5D & 10D</Text>
+      </View>
+      <Text style={styles.cardSubtitle}>
+        Haka (Hajar Kanan) = beli di Offer · Haki (Hajar Kiri) = jual di Bid
+      </Text>
       <View style={{ flexDirection: "row", gap: 12 }}>
         {[
-          { label: "Net Buy/Sell 5D",  value: flow.nbs5dStr,  sub: flow.label5d,  color: flow.color5d  },
-          { label: "Net Buy/Sell 10D", value: flow.nbs10dStr, sub: flow.label10d, color: flow.color10d },
+          { label: "Net Haka/Haki 5D",  value: flow.nbs5dStr,  sub: flow.label5d,  color: flow.color5d  },
+          { label: "Net Haka/Haki 10D", value: flow.nbs10dStr, sub: flow.label10d, color: flow.color10d },
         ].map(item => (
           <View key={item.label} style={[styles.flowBox]}>
             <Text style={styles.flowBoxLabel}>{item.label}</Text>
@@ -245,9 +337,16 @@ export default function MarketIntelScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { data: radarAll = [], isLoading } = useQuery({
+  const { data: radarAll = [], isLoading: radarLoading } = useQuery({
     queryKey: ["radar-market"],
     queryFn: fetchRadarMarket,
+    staleTime: 60 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
+  });
+
+  const { data: brokerFlow, isLoading: brokerLoading } = useQuery({
+    queryKey: ["broker-flow-aggregate"],
+    queryFn: fetchBrokerFlowAggregate,
     staleTime: 60 * 60 * 1000,
     gcTime: 2 * 60 * 60 * 1000,
   });
@@ -256,6 +355,8 @@ export default function MarketIntelScreen() {
     () => radarAll.filter(r => !r.ticker.startsWith("IDX") && r.ticker !== "COMPOSITE"),
     [radarAll]
   );
+
+  const isLoading = radarLoading && brokerLoading;
 
   const today = new Date().toLocaleDateString("id-ID", {
     weekday: "short", day: "numeric", month: "short", year: "numeric",
@@ -286,7 +387,8 @@ export default function MarketIntelScreen() {
           <MarketPulseCard stocks={stocks} />
           <PhaseDistributionCard stocks={stocks} />
           <FlowStateCard stocks={stocks} />
-          <SmartMoneyFlowCard stocks={stocks} />
+          <BrokerNetFlowCard data={brokerFlow} />
+          <HakaHakiFlowCard stocks={stocks} />
         </ScrollView>
       )}
     </View>
@@ -314,6 +416,7 @@ const styles = StyleSheet.create({
   cardTitle: { color: "#fff", fontWeight: "700", fontSize: 15 },
   cardSub: { color: "#475569", fontSize: 11 },
   cardSubtitle: { color: "#475569", fontSize: 10, marginBottom: 14, marginTop: -8 },
+  sectionMini: { color: "#475569", fontSize: 10, fontWeight: "600", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
 
   progressBg: { height: 10, backgroundColor: "#0f1629", borderRadius: 5, marginBottom: 8 },
   progressFill: { height: 10, borderRadius: 5 },
@@ -348,4 +451,17 @@ const styles = StyleSheet.create({
   flowBoxLabel: { color: "#64748b", fontSize: 10, marginBottom: 4 },
   flowBoxValue: { fontWeight: "900", fontSize: 22 },
   flowBoxSub:   { fontSize: 10, marginTop: 2 },
+
+  // Broker Net Flow specific
+  netFlowBox: {
+    borderRadius: 12, padding: 14, marginBottom: 14,
+    borderWidth: 1, alignItems: "center",
+  },
+  netFlowValue: { fontWeight: "900", fontSize: 32, letterSpacing: 1 },
+  netDirBadge: {
+    borderRadius: 6, paddingHorizontal: 10, paddingVertical: 3,
+    borderWidth: 1, marginTop: 6, marginBottom: 6,
+  },
+  netDirText: { fontWeight: "700", fontSize: 12 },
+  netVerdict: { fontSize: 11, textAlign: "center" },
 });

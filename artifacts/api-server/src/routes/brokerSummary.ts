@@ -3,11 +3,15 @@ import http from "http";
 
 const router = Router();
 
-// ─── Upstream fetcher ─────────────────────────────────────────
+// ─── Upstream fetchers ────────────────────────────────────────
 
 let brokerCache: BrokerRow[] | null = null;
 let brokerCachedAt = 0;
 const BROKER_TTL = 30 * 60 * 1000; // 30 min
+
+let broker1dCache: BrokerRow[] | null = null;
+let broker1dCachedAt = 0;
+const BROKER_1D_TTL = 30 * 60 * 1000;
 
 interface BrokerRow {
   ticker: string;
@@ -23,25 +27,17 @@ interface BrokerRow {
   acc_dist: string | null;
 }
 
-function fetchBrokerHistory(): Promise<BrokerRow[]> {
+function fetchUpstream(path: string): Promise<BrokerRow[]> {
   return new Promise((resolve, reject) => {
     const req = http.request(
-      {
-        hostname: "103.190.28.45",
-        port: 80,
-        path: "/broksum_data_history15d.json",
-        method: "GET",
-        timeout: 30_000,
-      },
+      { hostname: "103.190.28.45", port: 80, path, method: "GET", timeout: 30_000 },
       (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (c) => chunks.push(c));
         res.on("end", () => {
           try {
             resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as BrokerRow[]);
-          } catch (e) {
-            reject(e);
-          }
+          } catch (e) { reject(e); }
         });
       },
     );
@@ -53,10 +49,26 @@ function fetchBrokerHistory(): Promise<BrokerRow[]> {
 
 async function getBrokerData(): Promise<BrokerRow[]> {
   if (brokerCache && Date.now() - brokerCachedAt < BROKER_TTL) return brokerCache;
-  const data = await fetchBrokerHistory();
+  const data = await fetchUpstream("/broksum_data_history15d.json");
   brokerCache = data;
   brokerCachedAt = Date.now();
   return data;
+}
+
+async function getBroker1dData(): Promise<BrokerRow[]> {
+  if (broker1dCache && Date.now() - broker1dCachedAt < BROKER_1D_TTL) return broker1dCache;
+  const data = await fetchUpstream("/broksum_data_1d.json");
+  broker1dCache = data;
+  broker1dCachedAt = Date.now();
+  return data;
+}
+
+// ─── Parse helpers ────────────────────────────────────────────
+
+function parseNetValue(val: string | null): number {
+  if (!val) return 0;
+  const m = val.match(/([-\d.]+)\s*bn/i);
+  return m ? parseFloat(m[1]) : 0;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -220,6 +232,74 @@ function computeTicker(ticker: string, history: BrokerRow[]): SmartMoneyItem {
     latestAvgPrice:  latestVwap,
   };
 }
+
+// ─── Aggregate endpoint ───────────────────────────────────────
+// GET /api/broker-summary/market-aggregate → daily broker net flow summary
+
+router.get("/broker-summary/market-aggregate", async (_req: Request, res: Response) => {
+  try {
+    const rows = await getBroker1dData();
+    const valid = rows.filter(r => r.ticker && r.ticker.trim() !== "");
+
+    let totalNetBn = 0;
+    let accCount = 0, distCount = 0, unknownCount = 0;
+    let totalBuyBrokers = 0, totalSellBrokers = 0;
+    let inflowCount = 0, outflowCount = 0;
+
+    for (const r of valid) {
+      const net = parseNetValue(r.net_value_rpb);
+      totalNetBn += net;
+      if (net > 0) inflowCount++;
+      else if (net < 0) outflowCount++;
+
+      totalBuyBrokers  += r.broker_buy  ?? 0;
+      totalSellBrokers += r.broker_sell ?? 0;
+
+      const ad = (r.acc_dist ?? "").toLowerCase().trim();
+      if (ad === "acc")  accCount++;
+      else if (ad === "dist") distCount++;
+      else unknownCount++;
+    }
+
+    const total = valid.length;
+    const accPct  = Math.round((accCount  / total) * 100);
+    const distPct = Math.round((distCount / total) * 100);
+
+    const netDir   = totalNetBn >= 0 ? "INFLOW" : "OUTFLOW";
+    const absNetBn = Math.abs(totalNetBn);
+    const netStr   = absNetBn >= 1000
+      ? `${totalNetBn >= 0 ? "+" : "-"}${(absNetBn / 1000).toFixed(2)}T`
+      : `${totalNetBn >= 0 ? "+" : "-"}${absNetBn.toFixed(0)}B`;
+
+    const brokerBuyDominance = totalBuyBrokers + totalSellBrokers > 0
+      ? Math.round((totalBuyBrokers / (totalBuyBrokers + totalSellBrokers)) * 100)
+      : 50;
+
+    const date = valid[0]?.date ?? null;
+
+    res.setHeader("Cache-Control", "public, max-age=1800");
+    res.json({
+      date,
+      total,
+      totalNetBn:       parseFloat(totalNetBn.toFixed(2)),
+      netStr,
+      netDir,
+      accCount,
+      distCount,
+      unknownCount,
+      accPct,
+      distPct,
+      inflowCount,
+      outflowCount,
+      totalBuyBrokers,
+      totalSellBrokers,
+      brokerBuyDominance,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: "Failed to aggregate broker flow", detail: msg });
+  }
+});
 
 // ─── Main endpoint ────────────────────────────────────────────
 // GET /api/broker-summary/smart-money          → all tickers
