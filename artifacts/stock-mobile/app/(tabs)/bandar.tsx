@@ -309,7 +309,7 @@ export default function BandarScreen() {
           <View>
             <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 20 }}>📊 Buy/Sell Flow</Text>
             <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}>
-              Net Buy/Sell · VWAP · Flow Signal
+              Tekanan Offer/Bid · VWAP · Flow Signal
             </Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

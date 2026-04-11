@@ -245,7 +245,7 @@ export default function SmartMoneyScreen() {
           <View>
             <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 20 }}>💎 Smart Money Flow</Text>
             <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}>
-              Analisis broker · Update setelah 17:30 WIB
+              Tekanan Beli/Jual (Offer vs Bid) · Update setelah 17:30 WIB
             </Text>
           </View>
           <MenuButton />

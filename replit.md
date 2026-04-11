@@ -65,3 +65,20 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 
 ## Data Reference
 Full API + data source docs at `.local/stockbot-docs/data-sources.md`
+
+## Pemahaman Penting — Metodologi NBS (Net Buy/Sell)
+
+**NBS1D / NBS5D / NBS10D BUKAN data ringkasan broker (broker summary).**
+
+Ini adalah analisis tekanan beli/jual berdasarkan **posisi transaksi di order book**:
+- Transaksi terjadi di sisi **Offer** (harga ask) → dihitung sebagai **tekanan beli** (buyer agresif)
+- Transaksi terjadi di sisi **Bid** (harga bid) → dihitung sebagai **tekanan jual** (seller agresif)
+- NBS = Net dari (volume di Offer) − (volume di Bid)
+
+Istilah yang benar: **Buy Offer Side vs Sell Bid Side** — bukan "analisis broker" atau "broker flow".
+
+Label UI yang sudah dikoreksi:
+- Smart Money Flow subtitle: "Tekanan Beli/Jual (Offer vs Bid)"
+- Buy/Sell Flow subtitle: "Tekanan Offer/Bid · VWAP · Flow Signal"
+
+Data ini tetap di-generate oleh sistem AFL AmiBroker StockBot Pro dan diupdate setelah 17:30 WIB.
