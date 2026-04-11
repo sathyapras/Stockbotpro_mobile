@@ -961,7 +961,7 @@ function RadarNBSSection({ radar, currentPrice, colors }: {
       {radar.vwapD1 > 0 && (
         <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
           backgroundColor: colors.card, padding: 12, gap: 8 }}>
-          <SectionTitle title="VWAP BANDAR" colors={colors} />
+          <SectionTitle title="VWAP BIG MONEY" colors={colors} />
           <View style={{ flexDirection: "row" }}>
             <InfoCell label="VWAP 1D" value={fRp(radar.vwapD1)} color="#38BDF8" colors={colors} />
             {radar.vwap5dAvg > 0 && (
@@ -1075,12 +1075,12 @@ function SmartMoneyTab({ sm, radar, currentPrice, colors }: {
               <View style={{ marginTop: 10, gap: 4 }}>
                 {sm.top1Label ? (
                   <Text style={{ color: colors.foreground, fontSize: 11 }}>
-                    SM1: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{sm.top1Label}</Text>
+                    Smart Money 1: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{sm.top1Label}</Text>
                   </Text>
                 ) : null}
                 {sm.top3Label ? (
                   <Text style={{ color: colors.foreground, fontSize: 11 }}>
-                    SM3: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{sm.top3Label}</Text>
+                    Smart Money 3: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{sm.top3Label}</Text>
                   </Text>
                 ) : null}
                 {sm.latestVwap ? (
@@ -2038,8 +2038,8 @@ export default function StockDetailScreen() {
                 <View style={{ flexDirection: "row", justifyContent: "space-between",
                   marginBottom: 8 }}>
                   {[
-                    { label: "MA20", val: fRp(quote.ma20) },
-                    { label: "MA50", val: fRp(quote.ma50) },
+                    { label: "Trend 20", val: fRp(quote.ma20) },
+                    { label: "Trend 50", val: fRp(quote.ma50) },
                     { label: "52W H", val: fRp(quote.high52w) },
                     { label: "VOL", val: formatVol(quote.volK) },
                   ].map(({ label, val }) => (
