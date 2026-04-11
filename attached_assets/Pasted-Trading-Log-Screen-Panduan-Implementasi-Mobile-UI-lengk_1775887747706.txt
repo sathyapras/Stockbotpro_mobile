@@ -1,0 +1,764 @@
+Trading Log Screen — Panduan Implementasi Mobile
+UI lengkap: list, filter, card, modal, delete, empty state
+ARSITEKTUR SCREEN
+TradingLogScreen
+├── SummaryBar          — statistik ringkas di atas
+├── FilterTabs          — Semua / Open / Closed
+├── FlatList<TradeCard> — daftar trade terfilter
+│   └── TradeCard       — card per trade
+├── ModalTambah         — form tambah trade baru
+├── ModalTutup          — form tutup posisi + preview P&L
+└── EmptyState          — tampilan saat belum ada data
+
+SETUP DEVICE ID
+Panggil sekali saat screen mount, simpan di state lokal.
+
+import * as SecureStore from "expo-secure-store";
+import "react-native-get-random-values";
+import { v4 as uuidv4 } from "uuid";
+const DEVICE_KEY = "sbp_device_id";
+async function getOrCreateDeviceId(): Promise<string> {
+  let id = await SecureStore.getItemAsync(DEVICE_KEY);
+  if (!id) {
+    id = uuidv4();
+    await SecureStore.setItemAsync(DEVICE_KEY, id);
+  }
+  return id;
+}
+
+TIPE DATA
+type SignalType  = "BOW" | "BOS";
+type TradeStatus = "OPEN" | "CLOSED";
+type FilterTab   = "SEMUA" | "OPEN" | "CLOSED";
+interface Trade {
+  id:          number;
+  deviceId:    string;
+  ticker:      string;
+  signalType:  SignalType;
+  entryPrice:  string;
+  slPrice:     string;
+  tp1Price:    string;
+  tp2Price:    string;
+  entryDate:   string;   // "YYYY-MM-DD"
+  exitPrice:   string | null;
+  exitDate:    string | null;
+  status:      TradeStatus;
+  notes:       string | null;
+  createdAt:   string;
+}
+interface Summary {
+  totalTrades:   number;
+  winRate:       number;
+  totalPnl:      number;
+  avgHoldDays:   number;
+  openPositions: number;
+}
+
+STATE SCREEN UTAMA
+const [deviceId,     setDeviceId]     = useState<string>("");
+const [trades,       setTrades]       = useState<Trade[]>([]);
+const [summary,      setSummary]      = useState<Summary | null>(null);
+const [activeFilter, setActiveFilter] = useState<FilterTab>("SEMUA");
+const [loading,      setLoading]      = useState(true);
+const [showTambah,   setShowTambah]   = useState(false);
+const [showTutup,    setShowTutup]    = useState(false);
+const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+const BASE = "https://stockbotpro.replit.app/api";
+
+DATA FETCHING
+useEffect(() => {
+  (async () => {
+    const id = await getOrCreateDeviceId();
+    setDeviceId(id);
+    await fetchAll(id);
+  })();
+}, []);
+async function fetchAll(id: string) {
+  setLoading(true);
+  try {
+    const [tRes, sRes] = await Promise.all([
+      fetch(`${BASE}/trading-log?device_id=${id}`),
+      fetch(`${BASE}/trading-log/summary?device_id=${id}`),
+    ]);
+    const tJson = await tRes.json();
+    const sJson = await sRes.json();
+    if (tJson.ok) setTrades(tJson.data);
+    if (sJson.ok) setSummary(sJson);
+  } catch {
+    // tampilkan empty state
+  } finally {
+    setLoading(false);
+  }
+}
+// Filter trades berdasarkan tab aktif
+const filteredTrades = trades.filter((t) => {
+  if (activeFilter === "OPEN")   return t.status === "OPEN";
+  if (activeFilter === "CLOSED") return t.status === "CLOSED";
+  return true;
+});
+
+KOMPONEN: SummaryBar
+Tampil di paling atas layar, 4 kolom statistik.
+
+function SummaryBar({ summary }: { summary: Summary | null }) {
+  const pnl = summary?.totalPnl ?? 0;
+  return (
+    <View style={styles.summaryBar}>
+      <StatBox label="Total Trade" value={String(summary?.totalTrades ?? 0)} />
+      <StatBox label="Win Rate"    value={`${summary?.winRate ?? 0}%`} color="#22c55e" />
+      <StatBox
+        label="Total P&L"
+        value={`${pnl >= 0 ? "+" : ""}${pnl}%`}
+        color={pnl >= 0 ? "#22c55e" : "#ef4444"}
+      />
+      <StatBox label="Open"        value={String(summary?.openPositions ?? 0)} color="#f59e0b" />
+    </View>
+  );
+}
+function StatBox({ label, value, color = "#e2e8f0" }) {
+  return (
+    <View style={styles.statBox}>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+Style summary bar:
+
+summaryBar: {
+  flexDirection: "row",
+  backgroundColor: "#0f1729",
+  borderRadius: 12,
+  marginHorizontal: 16,
+  marginBottom: 12,
+  padding: 12,
+  gap: 4,
+  borderWidth: 1,
+  borderColor: "rgba(0,180,255,0.1)",
+},
+statBox: {
+  flex: 1,
+  alignItems: "center",
+  gap: 2,
+},
+statValue: {
+  fontSize: 15,
+  fontWeight: "700",
+  color: "#e2e8f0",
+},
+statLabel: {
+  fontSize: 9,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+},
+
+KOMPONEN: FilterTabs
+const TABS: FilterTab[] = ["SEMUA", "OPEN", "CLOSED"];
+function FilterTabs({ active, onChange }) {
+  return (
+    <View style={styles.tabRow}>
+      {TABS.map((tab) => (
+        <Pressable
+          key={tab}
+          style={[styles.tab, active === tab && styles.tabActive]}
+          onPress={() => onChange(tab)}
+        >
+          <Text style={[styles.tabText, active === tab && styles.tabTextActive]}>
+            {tab}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+Style:
+
+tabRow: {
+  flexDirection: "row",
+  gap: 8,
+  paddingHorizontal: 16,
+  marginBottom: 12,
+},
+tab: {
+  flex: 1,
+  paddingVertical: 8,
+  borderRadius: 8,
+  alignItems: "center",
+  backgroundColor: "#0f1729",
+  borderWidth: 1,
+  borderColor: "#1e293b",
+},
+tabActive: {
+  backgroundColor: "rgba(0,180,255,0.15)",
+  borderColor: "#00b4d8",
+},
+tabText: {
+  fontSize: 12,
+  fontWeight: "600",
+  color: "#64748b",
+},
+tabTextActive: {
+  color: "#00d4ff",
+},
+
+KOMPONEN: TradeCard
+function TradeCard({ trade, onClose, onDelete }) {
+  const entry   = Number(trade.entryPrice);
+  const exit    = trade.exitPrice ? Number(trade.exitPrice) : null;
+  const pnlPct  = exit != null ? ((exit - entry) / entry * 100) : null;
+  const isOpen  = trade.status === "OPEN";
+  // Hitung hold days
+  const entryMs = new Date(trade.entryDate).getTime();
+  const endDate = trade.exitDate ? new Date(trade.exitDate) : new Date();
+  const holdDays = Math.round((endDate.getTime() - entryMs) / 86_400_000);
+  return (
+    <View style={styles.card}>
+      {/* ── Header: Ticker + Badge signal + Status ── */}
+      <View style={styles.cardHeader}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={styles.ticker}>{trade.ticker}</Text>
+          <View style={[styles.signalBadge,
+            { backgroundColor: trade.signalType === "BOW"
+              ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)" }]}>
+            <Text style={[styles.signalText,
+              { color: trade.signalType === "BOW" ? "#22c55e" : "#3b82f6" }]}>
+              {trade.signalType}
+            </Text>
+          </View>
+        </View>
+        {/* Status badge */}
+        <View style={[styles.statusBadge,
+          { backgroundColor: isOpen
+            ? "rgba(245,158,11,0.15)" : "rgba(100,116,139,0.15)" }]}>
+          <Text style={[styles.statusText,
+            { color: isOpen ? "#f59e0b" : "#64748b" }]}>
+            {isOpen ? "OPEN" : "CLOSED"}
+          </Text>
+        </View>
+      </View>
+      {/* ── Grid harga: Entry / SL / TP1 / TP2 / Exit ── */}
+      <View style={styles.priceGrid}>
+        <PriceItem label="Entry" value={formatPrice(trade.entryPrice)} />
+        <PriceItem label="SL"    value={formatPrice(trade.slPrice)}    color="#ef4444" />
+        <PriceItem label="TP1"   value={formatPrice(trade.tp1Price)}   color="#22c55e" />
+        <PriceItem label="TP2"   value={formatPrice(trade.tp2Price)}   color="#22c55e" />
+        {exit != null && (
+          <PriceItem label="Exit" value={formatPrice(trade.exitPrice!)}
+            color={pnlPct! >= 0 ? "#22c55e" : "#ef4444"} />
+        )}
+      </View>
+      {/* ── P&L dan Hold Days ── */}
+      <View style={styles.cardFooter}>
+        <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+          {pnlPct != null && (
+            <Text style={[styles.pnl, { color: pnlPct >= 0 ? "#22c55e" : "#ef4444" }]}>
+              {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+            </Text>
+          )}
+          <Text style={styles.holdDays}>
+            📅 {trade.entryDate.slice(5).replace("-", "/")}
+            {trade.exitDate ? ` → ${trade.exitDate.slice(5).replace("-", "/")}` : ""}
+            {" "}·{" "}{holdDays}h
+          </Text>
+        </View>
+        {/* Action buttons */}
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {isOpen && (
+            <Pressable style={styles.btnClose} onPress={() => onClose(trade)}>
+              <Text style={styles.btnCloseText}>Tutup</Text>
+            </Pressable>
+          )}
+          <Pressable style={styles.btnDelete} onPress={() => onDelete(trade)}>
+            <Text style={styles.btnDeleteText}>🗑</Text>
+          </Pressable>
+        </View>
+      </View>
+      {/* ── Catatan (jika ada) ── */}
+      {trade.notes ? (
+        <Text style={styles.notes}>📝 {trade.notes}</Text>
+      ) : null}
+    </View>
+  );
+}
+function PriceItem({ label, value, color = "#94a3b8" }) {
+  return (
+    <View style={{ alignItems: "center" }}>
+      <Text style={[styles.priceValue, { color }]}>{value}</Text>
+      <Text style={styles.priceLabel}>{label}</Text>
+    </View>
+  );
+}
+function formatPrice(val: string | number): string {
+  const n = Number(val);
+  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+  return String(Math.round(n));
+}
+
+Style card:
+
+card: {
+  backgroundColor: "#0b1628",
+  borderRadius: 14,
+  padding: 14,
+  marginHorizontal: 16,
+  marginBottom: 10,
+  borderWidth: 1,
+  borderColor: "#1e293b",
+  gap: 10,
+},
+cardHeader: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+ticker: {
+  fontSize: 18,
+  fontWeight: "800",
+  color: "#f1f5f9",
+  letterSpacing: 0.5,
+},
+signalBadge: {
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  borderRadius: 6,
+},
+signalText: {
+  fontSize: 11,
+  fontWeight: "700",
+},
+statusBadge: {
+  paddingHorizontal: 10,
+  paddingVertical: 3,
+  borderRadius: 6,
+},
+statusText: {
+  fontSize: 11,
+  fontWeight: "700",
+},
+priceGrid: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  backgroundColor: "#060e1f",
+  borderRadius: 8,
+  padding: 10,
+},
+priceValue: {
+  fontSize: 13,
+  fontWeight: "700",
+},
+priceLabel: {
+  fontSize: 9,
+  color: "#475569",
+  textTransform: "uppercase",
+  marginTop: 2,
+},
+cardFooter: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+pnl: {
+  fontSize: 16,
+  fontWeight: "800",
+},
+holdDays: {
+  fontSize: 11,
+  color: "#475569",
+},
+btnClose: {
+  backgroundColor: "rgba(0,180,255,0.15)",
+  borderWidth: 1,
+  borderColor: "#00b4d8",
+  borderRadius: 8,
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+},
+btnCloseText: {
+  color: "#00d4ff",
+  fontSize: 12,
+  fontWeight: "700",
+},
+btnDelete: {
+  backgroundColor: "rgba(239,68,68,0.1)",
+  borderRadius: 8,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+},
+btnDeleteText: {
+  fontSize: 14,
+},
+notes: {
+  fontSize: 12,
+  color: "#64748b",
+  fontStyle: "italic",
+  paddingTop: 4,
+  borderTopWidth: 1,
+  borderTopColor: "#1e293b",
+},
+
+MODAL: Tambah Trade
+Gunakan BottomSheetModal atau Modal biasa.
+
+function ModalTambah({ visible, deviceId, onClose, onSuccess }) {
+  const [ticker,     setTicker]     = useState("");
+  const [signalType, setSignalType] = useState<"BOW" | "BOS">("BOW");
+  const [entry,      setEntry]      = useState("");
+  const [sl,         setSl]         = useState("");
+  const [tp1,        setTp1]        = useState("");
+  const [tp2,        setTp2]        = useState("");
+  const [date,       setDate]       = useState(todayStr()); // "YYYY-MM-DD"
+  const [notes,      setNotes]      = useState("");
+  const [saving,     setSaving]     = useState(false);
+  async function handleSave() {
+    if (!ticker.trim() || !entry || !sl || !tp1 || !tp2 || !date) {
+      Alert.alert("Lengkapi semua field wajib");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("https://stockbotpro.replit.app/api/trading-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          device_id:   deviceId,
+          ticker:      ticker.trim().toUpperCase(),
+          signal_type: signalType,
+          entry_price: Number(entry),
+          sl_price:    Number(sl),
+          tp1_price:   Number(tp1),
+          tp2_price:   Number(tp2),
+          entry_date:  date,
+          notes:       notes.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
+      onSuccess();
+      onClose();
+    } catch (e: any) {
+      Alert.alert("Gagal", e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.overlay}>
+        <View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>Tambah Trade</Text>
+          {/* Toggle BOW / BOS */}
+          <View style={styles.toggleRow}>
+            {(["BOW","BOS"] as const).map((s) => (
+              <Pressable key={s}
+                style={[styles.toggleBtn,
+                  signalType === s && styles.toggleBtnActive,
+                  { borderColor: s === "BOW" ? "#22c55e" : "#3b82f6" },
+                  signalType === s && { backgroundColor:
+                    s === "BOW" ? "rgba(34,197,94,0.2)" : "rgba(59,130,246,0.2)" }
+                ]}
+                onPress={() => setSignalType(s)}>
+                <Text style={[styles.toggleText,
+                  { color: signalType === s
+                    ? (s === "BOW" ? "#22c55e" : "#3b82f6")
+                    : "#64748b" }]}>
+                  {s === "BOW" ? "🟢 BOW" : "🔵 BOS"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {/* Field input */}
+          <TextInput style={styles.input} placeholder="Ticker (misal: BBRI)"
+            placeholderTextColor="#475569" value={ticker}
+            onChangeText={(v) => setTicker(v.toUpperCase())}
+            autoCapitalize="characters" />
+          <View style={styles.row2}>
+            <TextInput style={[styles.input, { flex: 1 }]} placeholder="Entry"
+              placeholderTextColor="#475569" keyboardType="decimal-pad"
+              value={entry} onChangeText={setEntry} />
+            <TextInput style={[styles.input, { flex: 1 }]} placeholder="Stop Loss"
+              placeholderTextColor="#475569" keyboardType="decimal-pad"
+              value={sl} onChangeText={setSl} />
+          </View>
+          <View style={styles.row2}>
+            <TextInput style={[styles.input, { flex: 1 }]} placeholder="TP1"
+              placeholderTextColor="#475569" keyboardType="decimal-pad"
+              value={tp1} onChangeText={setTp1} />
+            <TextInput style={[styles.input, { flex: 1 }]} placeholder="TP2"
+              placeholderTextColor="#475569" keyboardType="decimal-pad"
+              value={tp2} onChangeText={setTp2} />
+          </View>
+          {/* Tanggal — bisa pakai DateTimePicker atau input manual */}
+          <TextInput style={styles.input} placeholder="Tanggal (YYYY-MM-DD)"
+            placeholderTextColor="#475569" value={date} onChangeText={setDate} />
+          <TextInput style={[styles.input, { height: 64, textAlignVertical: "top" }]}
+            placeholder="Catatan (opsional)" placeholderTextColor="#475569"
+            multiline value={notes} onChangeText={setNotes} />
+          <View style={styles.row2}>
+            <Pressable style={[styles.btn, styles.btnCancel]} onPress={onClose}>
+              <Text style={styles.btnCancelText}>Batal</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, styles.btnSave]} onPress={handleSave}
+              disabled={saving}>
+              <Text style={styles.btnSaveText}>
+                {saving ? "Menyimpan..." : "Simpan Trade"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+MODAL: Tutup Posisi
+Preview P&L real-time berubah saat user mengetik exit price.
+
+function ModalTutup({ visible, trade, deviceId, onClose, onSuccess }) {
+  const [exitPrice, setExitPrice] = useState("");
+  const [exitDate,  setExitDate]  = useState(todayStr());
+  const [notes,     setNotes]     = useState("");
+  const [saving,    setSaving]    = useState(false);
+  // Preview P&L real-time
+  const entry   = Number(trade?.entryPrice ?? 0);
+  const exit    = Number(exitPrice) || 0;
+  const pnlPct  = entry > 0 && exit > 0
+    ? ((exit - entry) / entry * 100)
+    : null;
+  async function handleConfirm() {
+    if (!exitPrice || !exitDate) {
+      Alert.alert("Lengkapi exit price dan tanggal");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `https://stockbotpro.replit.app/api/trading-log/${trade.id}/close?device_id=${deviceId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            exit_price: Number(exitPrice),
+            exit_date:  exitDate,
+            notes:      notes.trim() || undefined,
+          }),
+        }
+      );
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
+      onSuccess();
+      onClose();
+    } catch (e: any) {
+      Alert.alert("Gagal", e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  if (!trade) return null;
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.overlay}>
+        <View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>Tutup Posisi</Text>
+          <Text style={styles.sheetSubtitle}>{trade.ticker} · {trade.signalType}</Text>
+          {/* Preview P&L real-time */}
+          <View style={styles.pnlPreview}>
+            <Text style={styles.pnlPreviewLabel}>Entry</Text>
+            <Text style={styles.pnlPreviewValue}>{formatPrice(trade.entryPrice)}</Text>
+            <Text style={styles.pnlArrow}>→</Text>
+            <Text style={[styles.pnlPreviewValue,
+              { color: exit === 0 ? "#94a3b8"
+                : pnlPct! >= 0 ? "#22c55e" : "#ef4444" }]}>
+              {exit > 0 ? formatPrice(exitPrice) : "—"}
+            </Text>
+            {pnlPct != null && (
+              <View style={[styles.pnlBadge,
+                { backgroundColor: pnlPct >= 0 ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)" }]}>
+                <Text style={{ color: pnlPct >= 0 ? "#22c55e" : "#ef4444",
+                  fontWeight: "800", fontSize: 16 }}>
+                  {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                </Text>
+              </View>
+            )}
+          </View>
+          <TextInput style={styles.input} placeholder="Exit Price"
+            placeholderTextColor="#475569" keyboardType="decimal-pad"
+            value={exitPrice} onChangeText={setExitPrice} />
+          <TextInput style={styles.input} placeholder="Tanggal Exit (YYYY-MM-DD)"
+            placeholderTextColor="#475569" value={exitDate}
+            onChangeText={setExitDate} />
+          <TextInput style={[styles.input, { height: 56, textAlignVertical: "top" }]}
+            placeholder="Catatan (opsional)" placeholderTextColor="#475569"
+            multiline value={notes} onChangeText={setNotes} />
+          <View style={styles.row2}>
+            <Pressable style={[styles.btn, styles.btnCancel]} onPress={onClose}>
+              <Text style={styles.btnCancelText}>Batal</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, styles.btnSave]} onPress={handleConfirm}
+              disabled={saving}>
+              <Text style={styles.btnSaveText}>
+                {saving ? "Menyimpan..." : "Konfirmasi Tutup"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+HAPUS DENGAN KONFIRMASI DIALOG
+function handleDeletePress(trade: Trade) {
+  Alert.alert(
+    "Hapus Trade",
+    `Yakin ingin menghapus trade ${trade.ticker}?`,
+    [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const res = await fetch(
+              `${BASE}/trading-log/${trade.id}?device_id=${deviceId}`,
+              { method: "DELETE" }
+            );
+            const json = await res.json();
+            if (!json.ok) throw new Error(json.error);
+            await fetchAll(deviceId); // refresh list
+          } catch (e: any) {
+            Alert.alert("Gagal hapus", e.message);
+          }
+        },
+      },
+    ]
+  );
+}
+
+EMPTY STATE
+Tampil saat tidak ada trade (atau filter tidak ada hasilnya).
+
+function EmptyState({ filter }: { filter: FilterTab }) {
+  return (
+    <View style={styles.empty}>
+      <Text style={styles.emptyIcon}>📋</Text>
+      <Text style={styles.emptyTitle}>
+        {filter === "SEMUA"   ? "Belum Ada Trade"
+         : filter === "OPEN"  ? "Tidak Ada Posisi Open"
+                              : "Belum Ada Trade Closed"}
+      </Text>
+      <Text style={styles.emptyDesc}>
+        {filter === "SEMUA"
+          ? "Tap tombol + untuk mencatat sinyal trading pertama Anda."
+          : "Coba filter lain atau tambah trade baru."}
+      </Text>
+    </View>
+  );
+}
+
+Style:
+
+empty: {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingVertical: 64,
+  gap: 12,
+},
+emptyIcon: {
+  fontSize: 48,
+},
+emptyTitle: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#e2e8f0",
+},
+emptyDesc: {
+  fontSize: 13,
+  color: "#64748b",
+  textAlign: "center",
+  paddingHorizontal: 32,
+  lineHeight: 20,
+},
+
+STRUKTUR SCREEN LENGKAP
+export default function TradingLogScreen() {
+  // ... semua state di atas ...
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#060e1f" }}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Trading Log</Text>
+        <Pressable style={styles.addBtn} onPress={() => setShowTambah(true)}>
+          <Text style={styles.addBtnText}>+ Tambah</Text>
+        </Pressable>
+      </View>
+      {/* Summary Bar */}
+      <SummaryBar summary={summary} />
+      {/* Filter Tabs */}
+      <FilterTabs active={activeFilter} onChange={setActiveFilter} />
+      {/* Trade List */}
+      {loading ? (
+        <ActivityIndicator size="large" color="#00d4ff" style={{ flex: 1 }} />
+      ) : filteredTrades.length === 0 ? (
+        <EmptyState filter={activeFilter} />
+      ) : (
+        <FlatList
+          data={filteredTrades}
+          keyExtractor={(t) => String(t.id)}
+          renderItem={({ item }) => (
+            <TradeCard
+              trade={item}
+              onClose={(t) => { setSelectedTrade(t); setShowTutup(true); }}
+              onDelete={handleDeletePress}
+            />
+          )}
+          contentContainerStyle={{ paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
+          refreshing={loading}
+          onRefresh={() => fetchAll(deviceId)}
+        />
+      )}
+      {/* Modals */}
+      <ModalTambah
+        visible={showTambah}
+        deviceId={deviceId}
+        onClose={() => setShowTambah(false)}
+        onSuccess={() => fetchAll(deviceId)}
+      />
+      <ModalTutup
+        visible={showTutup}
+        trade={selectedTrade}
+        deviceId={deviceId}
+        onClose={() => { setShowTutup(false); setSelectedTrade(null); }}
+        onSuccess={() => fetchAll(deviceId)}
+      />
+    </SafeAreaView>
+  );
+}
+
+WARNA REFERENSI
+Elemen	Warna
+Background screen	#060e1f
+Card background	#0b1628
+Summary bar	#0f1729
+Border	#1e293b
+Teks utama	#f1f5f9
+Teks sekunder	#64748b
+Aksen cyan	#00d4ff
+Profit / Win	#22c55e
+Loss / SL	#ef4444
+Open badge	#f59e0b
+BOW badge	#22c55e
+BOS badge	#3b82f6
+CATATAN PENTING
+Empty state: Backend sudah live di stockbotpro.replit.app/api — tampilan akan langsung terisi data begitu user tambah trade pertama.
+Pull to refresh: Gunakan onRefresh + refreshing pada FlatList.
+Date input: Bisa gunakan @react-native-community/datetimepicker untuk UX yang lebih baik daripada input manual.
+Tidak perlu auth: Semua endpoint trading-log menggunakan device_id, tidak butuh token JWT.
+device_id di query param untuk GET/DELETE/PATCH, di body untuk POST.
