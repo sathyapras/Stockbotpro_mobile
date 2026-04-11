@@ -312,7 +312,7 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
           {[
             { label: "Akumulasi", value: `${marketCtx.accPct}%`,    color: "#34d399" },
             { label: "Distribusi", value: `${marketCtx.dstPct}%`,   color: "#f87171" },
-            { label: "Avg Bandar", value: `${marketCtx.avgBandar}`, color: "#a78bfa" },
+            { label: "Avg Flow", value: `${marketCtx.avgBandar}`, color: "#a78bfa" },
           ].map((stat, i) => (
             <View key={stat.label} style={{
               flex: 1, alignItems: "center",
@@ -417,7 +417,7 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
       detail: stats?.topEntry ? `Hot: ${stats.topEntry.ticker}  ${stats.topEntry.trendScore}/100` : loading ? "Loading…" : "Belum ada data",
     },
     {
-      icon: "⚡", label: "FLOW", sub: "Bandar Activity",
+      icon: "⚡", label: "FLOW", sub: "Buy/Sell Pressure",
       color: "#a78bfa", bg: "#1a1030", border: "#a78bfaaa",
       path: "/(tabs)/bandar",
       metric: stats ? `${stats.accCount} ACC  ·  ${stats.distCount} DIST` : "—",
@@ -428,7 +428,7 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
       color: "#10b981", bg: "#041f10", border: "#10b981aa",
       path: "/(tabs)/smartmoney",
       metric: stats?.topScore ? `⭐ ${stats.topScore.ticker}` : "—",
-      detail: stats?.topScore ? `Bandar Score ${stats.topScore.bandarScore}/100` : loading ? "Loading…" : "Belum ada data",
+      detail: stats?.topScore ? `Flow Score ${stats.topScore.bandarScore}/100` : loading ? "Loading…" : "Belum ada data",
     },
     {
       icon: "📡", label: "RADAR", sub: "Market Intel",
@@ -869,7 +869,7 @@ function calcRiskScore(radar: RadarMarket[], breadth: ReturnType<typeof calcBrea
   const scorePoin = avgScore < 30 ? 1 : 0;
   score += scorePoin;
   components.push({
-    icon: "🧠", label: "Avg Bandar Score",
+    icon: "🧠", label: "Avg Flow Score",
     poin: scorePoin > 0 ? `+${scorePoin} poin` : "aman",
     desc: `Rata-rata bandar score: ${avgScore.toFixed(0)}/100`,
     color: scorePoin >= 1 ? "#fbbf24" : "#34d399",
@@ -1111,7 +1111,7 @@ const SORT_OPTS: { label: string; val: SortKey }[] = [
 const PRESETS: { key: string; icon: string; label: string; color: string; bg: string }[] = [
   { key: "entry",  icon: "🚀", label: "Entry Signal",  color: "#0ea5e9", bg: "#071624" },
   { key: "acc",    icon: "⭐", label: "Strong Acc",    color: "#16a34a", bg: "#041f10" },
-  { key: "bandar", icon: "💎", label: "Top Bandar",    color: "#a78bfa", bg: "#1a1030" },
+  { key: "bandar", icon: "💎", label: "Top Flow",      color: "#a78bfa", bg: "#1a1030" },
   { key: "volume", icon: "📈", label: "Vol Spike",     color: "#f59e0b", bg: "#180e00" },
   { key: "dist",   icon: "🔴", label: "Distribusi",    color: "#dc2626", bg: "#1a0707" },
 ];

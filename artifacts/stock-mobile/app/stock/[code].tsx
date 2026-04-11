@@ -916,7 +916,7 @@ function RadarNBSSection({ radar, currentPrice, colors }: {
         {/* Score bars */}
         <View style={{ gap: 6, marginTop: 4 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Bandar Score</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Flow Score</Text>
             <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{radar.bandarScore.toFixed(0)}/100</Text>
           </View>
           <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: "hidden" }}>
