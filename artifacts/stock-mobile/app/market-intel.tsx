@@ -17,18 +17,19 @@ import { type RadarMarket, fetchRadarMarket } from "@/services/radarMarketServic
 
 // ─── Phase map ────────────────────────────────────────────────
 
+// Maps actual RADAR_MARKET Phase field values → display
 const PHASE_MAP: Record<string, { label: string; color: string }> = {
-  IGNITION:     { label: "Markup",        color: "#60a5fa" },
-  EARLY_ACC:    { label: "Accumulation",  color: "#34d399" },
-  STRONG_TREND: { label: "Markup",        color: "#60a5fa" },
-  EXHAUSTION:   { label: "Late Stage",    color: "#fbbf24" },
-  DISTRIBUTION: { label: "Distribution",  color: "#f87171" },
-  CHURNING:     { label: "Consolidation", color: "#94a3b8" },
+  "MARKUP PHASE":       { label: "Markup",      color: "#60a5fa" },
+  "EARLY MARKUP":       { label: "Markup",      color: "#60a5fa" },
+  "ACCUMULATION PHASE": { label: "Akumulasi",   color: "#34d399" },
+  "LATE STAGE":         { label: "Late Stage",  color: "#fbbf24" },
+  "DISTRIBUTION PHASE": { label: "Distribusi",  color: "#f87171" },
+  "CONSOLIDATION":      { label: "Konsolidasi", color: "#94a3b8" },
 };
 
 function phaseDisplay(phase: string): { label: string; color: string } {
   const key = (phase ?? "").toUpperCase().trim();
-  return PHASE_MAP[key] ?? { label: "Consolidation", color: "#94a3b8" };
+  return PHASE_MAP[key] ?? { label: "Konsolidasi", color: "#94a3b8" };
 }
 
 // ─── Compute helpers ──────────────────────────────────────────
@@ -598,9 +599,9 @@ const styles = StyleSheet.create({
 
   phaseLabel: { fontSize: 11, fontWeight: "700", width: 110 },
   phaseStat:  { color: "#64748b", fontSize: 11 },
-  barBg:  { height: 6, backgroundColor: "#0f1629", borderRadius: 3 },
-  barBg2: { flex: 1, height: 6, backgroundColor: "#0f1629", borderRadius: 3 },
-  barFill: { height: 6, borderRadius: 3 },
+  barBg:  { height: 8, backgroundColor: "#0f1629", borderRadius: 4, overflow: "hidden" },
+  barBg2: { flex: 1, height: 8, backgroundColor: "#0f1629", borderRadius: 4, overflow: "hidden" },
+  barFill: { height: 8, borderRadius: 4 },
 
   flowLabel: { fontSize: 10, width: 88, textAlign: "right" },
   flowStat:  { color: "#64748b", fontSize: 10, width: 56, textAlign: "right" },
