@@ -364,13 +364,16 @@ interface CCCard {
 }
 
 function CommandMiniCard({ card }: { card: CCCard }) {
+  const colors = useColors();
   return (
     <TouchableOpacity
       onPress={() => router.push(card.path as any)}
       activeOpacity={0.8}
       style={{
         flex: 1, borderRadius: 14, padding: 13,
-        backgroundColor: card.bg, borderWidth: 1, borderColor: card.border,
+        backgroundColor: card.bg,
+        borderWidth: 1, borderColor: colors.border,
+        borderLeftWidth: 3, borderLeftColor: card.color,
       }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
         <Text style={{ fontSize: 16 }}>{card.icon}</Text>
