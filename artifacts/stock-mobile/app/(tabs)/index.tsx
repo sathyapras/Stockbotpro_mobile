@@ -231,10 +231,10 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
               </Text>
               {usdIdrChg != null && (
                 <Text style={{
-                  fontSize: 13, fontWeight: "700",
+                  fontSize: 11, fontWeight: "700",
                   color: usdIdrChg >= 0 ? "#f87171" : "#34d399",
                 }}>
-                  {usdIdrChg >= 0 ? "▲" : "▼"}
+                  {usdIdrChg >= 0 ? "▲" : "▼"} {usdIdrChg >= 0 ? "+" : ""}{usdIdrChg.toFixed(2)}%
                 </Text>
               )}
             </View>
