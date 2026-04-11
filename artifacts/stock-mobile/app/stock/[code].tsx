@@ -893,7 +893,7 @@ function RadarNBSSection({ radar, currentPrice, colors }: {
       {/* FlowState + Strength */}
       <View style={{ borderRadius: 12, borderWidth: 1, borderColor: flow.color + "40",
         backgroundColor: colors.card, padding: 12, gap: 8 }}>
-        <SectionTitle title="RADAR MARKET — BANDAR ACTIVITY" colors={colors} />
+        <SectionTitle title="FLOW B/S — NET BUY/SELL" colors={colors} />
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <View style={{ gap: 2 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -1044,12 +1044,7 @@ function SmartMoneyTab({ sm, radar, currentPrice, colors }: {
     <ScrollView showsVerticalScrollIndicator={false}
       contentContainerStyle={{ padding: 16, gap: 12 }}>
 
-      {/* ── Radar Market (primary source) ── */}
-      {radar && (
-        <RadarNBSSection radar={radar} currentPrice={currentPrice} colors={colors} />
-      )}
-
-      {/* ── Broker History Smart Money (secondary) ── */}
+      {/* ── Broker History Smart Money (primary) ── */}
       {sm && phaseCfg && trendCfg && (
         <>
           {/* Phase + Score */}
@@ -1207,6 +1202,11 @@ function SmartMoneyTab({ sm, radar, currentPrice, colors }: {
             </Text>
           </View>
         </>
+      )}
+
+      {/* ── Flow B/S — Radar NBS (secondary) ── */}
+      {radar && (
+        <RadarNBSSection radar={radar} currentPrice={currentPrice} colors={colors} />
       )}
     </ScrollView>
   );
