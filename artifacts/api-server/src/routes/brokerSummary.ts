@@ -168,7 +168,7 @@ function computeTicker(ticker: string, history: BrokerRow[]): SmartMoneyItem {
     else if (ad === "Dist") distDays++;
   }
 
-  const sparkline = withData.slice(0, 5)
+  const sparkline = withData.slice(0, 15)
     .map(r => parseRpbn(r.average_rpbn))
     .reverse();
 
