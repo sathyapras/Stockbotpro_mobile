@@ -2222,27 +2222,25 @@ export default function StockDetailScreen() {
               })()}
 
               {/* Tab bar */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: "row" }}>
-                  {tabs.map((tab) => {
-                    const active = activeTab === tab.id;
-                    return (
-                      <TouchableOpacity
-                        key={tab.id}
-                        style={{ paddingHorizontal: 12, paddingVertical: 10,
-                          borderBottomWidth: active ? 2 : 0,
-                          borderBottomColor: colors.primary }}
-                        onPress={() => setActiveTab(tab.id)}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "700",
-                          color: active ? colors.primary : colors.mutedForeground }}>
-                          {tab.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
+              <View style={{ flexDirection: "row" }}>
+                {tabs.map((tab) => {
+                  const active = activeTab === tab.id;
+                  return (
+                    <TouchableOpacity
+                      key={tab.id}
+                      style={{ flex: 1, alignItems: "center", paddingVertical: 10,
+                        borderBottomWidth: active ? 2 : 0,
+                        borderBottomColor: colors.primary }}
+                      onPress={() => setActiveTab(tab.id)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "700",
+                        color: active ? colors.primary : colors.mutedForeground }}>
+                        {tab.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
             {/* ── Tab content ── */}
