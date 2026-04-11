@@ -870,8 +870,8 @@ function FinancialsTab({ ticker, quote, broker1d, masterStock, colors }: {
           )}
 
           {/* Fundamental Narrative */}
-          {ms.per > 0 && ms.peg > 0 && ms.roe > 0 && (() => {
-            const insight = generateFundamentalInsight(ms.per, ms.peg, ms.roe);
+          {ms.roe > 0 && (() => {
+            const insight = generateFundamentalInsight(ms.per ?? 0, ms.peg ?? 0, ms.roe);
             const actionColor = insight.action === "BUY / ACCUMULATE" ? "#34d399"
               : insight.action === "WAIT / AVOID ENTRY" ? "#f87171"
               : "#94a3b8";
@@ -921,39 +921,35 @@ function FinancialsTab({ ticker, quote, broker1d, masterStock, colors }: {
         </View>
       )}
 
-      {/* MA status */}
-      <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-        backgroundColor: colors.card, padding: 12, gap: 10 }}>
-        <SectionTitle title="MOVING AVERAGES & LEVELS" colors={colors} />
-        {[
-          { label: "MA 20", ma: quote.ma20 },
-          { label: "MA 50", ma: quote.ma50 },
-          { label: "52W High", ma: high52w },
-          { label: "52W Low", ma: low52w },
-          ...(broker1d?.vwap ? [{ label: "VWAP (broker)", ma: broker1d.vwap }] : []),
-          ...(ms?.support ? [{ label: "Support", ma: ms.support }] : []),
-          ...(ms?.resistance ? [{ label: "Resistance", ma: ms.resistance }] : []),
-        ].filter(x => x.ma > 0).map(({ label, ma }) => {
-          const above = price >= ma;
-          const isLevel = label === "52W Low" || label === "Support";
-          return (
-            <View key={label} style={{ flexDirection: "row", justifyContent: "space-between",
-              alignItems: "center" }}>
-              <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{label}</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={{ color: colors.foreground, fontWeight: "700" }}>{fRp(ma)}</Text>
-                <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5,
-                  backgroundColor: (above ? "#34d399" : "#f87171") + "20" }}>
-                  <Text style={{ color: above ? "#34d399" : "#f87171",
-                    fontSize: 9, fontWeight: "700" }}>
-                    {above ? "Above ▲" : "Below ▼"}
-                  </Text>
+      {/* Support & Resistance */}
+      {(ms?.support > 0 || ms?.resistance > 0) && (
+        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+          backgroundColor: colors.card, padding: 12, gap: 10 }}>
+          <SectionTitle title="SUPPORT & RESISTANCE" colors={colors} />
+          {[
+            ...(ms?.resistance > 0 ? [{ label: "Resistance", ma: ms.resistance, up: true }] : []),
+            ...(ms?.support > 0    ? [{ label: "Support",    ma: ms.support,    up: false }] : []),
+          ].map(({ label, ma, up }) => {
+            const above = price >= ma;
+            return (
+              <View key={label} style={{ flexDirection: "row", justifyContent: "space-between",
+                alignItems: "center" }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{label}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ color: colors.foreground, fontWeight: "700" }}>{fRp(ma)}</Text>
+                  <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5,
+                    backgroundColor: (above ? "#34d399" : "#f87171") + "20" }}>
+                    <Text style={{ color: above ? "#34d399" : "#f87171",
+                      fontSize: 9, fontWeight: "700" }}>
+                      {above ? "Above ▲" : "Below ▼"}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* RS + Score */}
       <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
