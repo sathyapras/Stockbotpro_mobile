@@ -307,7 +307,7 @@ export default function BandarScreen() {
         <View style={{ flexDirection: "row", justifyContent: "space-between",
           alignItems: "flex-start", marginBottom: 10 }}>
           <View>
-            <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 20 }}>📊 Buy/Sell Flow</Text>
+            <Text style={{ color: colors.foreground, fontWeight: "900", fontSize: 20 }}>⚡ Buy/Sell Flow</Text>
             <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}>
               Tekanan Offer/Bid · VWAP · Flow Signal
             </Text>
