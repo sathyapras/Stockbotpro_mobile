@@ -371,7 +371,7 @@ function CommandMiniCard({ card }: { card: CCCard }) {
       activeOpacity={0.8}
       style={{
         flex: 1, borderRadius: 14, padding: 13,
-        backgroundColor: card.bg,
+        backgroundColor: colors.card,
         borderWidth: 1, borderColor: colors.border,
         borderLeftWidth: 3, borderLeftColor: card.color,
       }}>
@@ -517,8 +517,8 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
             activeOpacity={0.8}
             style={{
               flex: 1, borderRadius: 14, padding: 13,
-              backgroundColor: "#031014",
-              borderWidth: 1, borderColor: "#06b6d4aa",
+              backgroundColor: colors.card,
+              borderWidth: 1, borderColor: colors.border,
               borderLeftWidth: 3, borderLeftColor: "#06b6d4",
             }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -526,14 +526,14 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
               <View>
                 <Text style={{ color: "#06b6d4", fontSize: 9, fontWeight: "800",
                   letterSpacing: 0.5 }}>MARKET INTEL</Text>
-                <Text style={{ color: "#94a3b8", fontSize: 8 }}>Broker · Flow · Radar</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 8 }}>Broker · Flow · Radar</Text>
               </View>
             </View>
-            <Text style={{ color: "#f1f5f9", fontWeight: "800", fontSize: 14 }}>
+            <Text style={{ color: colors.foreground, fontWeight: "800", fontSize: 14 }}>
               {stats ? `${stats.accCount} ACC` : loading ? "Loading…" : "—"}
             </Text>
             {stats && (
-              <Text style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 1 }}>
                 {stats.distCount} DIST
               </Text>
             )}
