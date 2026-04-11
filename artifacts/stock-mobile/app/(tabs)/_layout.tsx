@@ -20,10 +20,6 @@ function NativeTabLayout() {
         <Icon sf={{ default: "bookmark", selected: "bookmark.fill" }} />
         <Label>Watchlist</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="smartmoney">
-        <Icon sf={{ default: "dollarsign.circle", selected: "dollarsign.circle.fill" }} />
-        <Label>Smart</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="stockpick">
         <Icon sf={{ default: "star.circle", selected: "star.circle.fill" }} />
         <Label>Stockpick</Label>
@@ -114,12 +110,8 @@ function ClassicTabLayout() {
         name="smartmoney"
         options={{
           title: "Smart",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="dollarsign.circle" tintColor={color} size={24} />
-            ) : (
-              <Feather name="trending-up" size={22} color={color} />
-            ),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none", width: 0, overflow: "hidden" },
         }}
       />
       <Tabs.Screen
