@@ -838,27 +838,6 @@ function FinancialsTab({ quote, broker1d, masterStock, colors }: {
         </View>
       )}
 
-      {/* Broker 1D */}
-      {broker1d && (
-        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-          backgroundColor: colors.card, padding: 12, gap: 8 }}>
-          <SectionTitle title="BROKER TODAY (1D)" colors={colors} />
-          <View style={{ flexDirection: "row" }}>
-            <InfoCell label="TOP 1" value={broker1d.top1} colors={colors} />
-            <InfoCell label="TOP 3" value={broker1d.top3} colors={colors} />
-            <InfoCell label="TOP 5" value={broker1d.top5} colors={colors} />
-          </View>
-          {broker1d.avgNetBn !== null && (
-            <View style={{ flexDirection: "row", marginTop: 4 }}>
-              <InfoCell label="AVG NET (BN)" colors={colors}
-                value={`${broker1d.avgNetBn > 0 ? "+" : ""}${broker1d.avgNetBn.toFixed(1)}B`}
-                color={broker1d.avgNetBn > 0 ? "#34d399" : "#f87171"} />
-              <InfoCell label="ACC/DIST" value={broker1d.accDist ?? "–"} colors={colors}
-                color={broker1d.accDist === "Acc" ? "#34d399" : "#f87171"} />
-            </View>
-          )}
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -1873,7 +1852,7 @@ export default function StockDetailScreen() {
   const tabs: { id: Tab; label: string }[] = [
     { id: "plan",       label: planTabLabel    },
     { id: "chart",      label: "Chart"         },
-    { id: "financials", label: "Financials"    },
+    { id: "financials", label: "TA & FA"       },
     { id: "smartmoney", label: "Smart Money"   },
     { id: "levels",     label: "Price Levels"  },
   ];
