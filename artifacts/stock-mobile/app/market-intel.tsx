@@ -448,7 +448,7 @@ function SignalSynthesisCard({
           <Text style={[styles.confText, {
             color: syn.confidence === "TINGGI" ? "#34d399" : "#fbbf24",
           }]}>
-            {syn.confidence === "TINGGI" ? "🟢 KONFIRMASI KUAT" : "🟡 SINYAL CAMPURAN"}
+            {syn.confidence === "TINGGI" ? "🟢 KONFIRMASI KUAT" : "🟡 SINYAL DIVERGEN"}
           </Text>
         </View>
       </View>
