@@ -2038,13 +2038,13 @@ export default function StockDetailScreen() {
                 const price = quote.price ?? 0;
                 const t20 = quote.ma20 > 0
                   ? price >= quote.ma20
-                    ? { label: "▲ Uptrend", color: "#34d399" }
-                    : { label: "▼ Downtrend", color: "#f87171" }
+                    ? { label: "▲ Bullish", color: "#34d399" }
+                    : { label: "▼ Bearish", color: "#f87171" }
                   : null;
                 const t50 = quote.ma50 > 0
                   ? price >= quote.ma50
-                    ? { label: "▲ Uptrend", color: "#34d399" }
-                    : { label: "▼ Downtrend", color: "#f87171" }
+                    ? { label: "▲ Bullish", color: "#34d399" }
+                    : { label: "▼ Bearish", color: "#f87171" }
                   : null;
                 return (
                   <View style={{ flexDirection: "row", justifyContent: "space-between",
