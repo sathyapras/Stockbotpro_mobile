@@ -41,7 +41,7 @@ import { type MasterStock } from "@/services/masterStockService";
 
 // ─── Tab types ────────────────────────────────────────────────
 
-type Tab = "plan" | "chart" | "financials" | "smartmoney" | "levels";
+type Tab = "plan" | "chart" | "financials" | "smartmoney";
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -2016,7 +2016,6 @@ export default function StockDetailScreen() {
     { id: "chart",      label: "Chart"         },
     { id: "financials", label: "TA & FA"       },
     { id: "smartmoney", label: "Smart Money"   },
-    { id: "levels",     label: "Price Levels"  },
   ];
 
   return (
@@ -2279,9 +2278,6 @@ export default function StockDetailScreen() {
               )}
               {activeTab === "chart" && (
                 <ChartTab symbol={ticker} />
-              )}
-              {activeTab === "levels" && (
-                <PriceLevelsTab quote={quote} colors={colors} />
               )}
             </View>
           </>
