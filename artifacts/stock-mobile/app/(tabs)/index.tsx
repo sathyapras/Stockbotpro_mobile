@@ -312,7 +312,7 @@ function HomeHeader({ stocks, radar }: { stocks: MasterStock[]; radar: RadarMark
           {[
             { label: "Akumulasi", value: `${marketCtx.accPct}%`,    color: "#34d399" },
             { label: "Distribusi", value: `${marketCtx.dstPct}%`,   color: "#f87171" },
-            { label: "Avg Flow", value: `${marketCtx.avgBandar}/100`, color: "#a78bfa" },
+            { label: "Avg Flow SM", value: `${marketCtx.avgBandar}/100`, color: "#a78bfa" },
           ].map((stat, i) => (
             <View key={stat.label} style={{
               flex: 1, alignItems: "center",

@@ -42,6 +42,81 @@ function hexRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+// ─── Home Screen Guide (hardcoded) ───────────────────────────
+
+interface HomeGuideItem {
+  icon: string;
+  title: string;
+  desc: string;
+  color: string;
+  link?: string;
+  linkLabel?: string;
+}
+
+const HOME_GUIDE: HomeGuideItem[] = [
+  {
+    icon: "🏠",
+    title: "Header & Status Pasar",
+    color: "#00d4ff",
+    desc:
+      "Bagian teratas menampilkan sapaan harian dan kondisi pasar saat ini: jumlah saham yang naik (Adv) dan turun (Dec), serta arah IHSG hari ini.\n\nAda juga tiga indikator mini:\n• Akumulasi % — persentase saham yang sedang diakumulasi (sinyal beli bandar)\n• Distribusi % — persentase saham yang sedang didistribusi (sinyal jual bandar)\n• Avg Flow SM — rata-rata Bandar Score dari seluruh saham (skala 0–100). Makin tinggi = semakin banyak aliran masuk dari smart money.",
+    link: "/home",
+    linkLabel: "Buka Home",
+  },
+  {
+    icon: "🎛️",
+    title: "Command Center",
+    color: "#f5c518",
+    desc:
+      "Empat kartu pintas yang merangkum kondisi market secara real-time:\n\n• 🎯 STOCKPICK — jumlah saham dengan sinyal entry kuat (fase IGNITION). Menampilkan saham terpanas hari ini.\n• ⚡ FLOW — perbandingan saham akumulasi vs distribusi, plus saham dengan Net Buy terbesar.\n• 💎 SMART MONEY — saham dengan Bandar Score tertinggi hari ini.\n• 📡 RADAR — total saham fase ignition dan saham dengan score broker terkuat.\n\nBaris bawah:\n• 🔄 Sector Rotation — berapa sektor leading vs lagging\n• 🌐 Market Intel — kondisi global dan breadth pasar",
+    link: "/(tabs)/stockpick",
+    linkLabel: "Buka Stockpick",
+  },
+  {
+    icon: "⚡",
+    title: "Signal Snapshot",
+    color: "#b87eff",
+    desc:
+      "Panel ini menampilkan 5 saham terpilih per kategori dalam format tab:\n\n• ⭐ Top Akumulasi — saham dengan Bandar Score tertinggi yang sedang diakumulasi\n• 🚀 Entry Peluang — saham fase IGNITION (akumulasi kuat + score ≥65) diurutkan dari net buy terbesar\n• ⚠️ Peringatan — saham yang mulai masuk distribusi, perlu waspada\n• ✅ Strong Trend — saham dengan tren naik stabil dan flow masuk konsisten\n\nTap kartu saham untuk melihat detail teknikal lengkap.",
+    link: "/(tabs)/screener",
+    linkLabel: "Lihat Screener",
+  },
+  {
+    icon: "📊",
+    title: "Phase Distribution",
+    color: "#33cc66",
+    desc:
+      "Bar horizontal yang menampilkan komposisi fase dari seluruh saham di RADAR:\n\n• Hijau tua — IGNITION (akumulasi kuat, potensi entry)\n• Hijau — EARLY_ACC (awal akumulasi)\n• Biru — STRONG_TREND (tren kuat)\n• Oranye — EXHAUSTION (mulai lemah)\n• Merah — DISTRIBUTION (distribusi/jual bandar)\n• Abu — CHURNING (netral)\n\nDi bawah bar terdapat 3 angka kunci:\n• Avg Flow Score — rata-rata flow score 0–100\n• Akumulasi % — persen saham fase positif\n• Distribusi % — persen saham fase negatif\n\nSemakin dominan warna hijau = kondisi pasar lebih bullish.",
+    link: "/market-intel",
+    linkLabel: "Lihat Market Intel",
+  },
+  {
+    icon: "🌍",
+    title: "Sentimen Global",
+    color: "#00d4ff",
+    desc:
+      "Kartu ringkasan kondisi global yang mempengaruhi IDX:\n\n• VIX (Fear & Greed Index) — indikator volatilitas pasar global\n  < 20 → NEUTRAL/GREED (kondisi aman)\n  20–25 → zona waspada\n  > 25 → FEAR (waspadai tekanan jual)\n\n• RISK ON / RISK OFF / MIXED — bias aliran dana global saat ini\n\n• USD/IDR — nilai tukar dollar. Rupiah melemah (USD/IDR naik) = tekanan pada saham-saham berbiaya dolar.\n\nTap kartu untuk melihat detail lengkap: indeks dunia, DXY, dan komoditas.",
+    link: "/global-sentiment",
+    linkLabel: "Buka Sentimen Global",
+  },
+  {
+    icon: "🛡️",
+    title: "Market Risk Score",
+    color: "#e05252",
+    desc:
+      "Skor risiko pasar 0–10 yang dihitung dari 4 komponen:\n\n1. Market Breadth — seberapa banyak saham yang turun vs naik (market width)\n2. Smart Money Flow — seberapa besar persentase saham dalam distribusi\n3. Arah IHSG — apakah IHSG turun signifikan hari ini (< −1.5%)\n4. Avg Flow Score — jika rata-rata bandar score < 30, ada sinyal kelemahan\n\nInterpretasi:\n• 0–3 → LOW RISK (kondisi aman, bisa entry bertahap)\n• 4–5 → MEDIUM RISK (selektif, pilih saham terkuat)\n• 6–7 → MED-HIGH (kurangi exposure)\n• 8–10 → HIGH RISK (hindari entry baru)\n\nTap untuk melihat breakdown tiap komponen.",
+  },
+  {
+    icon: "🚀",
+    title: "Top Gainers & Top Losers",
+    color: "#f97316",
+    desc:
+      "Scroll horizontal berisi saham dengan perubahan harga terbesar hari ini dari database Master Stock IDX.\n\n• Top Gainers — saham naik paling tinggi (urutkan dari % tertinggi)\n• Top Losers — saham turun paling dalam\n\nGunakan ini untuk:\n• Identifikasi saham yang sedang mendapat perhatian pasar\n• Cek apakah kenaikan didukung oleh akumulasi bandar (lihat di Radar/Bandar)\n• Hindari FOMO — kenaikan besar tanpa dukungan flow bandar berisiko reversal",
+    link: "/(tabs)/stockpick",
+    linkLabel: "Buka Stockpick",
+  },
+];
+
 // ─── Tips (hardcoded) ─────────────────────────────────────────
 
 const TIPS = [
@@ -96,6 +171,95 @@ function routeFromLink(link: string): string {
   return LINK_TO_ROUTE[link] ?? "/(tabs)/";
 }
 
+// ─── Home Screen Guide Component ─────────────────────────────
+
+function HomeScreenGuide() {
+  const router = useRouter();
+  const [openIdx, setOpenIdx] = useState<number>(-1);
+
+  return (
+    <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+      {/* Section header */}
+      <View style={{
+        flexDirection: "row", alignItems: "center", gap: 8,
+        marginBottom: 12, paddingBottom: 10,
+        borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)",
+      }}>
+        <Text style={{ fontSize: 18 }}>🏠</Text>
+        <View>
+          <Text style={{ color: "#e2e8f0", fontWeight: "800", fontSize: 15 }}>
+            Panduan Home Screen
+          </Text>
+          <Text style={{ color: "#475569", fontSize: 11, marginTop: 2 }}>
+            Penjelasan setiap bagian halaman utama
+          </Text>
+        </View>
+      </View>
+
+      {HOME_GUIDE.map((item, idx) => {
+        const isOpen = openIdx === idx;
+        const accent = item.color;
+
+        return (
+          <View
+            key={idx}
+            style={[
+              styles.stepCard,
+              {
+                borderColor:     isOpen ? hexRgba(accent, 0.5) : "rgba(255,255,255,0.08)",
+                backgroundColor: isOpen ? hexRgba(accent, 0.07) : "rgba(255,255,255,0.03)",
+              },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={() => setOpenIdx(prev => prev === idx ? -1 : idx)}
+              style={styles.stepHeader}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.stepNumBox,
+                {
+                  backgroundColor: isOpen ? hexRgba(accent, 0.25) : hexRgba(accent, 0.12),
+                  borderColor:     isOpen ? hexRgba(accent, 0.6)  : hexRgba(accent, 0.3),
+                },
+              ]}>
+                <Text style={{ fontSize: 14 }}>{item.icon}</Text>
+              </View>
+
+              <Text
+                style={[styles.stepTitle, { color: isOpen ? accent : "#e2e8f0" }]}
+                numberOfLines={isOpen ? undefined : 1}
+              >
+                {item.title}
+              </Text>
+
+              <Text style={{ color: isOpen ? accent : "#475569", fontSize: 16, marginLeft: 8 }}>
+                {isOpen ? "▲" : "▼"}
+              </Text>
+            </TouchableOpacity>
+
+            {isOpen && (
+              <View style={styles.stepBody}>
+                <Text style={styles.stepDesc}>{item.desc}</Text>
+                {item.link && (
+                  <TouchableOpacity
+                    onPress={() => router.push(item.link as any)}
+                    style={[styles.stepLinkBtn, { borderColor: hexRgba(accent, 0.4) }]}
+                  >
+                    <Text style={[styles.stepLinkText, { color: accent }]}>
+                      {item.linkLabel ?? "Buka"} →
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────
 
 export default function TutorialScreen() {
@@ -131,11 +295,33 @@ export default function TutorialScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>📖 Tutorial Penggunaan</Text>
-          <Text style={styles.headerSub}>Panduan langkah demi langkah</Text>
+          <Text style={styles.headerSub}>Home screen & langkah penggunaan</Text>
         </View>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <Text style={{ color: "#64748b", fontSize: 16, fontWeight: "700" }}>✕</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* ── Home Screen Guide ── */}
+      <HomeScreenGuide />
+
+      {/* ── Divider: Tutorial Langkah-Langkah ── */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 12, marginTop: 4 }}>
+        <View style={{
+          flexDirection: "row", alignItems: "center", gap: 8,
+          paddingBottom: 10,
+          borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)",
+        }}>
+          <Text style={{ fontSize: 18 }}>📋</Text>
+          <View>
+            <Text style={{ color: "#e2e8f0", fontWeight: "800", fontSize: 15 }}>
+              Langkah Penggunaan
+            </Text>
+            <Text style={{ color: "#475569", fontSize: 11, marginTop: 2 }}>
+              Panduan step-by-step dari admin
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* ── Loading ── */}
