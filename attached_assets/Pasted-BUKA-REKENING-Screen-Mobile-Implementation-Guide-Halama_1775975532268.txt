@@ -1,0 +1,318 @@
+BUKA_REKENING Screen — Mobile Implementation Guide
+Halaman ini menampilkan informasi untuk membuka rekening saham melalui mitra resmi Stockbot Pro, lengkap dengan kode sales dan tombol pendaftaran.
+
+1. Routing & Akses
+Item	Detail
+Route name	BukaRekening
+Navigasi	Bottom tab / drawer menu
+Auth required	Tidak — bisa diakses tanpa login
+Tab icon	TrendingUp (Lucide) atau ikon rekening/bank
+2. API Endpoint
+GET /api/settings
+Ambil semua pengaturan aplikasi termasuk daftar mitra resmi.
+
+Response (ringkasan field yang relevan):
+
+{
+  "mitraResmiList": [
+    {
+      "id": "default",
+      "name": "Korea Investment Sekuritas Indonesia",
+      "salesCode": "BQ00397",
+      "registerUrl": "https://registration.kisi.co.id/"
+    }
+  ],
+  "telegramInviteLink": "https://t.me/...",
+  "whatsappNumber": "628xxxxxxxx"
+}
+
+Field mitraResmiList:
+
+Array — bisa berisi 1 atau lebih mitra
+id — unique identifier (string)
+name — nama lengkap sekuritas
+salesCode — kode sales untuk pendaftaran (bisa kosong "")
+registerUrl — URL pendaftaran rekening (buka di browser eksternal)
+Catatan: Jika mitraResmiList kosong atau tidak ada, gunakan default:
+
+name: "Korea Investment Sekuritas Indonesia"
+salesCode: "BQ00397"
+registerUrl: "https://registration.kisi.co.id/"
+
+3. Struktur Layar
+┌─────────────────────────────────┐
+│  [Header] Buka Rekening Saham   │
+├─────────────────────────────────┤
+│  [Hero Banner]                  │
+│  Badge: "Powered by Stockbot"   │
+│  Judul: Mulai Investasi dengan  │
+│         Teknologi & Komunitas   │
+│  Deskripsi paragraf             │
+│  Tags: IDX · OJK · Sinyal AI   │
+├─────────────────────────────────┤
+│  [Section] Tiga Pilar           │
+│  ┌────────────────────────┐     │
+│  │ 01 Support Tools Analisa│     │
+│  │ [icon] + judul + body   │     │
+│  │ • Smart Money Flow      │     │
+│  │ • Market Radar          │     │
+│  │ • AI Screener           │     │
+│  │ • Robo Advisor          │     │
+│  └────────────────────────┘     │
+│  ┌────────────────────────┐     │
+│  │ 02 Ekosistem Komunitas  │     │
+│  └────────────────────────┘     │
+│  ┌────────────────────────┐     │
+│  │ 03 Sharing Knowledge    │     │
+│  └────────────────────────┘     │
+├─────────────────────────────────┤
+│  [Quote Banner]                 │
+│  "Jadilah bagian dari           │
+│   komunitas investor modern..." │
+├─────────────────────────────────┤
+│  [Mitra Card — per mitra]       │
+│  Nama Sekuritas                 │
+│  [Kode Sales BQ00397] [Salin]   │
+│  ─────────────────────────────  │
+│  "Siap Memulai?"                │
+│  [Buka Rekening & Akses Fitur]  │
+│  Proses cepat · 100% online     │
+├─────────────────────────────────┤
+│  [Stats Strip]                  │
+│  500+ Emiten | AI-Powered | 24/7│
+└─────────────────────────────────┘
+
+4. Konten Tiga Pilar (Hardcoded)
+Konten tiga pilar tidak dari API — sudah ditentukan dan tidak berubah.
+
+Pilar 01 — Support Tools Analisa Modern
+Warna: Cyan hsl(189 100% 50%)
+Icon: BarChart2
+Poin:
+Smart Money Flow Scanner (BOW & BOS)
+Market Radar real-time IHSG
+AI Screener & Sektor Rotation
+Robo Advisor berbasis AI
+Pilar 02 — Ekosistem Komunitas Stockbot
+Warna: Green hsl(142 60% 50%)
+Icon: Network / Users
+Poin:
+Notifikasi sinyal BOW & BOS real-time
+Live feed pergerakan smart money
+Komunitas investor aktif IDX
+Grup eksklusif investor Stockbot
+Pilar 03 — Sesi Sharing Knowledge & Insight
+Warna: Amber hsl(38 92% 55%)
+Icon: Lightbulb
+Poin:
+Bedah emiten & analisis teknikal
+Psikologi trading & manajemen risiko
+Update dinamika pasar terkini
+Q&A langsung dengan analis berpengalaman
+5. Logic & State
+interface MitraItem {
+  id: string;
+  name: string;
+  salesCode: string;
+  registerUrl: string;
+}
+const DEFAULT_MITRA: MitraItem = {
+  id: "default",
+  name: "Korea Investment Sekuritas Indonesia",
+  salesCode: "BQ00397",
+  registerUrl: "https://registration.kisi.co.id/",
+};
+// State
+const [mitraList, setMitraList] = useState<MitraItem[]>([DEFAULT_MITRA]);
+const [copiedId, setCopiedId] = useState<string | null>(null);
+
+Fetch Settings on Mount
+useEffect(() => {
+  fetch(`${BASE_URL}/api/settings`)
+    .then(r => r.json())
+    .then(d => {
+      if (Array.isArray(d.mitraResmiList) && d.mitraResmiList.length > 0) {
+        setMitraList(d.mitraResmiList);
+      }
+      // Jika kosong, tetap pakai DEFAULT_MITRA (sudah di-set sebagai initial state)
+    })
+    .catch(() => {}); // fallback ke default
+}, []);
+
+Copy Kode Sales
+const copyCode = (id: string, code: string) => {
+  Clipboard.setStringAsync(code).then(() => {
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  });
+};
+// Di Expo: import * as Clipboard from "expo-clipboard"
+
+Buka URL Pendaftaran
+import { Linking } from "react-native";
+const openRegister = (url: string) => {
+  Linking.openURL(url);
+};
+
+6. Komponen Utama
+Hero Banner
+<View style={styles.heroBanner}>
+  {/* Badge */}
+  <View style={styles.badge}>
+    <View style={styles.badgeDot} />
+    <Text style={styles.badgeText}>Powered by Stockbot Pro</Text>
+  </View>
+  {/* Judul */}
+  <Text style={styles.heroTitle}>
+    Mulai Langkah Investasi Anda dengan Dukungan{" "}
+    <Text style={{ color: CYAN }}>Teknologi</Text>
+    {" & "}
+    <Text style={{ color: GREEN }}>Komunitas</Text>
+    {" "}Terdepan
+  </Text>
+  <Text style={styles.heroDesc}>
+    Ingin terjun ke pasar modal namun bingung menentukan langkah pertama?
+    Jangan hanya sekadar membuka akun. Di sini, kami memberikan Anda ekosistem
+    trading yang lengkap untuk menavigasi pasar dengan lebih percaya diri.
+  </Text>
+  {/* Tags */}
+  <View style={styles.tagRow}>
+    {["IDX Teregulasi", "OJK Terdaftar", "Sinyal AI"].map(tag => (
+      <View key={tag} style={styles.tag}>
+        <CheckIcon size={12} color={GREEN} />
+        <Text style={styles.tagText}>{tag}</Text>
+      </View>
+    ))}
+  </View>
+</View>
+
+Pilar Card
+{PILLARS.map(pillar => (
+  <View key={pillar.number} style={[styles.pillarCard, { borderColor: pillar.border, backgroundColor: pillar.bg }]}>
+    {/* Header */}
+    <View style={styles.pillarHeader}>
+      <View style={[styles.pillarIcon, { backgroundColor: pillar.color + "20", borderColor: pillar.color + "40" }]}>
+        <pillar.Icon size={20} color={pillar.color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.pillarNumber, { color: pillar.color }]}>{pillar.number}</Text>
+        <Text style={styles.pillarTitle}>{pillar.title}</Text>
+      </View>
+    </View>
+    {/* Body */}
+    <Text style={styles.pillarBody}>{pillar.body}</Text>
+    {/* Points */}
+    {pillar.points.map(point => (
+      <View key={point} style={styles.pointRow}>
+        <ArrowRightIcon size={12} color={pillar.color} />
+        <Text style={styles.pointText}>{point}</Text>
+      </View>
+    ))}
+  </View>
+))}
+
+Mitra Card (per mitra)
+{mitraList.map((mitra, idx) => (
+  <View key={mitra.id} style={styles.mitraCard}>
+    {/* Header mitra */}
+    <View style={styles.mitraHeader}>
+      <View style={{ flex: 1 }}>
+        {mitraList.length > 1 && (
+          <Text style={styles.mitraPilihan}>PILIHAN {idx + 1}</Text>
+        )}
+        <Text style={styles.mitraLabel}>Mitra Resmi</Text>
+        <Text style={styles.mitraName}>{mitra.name}</Text>
+      </View>
+      {/* Kode Sales — tap untuk salin */}
+      {mitra.salesCode ? (
+        <TouchableOpacity
+          onPress={() => copyCode(mitra.id, mitra.salesCode)}
+          style={styles.salesCodeBox}
+        >
+          <Text style={styles.salesCodeLabel}>Kode Sales</Text>
+          <View style={styles.salesCodeRow}>
+            <Text style={styles.salesCodeValue}>{mitra.salesCode}</Text>
+            {copiedId === mitra.id
+              ? <CheckIcon size={12} color={GREEN} />
+              : <CopyIcon size={12} color={GREEN} />
+            }
+          </View>
+          <Text style={styles.salesCodeHint}>
+            {copiedId === mitra.id ? "Tersalin!" : "Ketuk untuk salin"}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+    {/* Body */}
+    <View style={styles.mitraBody}>
+      <Text style={styles.mitraBodyTitle}>Siap Memulai?</Text>
+      <Text style={styles.mitraBodyDesc}>
+        Klik tombol di bawah untuk membuka rekening saham dan dapatkan akses penuh
+        ke ekosistem Stockbot Pro.
+        {mitra.salesCode
+          ? ` Pastikan gunakan kode sales ${mitra.salesCode} saat pendaftaran.`
+          : ""}
+      </Text>
+      {/* CTA Button */}
+      <TouchableOpacity
+        onPress={() => openRegister(mitra.registerUrl)}
+        style={styles.ctaButton}
+      >
+        <TrendingUpIcon size={16} color="#fff" />
+        <Text style={styles.ctaText}>Buka Rekening & Akses Fitur Sekarang</Text>
+        <ExternalLinkIcon size={14} color="#fff" />
+      </TouchableOpacity>
+      <Text style={styles.ctaFootnote}>
+        Proses cepat · 100% online · Diawasi OJK
+      </Text>
+    </View>
+  </View>
+))}
+
+7. Multiple Mitra Logic
+Jika mitraList.length > 1, tampilkan label "Pilih Mitra Sekuritas" di atas section mitra dan badge "PILIHAN 1", "PILIHAN 2" dst di setiap mitra card.
+
+Jika hanya 1 mitra, sembunyikan label dan badge tersebut.
+
+8. Stats Strip
+Tiga stats statis di bawah mitra card:
+
+Value	Label
+500+	Emiten IDX
+AI-Powered	Analisa Pasar
+24/7	Akses Platform
+const STATS = [
+  { value: "500+",       label: "Emiten IDX",    color: CYAN  },
+  { value: "AI-Powered", label: "Analisa Pasar", color: GREEN },
+  { value: "24/7",       label: "Akses Platform", color: AMBER },
+];
+<View style={styles.statsRow}>
+  {STATS.map(stat => (
+    <View key={stat.label} style={styles.statItem}>
+      <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
+      <Text style={styles.statLabel}>{stat.label}</Text>
+    </View>
+  ))}
+</View>
+
+9. Design Tokens
+const CYAN  = "hsl(189, 100%, 50%)"; // #00d4ff
+const GREEN = "hsl(142, 60%, 50%)";  // #33cc66
+const AMBER = "hsl(38, 92%, 55%)";   // #f5a623
+
+10. UX Notes
+Tombol CTA membuka URL di browser eksternal (Linking.openURL) — jangan gunakan WebView internal karena proses pendaftaran memerlukan redirect dan cookies
+Kode Sales wajib tersedia sebelum user menekan tombol pendaftaran — tampilkan di UI secara prominent agar user ingat memasukkannya
+Fallback: Jika API gagal, tetap tampilkan default mitra (Korea Investment Sekuritas) agar halaman tidak kosong
+Halaman ini tidak memerlukan login — bisa diakses oleh siapa saja, termasuk user yang belum subscribe
+Jika salesCode kosong (""), sembunyikan kotak kode sales sepenuhnya
+11. Checklist Implementasi
+ GET /api/settings dipanggil saat screen mount
+ mitraResmiList di-parse dengan benar (array)
+ Fallback ke DEFAULT_MITRA jika list kosong
+ Kode sales bisa disalin ke clipboard (Expo Clipboard)
+ Tombol CTA membuka URL di browser eksternal (Linking.openURL)
+ Multiple mitra ditampilkan dengan label "PILIHAN X"
+ Tiga pilar ditampilkan dengan warna masing-masing
+ Stats strip (500+, AI-Powered, 24/7) di bagian bawah
+ Halaman bisa diakses tanpa login

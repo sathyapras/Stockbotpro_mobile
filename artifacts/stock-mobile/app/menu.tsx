@@ -46,7 +46,6 @@ function buildMenuGroups(
   const waUrl = settings?.whatsappNumber
     ? whatsappUrl(settings.whatsappNumber)
     : "";
-  const brokerUrl = settings?.mitraResmiList?.[0]?.registerUrl ?? "";
 
   return [
     {
@@ -87,13 +86,11 @@ function buildMenuGroups(
     {
       section: "MORE",
       items: [
-        ...(brokerUrl
-          ? [{
-              icon: "📈",
-              label: "Buka Rekening Saham",
-              onPress: () => openURL(brokerUrl),
-            }]
-          : []),
+        {
+          icon: "📈",
+          label: "Buka Rekening Saham",
+          onPress: () => router.push("/buka-rekening" as any),
+        },
         {
           icon: "ℹ️",
           label: "About Us",
