@@ -57,13 +57,18 @@ export default function PaymentSuccessScreen() {
         <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
           letterSpacing: 1, marginBottom: 10 }}>KAMU SEKARANG PUNYA AKSES</Text>
         {[
-          "✅ Semua fitur analisa premium",
-          "✅ Signal BOW / BOS harian",
-          "✅ Smart Money Flow",
-          "✅ Screener & Radar Market",
-          "✅ RoboCommentary AI",
+          { icon: "🎯", text: "BOW & BOS Signal — entry presisi berbasis aliran institusi" },
+          { icon: "💎", text: "Smart Money Flow — Prime, Alpha & Echo Flow broker dominan" },
+          { icon: "📡", text: "Radar Market — fase Ignition, Accumulation & Distribution" },
+          { icon: "🤖", text: "RoboCommentary — analisis AI 290+ saham IDX setiap hari" },
+          { icon: "📊", text: "Chart + MA50 Distance, ADX & Support/Resistance" },
+          { icon: "📋", text: "Trading Log — jurnal P&L otomatis per sinyal" },
         ].map((f, i) => (
-          <Text key={i} style={{ color: "#cbd5e1", fontSize: 13, lineHeight: 24 }}>{f}</Text>
+          <View key={i} style={{ flexDirection: "row", alignItems: "flex-start",
+            gap: 10, marginBottom: 8 }}>
+            <Text style={{ fontSize: 15 }}>{f.icon}</Text>
+            <Text style={{ color: "#cbd5e1", fontSize: 12, lineHeight: 20, flex: 1 }}>{f.text}</Text>
+          </View>
         ))}
       </View>
 

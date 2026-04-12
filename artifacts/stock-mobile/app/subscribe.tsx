@@ -252,42 +252,40 @@ export default function SubscribeScreen() {
 
 // ─── Feature highlights ───────────────────────────────────────
 
+const ALL_FEATURES = [
+  { icon: "🎯", text: "BOW & BOS Signal — sinyal entry presisi berbasis aliran dana institusi" },
+  { icon: "💎", text: "Smart Money Flow — lacak Prime, Alpha & Echo Flow broker dominan" },
+  { icon: "📡", text: "Radar Market — deteksi fase Ignition, Accumulation & Distribution real-time" },
+  { icon: "🤖", text: "RoboCommentary — analisis naratif AI untuk 290+ saham IDX setiap hari" },
+  { icon: "📊", text: "Chart Teknikal — candlestick, MA50 Distance, ADX, Support & Resistance" },
+  { icon: "🔄", text: "Sector Rotation — pantau sektor Leading vs Lagging setiap sesi" },
+  { icon: "📋", text: "Trading Log — jurnal trade BOW/BOS dengan kalkulasi P&L otomatis" },
+  { icon: "🔭", text: "Market Intel — agregasi Broker Flow + Radar dalam satu dashboard" },
+];
+
 const FEATURES: Record<string, string[]> = {
-  pro: [
-    "✅ Akses semua fitur analisa",
-    "✅ BOW / BOS Signal",
-    "✅ Screener saham harian",
-    "✅ Radar Market overview",
-    "✅ Update real-time",
-  ],
-  elite: [
-    "✅ Semua fitur Pro",
-    "✅ Smart Money Flow",
-    "✅ Analisa broker premium",
-    "✅ Priority support",
-    "✅ Master Stock Database",
-  ],
-  enterprise: [
-    "✅ Semua fitur Elite",
-    "✅ White Label",
-    "✅ Akses API langsung",
-    "✅ Dedicated support",
-    "✅ Custom integration",
-  ],
+  pro:        ALL_FEATURES.map(f => `${f.icon}  ${f.text}`),
+  elite:      ALL_FEATURES.map(f => `${f.icon}  ${f.text}`),
+  enterprise: ALL_FEATURES.map(f => `${f.icon}  ${f.text}`),
 };
 
 function FeatureHighlights({ selectedPlan }: { selectedPlan: string }) {
-  const features = FEATURES[selectedPlan] ?? FEATURES["pro"];
   return (
-    <View style={{ marginHorizontal: 16, backgroundColor: "#1e2433",
-      borderRadius: 14, padding: 16, marginBottom: 8 }}>
-      <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
-        letterSpacing: 1, marginBottom: 12, textTransform: "capitalize" }}>
-        FITUR PAKET {selectedPlan.toUpperCase()}
+    <View style={{ marginHorizontal: 16, backgroundColor: "#0f1729",
+      borderRadius: 14, padding: 16, marginBottom: 8,
+      borderWidth: 1, borderColor: "rgba(0,180,255,0.12)" }}>
+      <Text style={{ color: "#00d4ff", fontSize: 10, fontWeight: "800",
+        letterSpacing: 1.5, marginBottom: 14 }}>
+        ✦ SEMUA FITUR UNGGULAN
       </Text>
-      {features.map((f, i) => (
-        <Text key={i} style={{ color: "#cbd5e1", fontSize: 13,
-          lineHeight: 24 }}>{f}</Text>
+      {ALL_FEATURES.map((f, i) => (
+        <View key={i} style={{ flexDirection: "row", alignItems: "flex-start",
+          gap: 10, marginBottom: 10 }}>
+          <Text style={{ fontSize: 16, lineHeight: 22 }}>{f.icon}</Text>
+          <Text style={{ color: "#cbd5e1", fontSize: 12, lineHeight: 20, flex: 1 }}>
+            {f.text}
+          </Text>
+        </View>
       ))}
     </View>
   );
