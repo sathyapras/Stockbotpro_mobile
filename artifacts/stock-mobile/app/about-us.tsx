@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -148,10 +149,11 @@ export default function AboutUsScreen() {
 
       {/* ── Hero ── */}
       <View style={styles.hero}>
-        <View style={styles.heroIconWrap}>
-          <Text style={{ fontSize: 32 }}>📊</Text>
-        </View>
-        <Text style={styles.heroTitle}>About Stockbot Pro</Text>
+        <Image
+          source={require("../assets/logo-stockbot.png")}
+          style={{ width: 72, height: 72, borderRadius: 20, marginBottom: 16 }}
+          resizeMode="cover"
+        />
         {heroDesc ? (
           <Text style={styles.heroDesc}>{heroDesc}</Text>
         ) : null}
