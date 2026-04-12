@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   ScrollView,
@@ -1697,13 +1698,26 @@ function ChartTab({ symbol }: { symbol: string }) {
 
       {/* Chart area */}
       {isLoading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <Animated.View style={{ opacity: 1 }}>
-            <Text style={{ color: colors.primary, fontSize: 20 }}>📊</Text>
-          </Animated.View>
-          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-            Memuat chart historis…
-          </Text>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 14 }}>
+          <View style={{ position: "relative", width: 64, height: 64,
+            alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <View style={{
+              position: "absolute", width: 28, height: 28, borderRadius: 14,
+              backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+              alignItems: "center", justifyContent: "center",
+            }}>
+              <Text style={{ fontSize: 14 }}>📈</Text>
+            </View>
+          </View>
+          <View style={{ alignItems: "center", gap: 4 }}>
+            <Text style={{ color: colors.foreground, fontWeight: "700", fontSize: 13 }}>
+              Memuat Chart
+            </Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+              Mengambil data historis…
+            </Text>
+          </View>
         </View>
       ) : candles.length === 0 ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center",
