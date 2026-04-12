@@ -1,0 +1,1196 @@
+Home Screen — Panduan Implementasi Mobile
+Halaman utama StockBot Pro: Pasar + Signal + Konteks + Risk
+Mendekati tampilan web app, versi mobile-friendly
+
+LAYOUT OVERVIEW (UPDATED)
+┌─────────────────────────────────────────────┐
+│  [1] Header: Greeting + LIVE + IHSG         │
+│       Breadth Bar + 4 Index Cards           │
+├─────────────────────────────────────────────┤
+│  [2] TRENDING TOOLS (horizontal scroll) ← BARU│
+├─────────────────────────────────────────────┤
+│  [3] Signal Snapshot (4 tab, max 8 saham)   │
+├─────────────────────────────────────────────┤
+│  [4] Phase Distribution (kompak)            │
+├─────────────────────────────────────────────┤
+│  [5] Analisis Konteks IDX (collapsed)       │
+├─────────────────────────────────────────────┤
+│  [6] Market Risk Score (kompak)             │
+└─────────────────────────────────────────────┘
+
+PENTING — Kurangi Scroll:
+
+Signal Snapshot: max 5 item (bukan 8), "Lihat Semua" untuk lebih banyak
+Analisis Konteks: default collapsed, user tap untuk expand
+Market Risk Score: hanya tampil score + 2 komponen teratas, tap untuk expand
+Jangan tampilkan semua section dalam kondisi terbuka — gunakan accordion/collapse
+ENDPOINT YANG DIPAKAI
+// Fetch paralel — semua sekaligus, tidak saling tunggu
+const [marketRes, smRes, sentimentRes] = await Promise.all([
+  fetch(`${API}/api/market/summary`, { headers: auth }),
+  fetch(`${API}/api/broker-summary/smart-money`, { headers: auth }),
+  fetch(`${API}/api/global-sentiment`, { headers: auth }),
+]);
+const market    = await marketRes.json();
+// → { ihsg, lq45, jii, idx30, advancers, decliners, totalValue, topMovers }
+const smData    = (await smRes.json()).data ?? [];
+// → array of stocks dengan phase, flowScore, avg3d, sparkline, dll
+const sentiment = await sentimentRes.json();
+// → { sentiment: { vix, fearLabel, dxyValue, dxyBias, usdIdr, globalBias, ihsgClose, ihsgMA20, ihsgAboveMA20 },
+//     commodities: [...], fx: [...], globalIndices: [...] }
+
+[1] HEADER — Greeting + LIVE + IHSG + Breadth Bar + 4 Index Cards
+Data dari GET /api/market/summary
+{
+  "ihsg":       { "name": "IHSG",  "value": 6971, "changePercent": -0.26 },
+  "lq45":       { "name": "LQ45",  "value": 701.7, "changePercent": -0.86 },
+  "jii":        { "name": "JII30", "value": 474.4, "changePercent": -0.43 },
+  "idx30":      { "name": "IDX30", "value": 490,   "changePercent": 0.00 },
+  "advancers":  63,
+  "decliners":  160,
+  "unchanged":  66,
+  "totalStocks": 289
+}
+
+Greeting Logic
+function getGreeting(username) {
+  const hour = new Date().getHours();
+  const greet = hour < 11 ? "Good Morning"
+    : hour < 15 ? "Good Afternoon"
+    : "Good Evening";
+  return `${greet} 👋`;   // username opsional, bisa tanpa nama
+}
+
+Tampilan Header (sesuai mobile screenshot)
+Good Evening 👋                       ● LIVE
+IHSG  6.971  -0.26%
+[██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]
+63 naik           289 saham           160 turun
+┌────────────────────┐
+│ IDX COMPOSITE      │
+│ 6.971  -0.26%      │
+└────────────────────┘
+┌────────────────────┐  ┌────────────────────┐
+│ IDX LQ45           │  │ JSX ISLAMIC INDEX  │
+│ 701,7  -0.86%      │  │ 474,4  -0.43%      │
+└────────────────────┘  └────────────────────┘
+┌────────────────────┐
+│ IDX30              │
+│ 490  +0.00%        │
+└────────────────────┘
+
+CATATAN: IDX COMPOSITE ditampilkan pertama (full width). Cards lain (LQ45, JII, IDX30) muncul dalam 2-kolom grid. Jika data AFL hanya punya COMPOSITE, yang lain disembunyikan — bukan error.
+
+Komponen Header Lengkap
+function HomeHeader({ market }) {
+  const ihsg = market?.ihsg;
+  const isDown = (ihsg?.changePercent ?? 0) < 0;
+  const chgColor = isDown ? "#f87171" : "#34d399";
+  // Breadth bar — % lebar masing-masing segment
+  const total = market?.totalStocks || 289;
+  const advPct = ((market?.advancers ?? 0) / total) * 100;
+  const decPct = ((market?.decliners ?? 0) / total) * 100;
+  const neuPct = 100 - advPct - decPct;
+  const INDICES = [
+    { key: "ihsg",  label: "IDX COMPOSITE", fullWidth: true },
+    { key: "lq45",  label: "IDX LQ45" },
+    { key: "jii",   label: "JSX ISLAMIC INDEX" },
+    { key: "idx30", label: "IDX30" },
+  ];
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
+      {/* Row 1: Greeting + LIVE badge */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between",
+        alignItems: "center", marginBottom: 10 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 14 }}>{getGreeting()}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6,
+          backgroundColor: "#052e16", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#34d399" }} />
+          <Text style={{ color: "#34d399", fontSize: 11, fontWeight: "700" }}>LIVE</Text>
+        </View>
+      </View>
+      {/* Row 2: IHSG Big */}
+      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+        <Text style={{ color: "white", fontWeight: "900", fontSize: 18 }}>IHSG</Text>
+        <Text style={{ color: chgColor, fontWeight: "900", fontSize: 32 }}>
+          {ihsg?.value?.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+        </Text>
+        <Text style={{ color: chgColor, fontWeight: "700", fontSize: 16 }}>
+          {isDown ? "" : "+"}{ihsg?.changePercent?.toFixed(2)}%
+        </Text>
+      </View>
+      {/* Breadth Bar */}
+      <View style={{ marginBottom: 4 }}>
+        <View style={{ flexDirection: "row", height: 5, borderRadius: 3, overflow: "hidden" }}>
+          <View style={{ width: `${advPct}%`, backgroundColor: "#34d399" }} />
+          <View style={{ width: `${neuPct}%`, backgroundColor: "#475569" }} />
+          <View style={{ width: `${decPct}%`, backgroundColor: "#f87171" }} />
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 3 }}>
+          <Text style={{ color: "#34d399", fontSize: 9 }}>{market?.advancers ?? 0} naik</Text>
+          <Text style={{ color: "#64748b", fontSize: 9 }}>{total} saham</Text>
+          <Text style={{ color: "#f87171", fontSize: 9 }}>{market?.decliners ?? 0} turun</Text>
+        </View>
+      </View>
+      {/* Index Cards */}
+      <View style={{ gap: 8, marginTop: 10 }}>
+        {INDICES.map(idx => {
+          const data = market?.[idx.key];
+          if (!data) return null;
+          const up = (data.changePercent ?? 0) >= 0;
+          const color = up ? "#34d399" : "#f87171";
+          return (
+            <View key={idx.key}
+              style={{
+                backgroundColor: "#1e2433", borderRadius: 12,
+                padding: 12,
+                width: idx.fullWidth ? "100%" : "48%",
+                alignSelf: idx.fullWidth ? "stretch" : "auto",
+              }}>
+              <Text style={{ color: "#64748b", fontSize: 9, marginBottom: 2 }}>
+                {idx.label}
+              </Text>
+              <Text style={{ color: "white", fontWeight: "700", fontSize: 18 }}>
+                {data.value?.toLocaleString("id-ID", { maximumFractionDigits: 1 })}
+              </Text>
+              <Text style={{ color, fontSize: 12, fontWeight: "600" }}>
+                {up ? "+" : ""}{data.changePercent?.toFixed(2)}%
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+[2] TRENDING TOOLS — Akses Cepat Horizontal Scroll
+Letakkan di bawah header, sebelum Signal Snapshot. Beri akses cepat ke fitur-fitur utama dalam satu baris horizontal.
+
+Tampilan
+┌─────────────────────────────────────────────────────────────────┐
+│  [💎 Bandar]  [📡 Radar]  [📊 Screener]  [🔄 Sektor]  [🌐 Global] │
+└─────────────────────────────────────────────────────────────────┘
+
+Data & Navigasi
+Tidak butuh API — murni navigasi shortcut.
+
+const TRENDING_TOOLS = [
+  {
+    icon: "💎",
+    label: "Bandar",
+    sublabel: "Smart Money",
+    color: "#a78bfa",
+    bg: "#1e1433",
+    border: "#7c3aed40",
+    screen: "Bandar",         // tab navigasi
+    badge: null,
+  },
+  {
+    icon: "📡",
+    label: "Radar",
+    sublabel: "274 Saham",
+    color: "#34d399",
+    bg: "#0d2618",
+    border: "#16a34a40",
+    screen: "MarketIntelligence",
+    badge: null,
+  },
+  {
+    icon: "🎯",
+    label: "Stockpick",
+    sublabel: "BOW & BOS",
+    color: "#fbbf24",
+    bg: "#1c1500",
+    border: "#d9770640",
+    screen: "Stockpick",
+    badge: null,
+  },
+  {
+    icon: "🔽",
+    label: "Screener",
+    sublabel: "Filter Saham",
+    color: "#60a5fa",
+    bg: "#0c1629",
+    border: "#1d4ed840",
+    screen: "Screener",
+    badge: null,
+  },
+  {
+    icon: "🔄",
+    label: "Sektor",
+    sublabel: "Rotasi",
+    color: "#fb923c",
+    bg: "#1c0e05",
+    border: "#c2410c40",
+    screen: "SectorRotation",
+    badge: null,
+  },
+  {
+    icon: "🌐",
+    label: "Global",
+    sublabel: "VIX & FX",
+    color: "#94a3b8",
+    bg: "#131d2b",
+    border: "#33415540",
+    screen: "GlobalSentiment",
+    badge: null,
+  },
+];
+
+Komponen TrendingTools
+function TrendingToolsSection({ navigation }) {
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Text style={{ color: "#64748b", fontSize: 10, fontWeight: "700",
+        letterSpacing: 1, paddingHorizontal: 16, marginBottom: 8 }}>
+        FITUR UTAMA
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
+      >
+        {TRENDING_TOOLS.map(tool => (
+          <TouchableOpacity
+            key={tool.label}
+            onPress={() => navigation.navigate(tool.screen)}
+            style={{
+              backgroundColor: tool.bg,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: tool.border,
+              paddingVertical: 12,
+              paddingHorizontal: 14,
+              alignItems: "center",
+              minWidth: 80,
+            }}
+          >
+            <Text style={{ fontSize: 22, marginBottom: 4 }}>{tool.icon}</Text>
+            <Text style={{ color: tool.color, fontWeight: "700", fontSize: 12 }}>
+              {tool.label}
+            </Text>
+            <Text style={{ color: "#475569", fontSize: 9, marginTop: 2 }}>
+              {tool.sublabel}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+TIPS KURANGI SCROLL — Layout Kompak
+Masalah: home screen terlalu panjang karena semua section ditampilkan penuh.
+
+Solusi: Batasi Item + Accordion Collapse
+// 1. Signal Snapshot — batasi ke 5 item saja (bukan 8)
+const list = filterByTab(smData, activeTab).slice(0, 5);  // was slice(0, 8)
+// 2. Analisis Konteks IDX — default COLLAPSED
+function AnalisisKonteksSection({ ... }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <View>
+      {/* Header — selalu tampil */}
+      <TouchableOpacity onPress={() => setExpanded(e => !e)}
+        style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text>🌐 Analisis Konteks IDX</Text>
+        <Text>{expanded ? "▲" : "▼"}</Text>
+      </TouchableOpacity>
+      {/* 4 quick indicators — selalu tampil */}
+      <IndicatorRow ... />
+      {/* Bullet points — hanya jika expanded */}
+      {expanded && <BulletPoints ... />}
+    </View>
+  );
+}
+// 3. Market Risk Score — hanya tampil 2 komponen teratas, tap expand
+function MarketRiskCard({ ... }) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleComponents = expanded ? risk.components : risk.components.slice(0, 2);
+  return (
+    <View>
+      {/* Score + bar — selalu tampil */}
+      <ScoreBar />
+      {/* Components — terbatas */}
+      {visibleComponents.map(c => <ComponentRow c={c} />)}
+      {!expanded && (
+        <TouchableOpacity onPress={() => setExpanded(true)}>
+          <Text style={{ color: "#64748b" }}>+ {risk.components.length - 2} lagi...</Text>
+        </TouchableOpacity>
+      )}
+      {/* Strategy — hanya jika expanded */}
+      {expanded && <StrategyBox ... />}
+    </View>
+  );
+}
+
+Target Tinggi Ideal per Section
+Section	Target Tinggi	Cara Kompres
+Header (greeting + IHSG + breadth + cards)	~280px	Kurangi padding, cards lebih compact
+Trending Tools	~100px	Fixed 1 baris scroll
+Signal Snapshot (5 item)	~340px	Max 5 item, bukan 8
+Phase Distribution	~160px	Kompak, tanpa padding berlebih
+Analisis Konteks (collapsed)	~130px	Hanya quick indicators
+Market Risk Score (collapsed)	~180px	Score + bar + 2 komponen
+Total	~1190px	≈ 2-3 screen scroll
+[2] SIGNAL SNAPSHOT
+Data dari GET /api/broker-summary/smart-money — sudah include phase dan flowScore.
+
+4 Tab Categories
+Tab	Icon	Filter	Sort
+Top Akumulasi	⭐	phase: IGNITION, EARLY_ACC, STRONG_TREND	flowScore desc
+Entry Peluang	🚀	phase: IGNITION (best entry — bandar masuk, retail masih jual)	avg3d desc
+Peringatan	⚠️	phase: EXHAUSTION, DISTRIBUTION	flowScore asc
+Strong Trend	✅	phase: STRONG_TREND	avg3d desc
+const SNAPSHOT_TABS = [
+  { key: "acc",    icon: "⭐", label: "Top Akumulasi", badgeColor: "#16a34a" },
+  { key: "entry",  icon: "🚀", label: "Entry Peluang",  badgeColor: "#0ea5e9" },
+  { key: "warn",   icon: "⚠️", label: "Peringatan",     badgeColor: "#f97316" },
+  { key: "trend",  icon: "✅", label: "Strong Trend",   badgeColor: "#a78bfa" },
+];
+function filterByTab(smData, tab) {
+  switch (tab) {
+    case "acc":
+      return smData
+        .filter(s => ["IGNITION", "EARLY_ACC", "STRONG_TREND"].includes(s.phase))
+        .sort((a, b) => b.flowScore - a.flowScore)
+        .slice(0, 8);
+    case "entry":
+      return smData
+        .filter(s => s.phase === "IGNITION")
+        .sort((a, b) => b.avg3d - a.avg3d)
+        .slice(0, 8);
+    case "warn":
+      return smData
+        .filter(s => ["EXHAUSTION", "DISTRIBUTION"].includes(s.phase))
+        .sort((a, b) => a.flowScore - b.flowScore)  // worst first
+        .slice(0, 8);
+    case "trend":
+      return smData
+        .filter(s => s.phase === "STRONG_TREND")
+        .sort((a, b) => b.avg3d - a.avg3d)
+        .slice(0, 8);
+    default:
+      return [];
+  }
+}
+// Badge label per phase
+function getPhaseBadge(phase) {
+  const map = {
+    IGNITION:     { label: "ACC", color: "#16a34a" },
+    EARLY_ACC:    { label: "ACC", color: "#16a34a" },
+    STRONG_TREND: { label: "ACC", color: "#0ea5e9" },
+    EXHAUSTION:   { label: "LATE", color: "#f97316" },
+    DISTRIBUTION: { label: "DIST", color: "#dc2626" },
+    CHURNING:     { label: "NEU", color: "#475569" },
+  };
+  return map[phase] ?? { label: "NEU", color: "#475569" };
+}
+
+Tampilan Signal Snapshot
+🎯 Signal Snapshot  • 7 Apr 2026         Lihat Semua →
+[⭐ Top Akumulasi 8] [🚀 Entry Peluang 8] [⚠️ Peringatan 8] [✅ Strong Trend 8]
+1  ● INDF  [ACC]          +16.6B  78
+              IGNITION     avg3d  score
+─────────────────────────────────────
+2  ● BRMS  [ACC]           +6.3B  72
+              IGNITION     avg3d  score
+
+function SignalSnapshotSection({ smData, onPressLihatSemua, onPressStock }) {
+  const [activeTab, setActiveTab] = useState("acc");
+  const list = filterByTab(smData, activeTab);
+  // Hitung count per tab
+  const counts = {
+    acc:   smData.filter(s => ["IGNITION","EARLY_ACC","STRONG_TREND"].includes(s.phase)).length,
+    entry: smData.filter(s => s.phase === "IGNITION").length,
+    warn:  smData.filter(s => ["EXHAUSTION","DISTRIBUTION"].includes(s.phase)).length,
+    trend: smData.filter(s => s.phase === "STRONG_TREND").length,
+  };
+  const latestDate = smData[0]?.date
+    ? new Date(smData[0].date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+    : null;
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 18 }}>🎯</Text>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>Signal Snapshot</Text>
+          {latestDate && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#34d399" }} />
+              <Text style={{ color: "#64748b", fontSize: 11 }}>{latestDate}</Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity onPress={onPressLihatSemua}>
+          <Text style={{ color: "#f59e0b", fontSize: 12 }}>Lihat Semua →</Text>
+        </TouchableOpacity>
+      </View>
+      {/* Tabs — horizontal scroll */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 12 }}>
+        {SNAPSHOT_TABS.map(tab => {
+          const isActive = activeTab === tab.key;
+          return (
+            <TouchableOpacity key={tab.key}
+              onPress={() => setActiveTab(tab.key)}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 4,
+                paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+                backgroundColor: isActive ? tab.badgeColor + "25" : "transparent",
+                borderWidth: isActive ? 1 : 0, borderColor: tab.badgeColor,
+                marginRight: 8,
+              }}>
+              <Text style={{ fontSize: 13 }}>{tab.icon}</Text>
+              <Text style={{ color: isActive ? tab.badgeColor : "#64748b",
+                fontSize: 12, fontWeight: isActive ? "700" : "400" }}>
+                {tab.label} {counts[tab.key]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      {/* Stock List */}
+      {list.map((stock, idx) => {
+        const badge = getPhaseBadge(stock.phase);
+        const avg3dColor = (stock.avg3d ?? 0) >= 0 ? "#34d399" : "#f87171";
+        return (
+          <TouchableOpacity key={stock.ticker}
+            onPress={() => onPressStock(stock.ticker)}
+            style={{ flexDirection: "row", alignItems: "center",
+              paddingVertical: 10, borderBottomWidth: idx < list.length - 1 ? 1 : 0,
+              borderBottomColor: "#1e293b" }}>
+            {/* Rank */}
+            <Text style={{ color: "#475569", fontSize: 11, width: 20 }}>{idx + 1}</Text>
+            {/* Dot */}
+            <View style={{ width: 8, height: 8, borderRadius: 4,
+              backgroundColor: badge.color, marginRight: 8 }} />
+            {/* Ticker + Phase */}
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={{ color: "white", fontWeight: "700", fontSize: 14 }}>{stock.ticker}</Text>
+                <View style={{ backgroundColor: badge.color + "25",
+                  borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 }}>
+                  <Text style={{ color: badge.color, fontSize: 9, fontWeight: "700" }}>{badge.label}</Text>
+                </View>
+              </View>
+              <Text style={{ color: "#475569", fontSize: 10 }}>{stock.phase}</Text>
+            </View>
+            {/* avg3d + score */}
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ color: avg3dColor, fontWeight: "700", fontSize: 13 }}>
+                {(stock.avg3d ?? 0) >= 0 ? "+" : ""}{(stock.avg3d ?? 0).toFixed(1)}B
+              </Text>
+              <Text style={{ color: "#64748b", fontSize: 9 }}>avg3d</Text>
+            </View>
+            <View style={{ alignItems: "flex-end", marginLeft: 12, minWidth: 30 }}>
+              <Text style={{ color: "#a78bfa", fontWeight: "900", fontSize: 15 }}>
+                {stock.flowScore}
+              </Text>
+              <Text style={{ color: "#475569", fontSize: 9 }}>score</Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+[3] PHASE DISTRIBUTION + STATS
+Dari data smData (broker-summary/smart-money), hitung distribusi phase.
+
+// Mapping phase → display label
+const PHASE_DISPLAY = {
+  IGNITION:     "Akumulasi Kuat",
+  EARLY_ACC:    "Akumulasi",
+  CHURNING:     "Netral",
+  STRONG_TREND: "Akumulasi Kuat",  // gabung dengan IGNITION
+  EXHAUSTION:   "Distribusi",
+  DISTRIBUTION: "Distribusi Kuat",
+};
+const PHASE_COLORS = {
+  "Akumulasi Kuat": "#10b981",
+  "Akumulasi":      "#34d399",
+  "Netral":         "#fbbf24",
+  "Distribusi":     "#f87171",
+  "Distribusi Kuat":"#dc2626",
+};
+function buildPhaseStats(smData) {
+  const ORDER = ["Akumulasi Kuat", "Akumulasi", "Netral", "Distribusi", "Distribusi Kuat"];
+  const counts = Object.fromEntries(ORDER.map(k => [k, 0]));
+  let totalFlow = 0;
+  for (const s of smData) {
+    const label = PHASE_DISPLAY[s.phase] ?? "Netral";
+    counts[label] = (counts[label] ?? 0) + 1;
+    totalFlow += s.flowScore ?? 0;
+  }
+  const total = smData.length || 1;
+  const avgFlow = Math.round(totalFlow / total);
+  const accPct  = Math.round(((counts["Akumulasi Kuat"] + counts["Akumulasi"]) / total) * 100);
+  const distPct = Math.round(((counts["Distribusi"] + counts["Distribusi Kuat"]) / total) * 100);
+  return {
+    phases: ORDER.map(label => ({
+      label, count: counts[label],
+      pct: Math.round((counts[label] / total) * 100),
+      color: PHASE_COLORS[label],
+    })),
+    total, avgFlow, accPct, distPct,
+  };
+}
+
+Tampilan Phase Distribution
+PHASE DISTRIBUTION · 63 SAHAM
+[████████████████▒▒▒▒░░░░░░░░░░░░░░░░░░░░░░░░░░░]
+● Akumulasi Kuat 10  ● Akumulasi 13  ● Netral 2  ● Distribusi 33  ● Distribusi Kuat 5
+ Avg Smart Money    Akumulasi        Distribusi
+    59/100             37%              60%
+                               Lihat Market Radar →
+
+function PhaseDistributionSection({ smData, onPressMarketRadar }) {
+  const stats = buildPhaseStats(smData);
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+      {/* Title */}
+      <Text style={{ color: "#64748b", fontSize: 11, fontWeight: "700",
+        letterSpacing: 1, marginBottom: 10 }}>
+        PHASE DISTRIBUTION · {stats.total} SAHAM
+      </Text>
+      {/* Stacked bar */}
+      <View style={{ flexDirection: "row", height: 10, borderRadius: 5,
+        overflow: "hidden", marginBottom: 10 }}>
+        {stats.phases.map(p => p.count > 0 && (
+          <View key={p.label}
+            style={{ flex: p.count, backgroundColor: p.color }} />
+        ))}
+      </View>
+      {/* Legend */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        {stats.phases.map(p => p.count > 0 && (
+          <View key={p.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color }} />
+            <Text style={{ color: p.color, fontSize: 10 }}>
+              {p.label} {p.count}
+            </Text>
+          </View>
+        ))}
+      </View>
+      {/* Stats 3 kolom */}
+      <View style={{ flexDirection: "row", borderTopWidth: 1,
+        borderTopColor: "#1e293b", paddingTop: 12, marginBottom: 12 }}>
+        {[
+          { label: "Avg Smart Money", value: `${stats.avgFlow}/100` },
+          { label: "Akumulasi",       value: `${stats.accPct}%` },
+          { label: "Distribusi",      value: `${stats.distPct}%` },
+        ].map((s, i) => (
+          <View key={i} style={{ flex: 1, alignItems: "center" }}>
+            <Text style={{ color: "#64748b", fontSize: 9, marginBottom: 4 }}>{s.label}</Text>
+            <Text style={{
+              fontWeight: "700", fontSize: 18,
+              color: s.label === "Distribusi" ? "#f87171"
+                   : s.label === "Akumulasi"  ? "#34d399" : "#f59e0b",
+            }}>
+              {s.value}
+            </Text>
+          </View>
+        ))}
+      </View>
+      {/* Link */}
+      <TouchableOpacity onPress={onPressMarketRadar} style={{ alignSelf: "flex-end" }}>
+        <Text style={{ color: "#0ea5e9", fontSize: 12 }}>Lihat Market Radar →</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+[4] ANALISIS KONTEKS IDX
+Data dari GET /api/global-sentiment — VIX, USD/IDR, DXY + IHSG context.
+
+// sentiment object dari response:
+const {
+  vix, fearLabel, dxyValue, dxyBias, usdIdr,
+  globalBias,          // "RISK ON" | "RISK OFF" | "MIXED"
+  ihsgClose, ihsgMA20, ihsgAboveMA20,
+} = sentiment.sentiment;
+
+Global Bias Badge
+function globalBiasBadge(globalBias) {
+  if (globalBias === "RISK ON")  return { text: "Global: RISK ON",  color: "#34d399", bg: "#052e16" };
+  if (globalBias === "RISK OFF") return { text: "Global: RISK OFF", color: "#f87171", bg: "#2d0a0a" };
+  return                                 { text: "Global: MIXED",    color: "#fbbf24", bg: "#1c1500" };
+}
+
+Tampilan Analisis Konteks
+🌐 Analisis Konteks IDX     🔴 Global: RISK OFF      ↻
+VIX: 26.8 — FEAR    USD/IDR: 17.087    DXY: 99.9    IHSG: -0.26%
+📝 ANALISA NARASI TERINTEGRASI
+VIX 26.8 berada di zona Fear — sentimen global defensif...
+Rupiah melemah ke 17.087 — memberikan tekanan pada emiten...
+...
+● VIX 26.8 FEAR — sentimen risk-off, asing cenderung melepas EM
+● USD/IDR 17.087 — Rupiah Lemah, tekanan emiten utang USD
+● Coal +8.3% — watch ADRO, PTBA, ITMG, BYAN, HRUM
+
+function AnalisisKonteksSection({ sentiment, commodities, onRefresh }) {
+  const s = sentiment?.sentiment;
+  if (!s) return null;
+  const bias = globalBiasBadge(s.globalBias);
+  // Format 4 quick indicators
+  const indicators = [
+    { label: "VIX",     value: s.vix?.toFixed(1),    sub: s.fearLabel, color: s.vix >= 25 ? "#f87171" : s.vix >= 20 ? "#fbbf24" : "#34d399" },
+    { label: "USD/IDR", value: s.usdIdr?.toLocaleString("id-ID", { maximumFractionDigits: 0 }), sub: null, color: "#94a3b8" },
+    { label: "DXY",     value: s.dxyValue?.toFixed(1), sub: null, color: "#94a3b8" },
+    { label: "IHSG",    value: `${s.ihsgAboveMA20 ? "▲" : "▼"}MA20`, sub: null,
+      color: s.ihsgAboveMA20 ? "#34d399" : "#f87171" },
+  ];
+  // Key commodity bullets dari array commodities
+  const hotCommodities = (commodities ?? [])
+    .filter(c => Math.abs(c.changePct ?? 0) >= 1.5)
+    .sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))
+    .slice(0, 4);
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 16 }}>🌐</Text>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 14 }}>Analisis Konteks IDX</Text>
+          <View style={{ backgroundColor: bias.bg, borderRadius: 6,
+            paddingHorizontal: 8, paddingVertical: 2 }}>
+            <Text style={{ color: bias.color, fontSize: 10, fontWeight: "700" }}>{bias.text}</Text>
+          </View>
+        </View>
+        <TouchableOpacity onPress={onRefresh}>
+          <Text style={{ color: "#475569", fontSize: 16 }}>↻</Text>
+        </TouchableOpacity>
+      </View>
+      {/* 4 Quick Indicators */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between",
+        backgroundColor: "#0f1629", borderRadius: 10, padding: 10, marginBottom: 12 }}>
+        {indicators.map(ind => (
+          <View key={ind.label} style={{ alignItems: "center" }}>
+            <Text style={{ color: "#475569", fontSize: 9 }}>{ind.label}</Text>
+            <Text style={{ color: ind.color, fontWeight: "700", fontSize: 13 }}>{ind.value}</Text>
+            {ind.sub && <Text style={{ color: ind.color, fontSize: 8 }}>{ind.sub}</Text>}
+          </View>
+        ))}
+      </View>
+      {/* AI Narrative Placeholder — generate dari OpenAI di server */}
+      {/* Endpoint: POST /api/openai/market-narrative (jika ada) */}
+      {/* Atau tampilkan bullet poin dari sentiment data */}
+      {/* Commodity Bullets */}
+      {hotCommodities.length > 0 && (
+        <View style={{ gap: 6 }}>
+          <Text style={{ color: "#475569", fontSize: 10, fontWeight: "700",
+            letterSpacing: 1, marginBottom: 4 }}>📊 KOMODITAS PANAS</Text>
+          {hotCommodities.map(c => (
+            <View key={c.name} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ fontSize: 12 }}>
+                {c.changePct >= 0 ? "🔼" : "🔽"}
+              </Text>
+              <Text style={{
+                color: c.changePct >= 0 ? "#34d399" : "#f87171",
+                fontSize: 11, fontWeight: "600",
+              }}>
+                {c.name} {c.changePct >= 0 ? "+" : ""}{c.changePct?.toFixed(1)}%
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+[5] MARKET RISK SCORE
+Dihitung di mobile dari data sentiment — tidak butuh endpoint khusus.
+
+Logika Kalkulasi Risk Score (0-10)
+function calcMarketRiskScore(sentiment) {
+  const s = sentiment?.sentiment;
+  if (!s) return { score: 5, components: [], label: "MEDIUM RISK", color: "#fbbf24" };
+  let score = 0;
+  const components = [];
+  // ── VIX Fear Index ────────────────────────────────────────
+  let vixPoin = 0;
+  const vix = s.vix ?? 0;
+  if      (vix >= 30) { vixPoin = 4; }
+  else if (vix >= 25) { vixPoin = 3; }
+  else if (vix >= 20) { vixPoin = 2; }
+  else if (vix >= 15) { vixPoin = 1; }
+  score += vixPoin;
+  components.push({
+    icon: "😱", label: "VIX Fear Index",
+    poin: vixPoin > 0 ? `+${vixPoin} poin` : "aman",
+    desc: `VIX ${vix.toFixed(1)} — ${s.fearLabel?.toLowerCase()}`,
+    color: vixPoin >= 3 ? "#f87171" : vixPoin >= 2 ? "#fbbf24" : "#34d399",
+  });
+  // ── Dollar Index (DXY) ────────────────────────────────────
+  let dxyPoin = 0;
+  const dxy = s.dxyValue ?? 0;
+  if      (dxy >= 105) { dxyPoin = 2; }
+  else if (dxy >= 102) { dxyPoin = 1; }
+  score += dxyPoin;
+  components.push({
+    icon: "💵", label: "Dollar Index (DXY)",
+    poin: dxyPoin > 0 ? `+${dxyPoin} poin` : "aman",
+    desc: `DXY ${dxy.toFixed(1)} — ${s.dxyBias}`,
+    color: dxyPoin >= 2 ? "#f87171" : dxyPoin >= 1 ? "#fbbf24" : "#34d399",
+  });
+  // ── IHSG vs MA20 ─────────────────────────────────────────
+  let ma20Poin = 0;
+  if (!s.ihsgAboveMA20) {
+    const gap = s.ihsgMA20 ? ((s.ihsgMA20 - s.ihsgClose) / s.ihsgMA20 * 100) : 0;
+    ma20Poin = gap >= 5 ? 3 : gap >= 2 ? 2 : 1;
+  }
+  score += ma20Poin;
+  components.push({
+    icon: "📉", label: "IHSG vs MA20",
+    poin: ma20Poin > 0 ? `+${ma20Poin} poin` : "aman",
+    desc: s.ihsgAboveMA20
+      ? `IHSG ${s.ihsgClose?.toLocaleString("id-ID")} di atas MA20 — tren teknis sehat`
+      : `IHSG ${s.ihsgClose?.toLocaleString("id-ID")} | MA20 ${s.ihsgMA20?.toLocaleString("id-ID")} — tren teknis sedang rusak`,
+    color: ma20Poin >= 2 ? "#f87171" : ma20Poin >= 1 ? "#fbbf24" : "#34d399",
+  });
+  // ── USD/IDR ───────────────────────────────────────────────
+  let idrPoin = 0;
+  const usdIdr = s.usdIdr ?? 0;
+  if      (usdIdr >= 17000) { idrPoin = 3; }
+  else if (usdIdr >= 16500) { idrPoin = 2; }
+  else if (usdIdr >= 16000) { idrPoin = 1; }
+  score += idrPoin;
+  components.push({
+    icon: "🌏", label: "Nilai Tukar USD/IDR",
+    poin: idrPoin > 0 ? `+${idrPoin} poin` : "aman",
+    desc: `USD/IDR ${usdIdr.toLocaleString("id-ID")} — ${s.usdIdrContext}`,
+    color: idrPoin >= 2 ? "#f87171" : idrPoin >= 1 ? "#fbbf24" : "#34d399",
+  });
+  // Cap at 10
+  const finalScore = Math.min(10, score);
+  let label, color, bg, strategy;
+  if (finalScore >= 8)      { label = "HIGH RISK";    color = "#f87171"; bg = "#2d0a0a"; strategy = highRiskStrategy(); }
+  else if (finalScore >= 6) { label = "MEDIUM-HIGH";  color = "#f97316"; bg = "#1c0a00"; strategy = medHighStrategy(); }
+  else if (finalScore >= 4) { label = "MEDIUM RISK";  color = "#fbbf24"; bg = "#1c1500"; strategy = medStrategy(); }
+  else                      { label = "LOW RISK";     color = "#34d399"; bg = "#052e16"; strategy = lowStrategy(); }
+  return { score: finalScore, components, label, color, bg, strategy };
+}
+function highRiskStrategy() {
+  return {
+    title: "Kurangi Posisi — Pindah ke Safe Haven",
+    bullets: [
+      "Cash 40–50% dari portofolio",
+      "Emas / XAUUSD sebagai hedge",
+      "Hindari saham growth & spekulatif",
+      "Tunggu VIX < 20 dan IHSG > MA20 sebelum re-entry",
+    ],
+  };
+}
+function medHighStrategy() {
+  return {
+    title: "Selektif — Fokus Defensive & Dividen",
+    bullets: [
+      "Kurangi exposure growth stock",
+      "Fokus sektor defensive (FMCG, Healthcare, Telco)",
+      "Pertahankan cash 20–30%",
+      "Gunakan stop loss ketat",
+    ],
+  };
+}
+function medStrategy() {
+  return {
+    title: "Normal — Selektif per Sektor",
+    bullets: [
+      "Ikuti sinyal BOW/BOS dengan konfirmasi",
+      "Diversifikasi sektor",
+      "Risk per trade max 2%",
+    ],
+  };
+}
+function lowStrategy() {
+  return {
+    title: "Bullish — Entry dengan Konfirmasi",
+    bullets: [
+      "Cari setup breakout dengan volume",
+      "Saham momentum dan akumulasi",
+      "Tambah posisi yang sudah profit",
+    ],
+  };
+}
+
+Tampilan Risk Score
+function MarketRiskCard({ sentiment }) {
+  const risk = calcMarketRiskScore(sentiment);
+  // Gradient bar: hijau (0) → kuning (5) → merah (10)
+  const barWidth = `${(risk.score / 10) * 100}%`;
+  const barColor = risk.score >= 7 ? "#dc2626"
+    : risk.score >= 4 ? "#f97316" : "#34d399";
+  return (
+    <View style={{ backgroundColor: "#1e2433", borderRadius: 16, padding: 16, marginBottom: 12 }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+        <View>
+          <Text style={{ color: "#64748b", fontSize: 10, fontWeight: "700", letterSpacing: 1 }}>
+            MARKET RISK SCORE
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+            <Text style={{ fontSize: 16 }}>🚨</Text>
+            <Text style={{ color: risk.color, fontWeight: "700", fontSize: 15 }}>{risk.label}</Text>
+          </View>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ color: risk.color, fontWeight: "900", fontSize: 36 }}>{risk.score}</Text>
+          <Text style={{ color: "#475569", fontSize: 14, marginTop: -4 }}>/10</Text>
+        </View>
+      </View>
+      {/* Gradient Bar */}
+      <View style={{ marginBottom: 6 }}>
+        <View style={{ height: 10, backgroundColor: "#0f1629", borderRadius: 5, overflow: "hidden" }}>
+          {/* Static gradient segments */}
+          <View style={{ position: "absolute", flexDirection: "row", width: "100%", height: "100%" }}>
+            <View style={{ flex: 4, backgroundColor: "#34d399" }} />
+            <View style={{ flex: 3, backgroundColor: "#f97316" }} />
+            <View style={{ flex: 3, backgroundColor: "#dc2626" }} />
+          </View>
+          {/* Mask to show only up to score */}
+          <View style={{ position: "absolute", right: 0, top: 0, bottom: 0,
+            width: `${100 - (risk.score / 10 * 100)}%`, backgroundColor: "#0f1629" }} />
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+          <Text style={{ color: "#475569", fontSize: 9 }}>0 LOW</Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>4 MEDIUM</Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>7 HIGH</Text>
+          <Text style={{ color: "#475569", fontSize: 9 }}>10</Text>
+        </View>
+      </View>
+      {/* Components */}
+      <View style={{ gap: 10, marginVertical: 12 }}>
+        {risk.components.map(c => (
+          <View key={c.label} style={{ flexDirection: "row", gap: 8 }}>
+            <Text style={{ fontSize: 14 }}>{c.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                <Text style={{ color: c.color, fontWeight: "600", fontSize: 12 }}>{c.label}</Text>
+                {c.poin !== "aman" && (
+                  <Text style={{ color: c.color, fontSize: 11 }}>{c.poin}</Text>
+                )}
+                {c.poin === "aman" && (
+                  <Text style={{ color: "#34d399", fontSize: 10 }}>aman</Text>
+                )}
+              </View>
+              <Text style={{ color: "#64748b", fontSize: 10 }}>{c.desc}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+      {/* Strategy */}
+      <View style={{ backgroundColor: risk.bg, borderRadius: 10, padding: 12,
+        borderWidth: 1, borderColor: risk.color + "40" }}>
+        <Text style={{ color: "#64748b", fontSize: 9, fontWeight: "700",
+          letterSpacing: 1, marginBottom: 6 }}>STRATEGI YANG DISARANKAN</Text>
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 13, marginBottom: 8 }}>
+          {risk.strategy.title}
+        </Text>
+        {risk.strategy.bullets.map((b, i) => (
+          <View key={i} style={{ flexDirection: "row", gap: 6, marginBottom: 4 }}>
+            <Text style={{ color: "#475569", fontSize: 12 }}>→</Text>
+            <Text style={{ color: "#94a3b8", fontSize: 12, flex: 1 }}>{b}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+KOMPONEN UTAMA: HomeScreen (UPDATED — dengan TrendingTools + kompak)
+export function HomeScreen({ navigation }) {
+  // Paralel fetch — 3 source sekaligus
+  const { data: market }    = useQuery({
+    queryKey: ["market-summary"],
+    queryFn: () => fetchWithAuth("/api/market/summary"),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: smRaw }     = useQuery({
+    queryKey: ["sm-home"],
+    queryFn: () => fetchWithAuth("/api/broker-summary/smart-money"),
+    staleTime: 10 * 60 * 1000,
+  });
+  const { data: sentiment } = useQuery({
+    queryKey: ["global-sentiment"],
+    queryFn: () => fetchWithAuth("/api/global-sentiment"),
+    staleTime: 15 * 60 * 1000,
+  });
+  const smData = smRaw?.data ?? [];
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: "#0f1629" }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* [1] Header: Greeting + LIVE + IHSG + Breadth + 4 Index Cards */}
+      <HomeHeader market={market} />
+      {/* [2] Trending Tools — horizontal shortcut ke fitur utama */}
+      <TrendingToolsSection navigation={navigation} />
+      <View style={{ paddingHorizontal: 16 }}>
+        {/* [3] Signal Snapshot — max 5 item per tab */}
+        <SignalSnapshotSection
+          smData={smData}
+          maxItems={5}
+          onPressLihatSemua={() => navigation.navigate("Bandar")}
+          onPressStock={(ticker) => navigation.navigate("StockDetail", { symbol: ticker })}
+        />
+        {/* [4] Phase Distribution */}
+        <PhaseDistributionSection
+          smData={smData}
+          onPressMarketRadar={() => navigation.navigate("MarketIntelligence")}
+        />
+        {/* [5] Analisis Konteks IDX — default collapsed */}
+        <AnalisisKonteksSection
+          sentiment={sentiment}
+          commodities={sentiment?.commodities}
+          defaultExpanded={false}
+        />
+        {/* [6] Market Risk Score — compact mode (2 komponen dulu) */}
+        <MarketRiskCard
+          sentiment={sentiment}
+          compactMode={true}
+        />
+        {/* Spacer bawah untuk bottom tab bar */}
+        <View style={{ height: 24 }} />
+      </View>
+    </ScrollView>
+  );
+}
+
+RINGKASAN ENDPOINT
+Section	Endpoint	Stale Time
+Header (IHSG + breadth + 4 index cards)	GET /api/market/summary	5 menit
+Trending Tools	— (navigasi, tidak butuh API)	—
+Signal Snapshot (phase, NBS, score)	GET /api/broker-summary/smart-money	10 menit
+Phase Distribution + Stats	sama di atas	10 menit
+Analisis Konteks IDX (VIX/DXY/USD)	GET /api/global-sentiment	15 menit
+Market Risk Score	dihitung client-side dari global-sentiment	—
+PERUBAHAN DARI VERSI SEBELUMNYA
+Yang Berubah	Sebelum	Sesudah
+LIVE badge	Tidak ada	● LIVE pojok kanan atas
+Breadth bar	Tidak ada	Hijau-abu-merah dengan label naik/turun
+Trending Tools	Tidak ada	Horizontal scroll 6 tool shortcut
+Signal Snapshot items	Max 8	Max 5 (lebih kompak)
+Analisis Konteks	Selalu terbuka	Default collapsed, tap untuk expand
+Market Risk Score	Semua komponen tampil	Compact: 2 komponen + tap expand
+Home screen ini memberikan gambaran lengkap kondisi pasar dalam satu scroll — dari IHSG sampai strategi yang disarankan berdasarkan risk score.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Update documentation for mobile push notification implementation
+
+
+
+Show previous messages
+
+24 messages & 75 actions
+
+Checkpoint made
+22 days ago
+
+Worked for 9 minutes
+
+Attached Image
+saya bila ticker2 ini sy click belum kebuka chart template di dashbaord dan sector rotation nya boss :
+
+
+1 shape
+22 days ago
+
+19 messages & 53 actions
+
+Checkpoint made
+22 days ago
+
+Worked for 4 minutes
+The StockBot Pro — Analisa Saham IDX artifact crashed with a runtime error, please debug and fix it.
+
+22 days ago
+
+3 actions
+Clear — openChart is not accessible in the sub-component that renders the table. Let me check the SectorRotation file structure:
+
+
+4 actions
+The openChart is used inside SectorStockPanel (a sub-component), but the hook was added to the main function. Fix it by moving the hook into SectorStockPanel:
+
+
+4 actions
+Also remove the now-unused useChart call from the main SectorRotation function:
+
+
+2 actions
+Let me verify the fix is clean by checking the latest logs:
+
+
+2 actions
+Fixed. The problem was that openChart was placed in the main SectorRotation function, but the actual table rows are rendered inside a separate inner component SectorStockPanel — so the variable wasn't accessible there. Moved the hook into SectorStockPanel where it's actually used, and removed the unused one from the main function.
+
+Logs confirm clean hot-update with no more runtime errors.
+
+
+Checkpoint made
+22 days ago
+
+23 messages & 76 actions
+
+Checkpoint made
+16 minutes ago
+
+Worked for 10 minutes
+
+Published your app
+11 minutes ago
+ok lanjut buatkan guide doc utk di implementasi di mobile builder
+
+10 minutes ago
+
+4 actions
+Cek dokumen yang sudah ada dulu sebelum bikin yang baru:
+
+
+4 actions
+Cek lanjutan PUSH_NOTIFICATION_SCREEN_GUIDE yang sudah ada:
+
+
+3 actions
+Baca sisa dari PUSH_NOTIFICATION_SCREEN_GUIDE untuk tahu scope lengkapnya:
+
+
+3 actions
+Cek section 6 & 8 di index:
+
+
+3 actions
+Cek sisa akhir dari guide yang sudah ada:
+
+
+2 actions
+Cek implementasi backend aktual untuk verifikasi doc match:
+
+
+3 actions
+Cek PATCH whitelist di push.ts untuk verifikasi semua field baru:
+
+
+4 actions
+Sekarang paham situasinya. PUSH_NOTIFICATION_SCREEN_GUIDE.md sudah ada tapi ditulis SEBELUM backend diimplementasi — masih ada note "backend perlu…" yang sudah outdated. Perlu diupdate: tandai backend ✅ DONE, verifikasi semua detail API sesuai implementasi aktual, dan tambah endpoint baru yang belum ada di guide (GET /api/mobile/push/tokens).
+
+Mulai update:
+
+
+4 actions
+Update header dan status backend — tandai semua yang sudah dikerjakan:
+
+
+2 actions
+Update section A3 - ubah dari "perlu" ke "sudah ada":
+
+
+2 actions
+Update hook di A4 — perbaiki pengecekan isSubscribed agar gunakan GET /api/mobile/push/tokens:
+
+
+4 actions
+Update hook loadPrefs — gunakan GET /api/mobile/push/tokens untuk status mobile:
+
+
+2 actions
+Update return value hook untuk sertakan deviceCount:
+
+
+6 actions
+Sekarang update komponen UI A7 untuk pakai deviceCount dan perbaiki variabel yang referensi:
+
+
+5 actions
+Update checklist — tandai semua backend item sebagai ✅ DONE:
+
+
+4 actions
+Cek section A8 apakah ada di guide:
+
+
+2 actions
+Cek isi A8 dan lihat apa yang menyusul:
+
+
+2 actions
+Update referensi salah di checklist — A8 adalah quiet hours backend (✅ done), A9 adalah foreground handler:
+
+
+2 actions
+Update A8 header dan note untuk tandai sudah diimplementasi:
+
+
+2 actions
+Update juga dokumentasi index — hapus note "dibutuhkan" karena backend sudah done:
+
+
+2 actions
+Update juga tabel endpoint referensi cepat di index — tambahkan endpoint baru:
+
+
+2 actions
+Semua update selesai. Cek ukuran akhir guide:
+
+
+2 actions
+Guide sudah diperbarui dan siap pakai. Ini yang berubah:
+
+PUSH_NOTIFICATION_SCREEN_GUIDE.md (1129 baris)
+
+Empat bagian yang diupdate:
+
+Header → ditambah blok "STATUS BACKEND" di atas — tabel langsung show semua endpoint + kolom DB dengan status ✅ Live. Mobile builder tahu persis mana yang sudah ada, mana yang perlu mereka kerjakan.
+
+Section A3 (Endpoint) — dari "backend perlu…" → detail aktual setiap endpoint dengan response format yang tepat. Termasuk endpoint baru GET /api/mobile/push/tokens yang sebelumnya belum terdokumentasi:
+
+{ "count": 2, "tokens": [{platform, deviceName, createdAt}] }
+
+Plus catatan penting: isSubscribed di GET /api/push/preferences merujuk ke web push (VAPID) — untuk mobile, pakai count dari tokens endpoint.
+
+Hook usePushNotifications — diperbaiki:
+
+Load preferences + token count secara paralel (Promise.all)
+Tambah state deviceCount (jumlah perangkat terdaftar)
+isSubscribed sekarang berdasarkan deviceCount > 0 (bukan web push subscription)
+Return value tambah deviceCount untuk badge UI
+Checklist (Section C) — dipisah jelas:
+
+✅ Backend (11 item, semua done)
+☐ Mobile Client — Push OS (8 item)
+☐ Mobile Client — Settings UI (8 item)
+☐ Mobile Client — In-App Feed (10 item)
