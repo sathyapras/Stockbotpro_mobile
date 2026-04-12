@@ -105,15 +105,16 @@ function parseCommentary(raw: string): { badge: string | null; body: string } | 
 }
 
 /** Robo Commentary block — parses and renders nicely */
-function RoboCommentary({ commentary, colors }: {
+function RoboCommentary({ commentary, colors, showTitle = true }: {
   commentary: string;
   colors: ReturnType<typeof useColors>;
+  showTitle?: boolean;
 }) {
   const parsed = parseCommentary(commentary);
   if (!parsed) return null;
   return (
     <>
-      <SectionTitle title="ROBO COMMENTARY" colors={colors} />
+      {showTitle && <SectionTitle title="ROBO COMMENTARY" colors={colors} />}
       <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
         backgroundColor: colors.card, padding: 12, gap: 8 }}>
         {parsed.badge && (
@@ -1806,7 +1807,7 @@ function ChartTab({ symbol }: { symbol: string }) {
                 marginBottom: 4, letterSpacing: 0.5 }}>
                 ROBO COMMENTARY · {roboData.date}
               </Text>
-              <RoboCommentary commentary={roboData.commentary} colors={colors} />
+              <RoboCommentary commentary={roboData.commentary} colors={colors} showTitle={false} />
             </View>
           )}
         </ScrollView>
