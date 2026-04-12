@@ -1,0 +1,424 @@
+About Us Screen — Panduan Implementasi Mobile
+Replika halaman /about dari web — data dinamis dari CMS
+PENTING: Data Dari CMS (Bukan Statis)
+Konten About Us sepenuhnya diambil dari API, dikelola admin melalui panel CMS. Tidak boleh hardcode teks — semua harus fetch dari 3 endpoint berikut.
+
+ENDPOINT
+Endpoint	Auth	Isi
+GET /api/cms/content/about	❌	Deskripsi, Misi, Disclaimer
+GET /api/cms/content/about_features	❌	Fitur-fitur unggulan
+GET /api/cms/content/about_team	❌	Tim / anggota
+Base URL: https://stockbotpro.replit.app
+
+FORMAT RESPONSE
+GET /api/cms/content/about
+[
+  { "id": 1, "title": "Deskripsi",           "content": "Platform analisa saham IDX...", "isActive": true, "sortOrder": 0 },
+  { "id": 2, "title": "Misi Kami — Paragraf 1", "content": "Stockbot Pro lahir dari...", "isActive": true, "sortOrder": 1 },
+  { "id": 3, "title": "Misi Kami — Paragraf 2", "content": "Dengan menggabungkan...",   "isActive": true, "sortOrder": 2 },
+  { "id": 4, "title": "Disclaimer",          "content": "Stockbot Pro adalah platform...", "isActive": true, "sortOrder": 3 }
+]
+
+Cara ambil per section:
+
+const getSection = (sections, keyword) =>
+  sections.find(s => s.isActive && s.title.toLowerCase().includes(keyword.toLowerCase()));
+const heroDesc  = getSection(sections, "Deskripsi")?.content  ?? "";
+const mission1  = getSection(sections, "Paragraf 1")?.content ?? "";
+const mission2  = getSection(sections, "Paragraf 2")?.content ?? "";
+const disclaimer = getSection(sections, "Disclaimer")?.content ?? "";
+
+GET /api/cms/content/about_features
+[
+  { "id": 1, "title": "TrendingUp|||15+ Strategi Analisa", "content": "Buy on Weakness, Volume Spike...", "isActive": true, "sortOrder": 0 },
+  { "id": 2, "title": "Zap|||Data Real-Time IDX",          "content": "Harga, volume, dan sinyal...",     "isActive": true, "sortOrder": 1 },
+  { "id": 3, "title": "Shield|||Risk Management",          "content": "Analisa kondisi pasar...",         "isActive": true, "sortOrder": 2 },
+  { "id": 4, "title": "Globe|||Portfolio Tracker",         "content": "Pantau portofolio standar...",     "isActive": true, "sortOrder": 3 },
+  { "id": 5, "title": "Users|||Komunitas Trader",          "content": "Live Feed, Chat Room...",          "isActive": true, "sortOrder": 4 }
+]
+
+Format title: "IconName|||Judul Fitur" — parse dengan split "|||":
+
+function parseFeature(item) {
+  const parts = item.title.split("|||");
+  return {
+    iconName: parts.length === 2 ? parts[0] : "TrendingUp",
+    title:    parts.length === 2 ? parts[1] : item.title,
+    desc:     item.content,
+  };
+}
+
+Icon mapping (IconName → emoji atau react-native-vector-icons):
+
+IconName	Lucide Web	Emoji Mobile
+TrendingUp	TrendingUp	📈
+Zap	Zap	⚡
+Shield	Shield	🛡️
+Globe	Globe	🌐
+Users	Users	👥
+BarChart2	BarChart2	📊
+LineChart	LineChart	📉
+Cpu	Cpu	🖥️
+Rocket	Rocket	🚀
+Star	Star	⭐
+Layers	Layers	🗂️
+Info	Info	ℹ️
+GET /api/cms/content/about_team
+[
+  { "id": 1, "title": "Stockbot Team",          "content": "Founder & Lead Dev", "isActive": true, "sortOrder": 0 },
+  { "id": 2, "title": "IDX Research Division",  "content": "Data & Analysis",    "isActive": true, "sortOrder": 1 },
+  { "id": 3, "title": "Design Studio",          "content": "UI/UX Design",       "isActive": true, "sortOrder": 2 }
+]
+
+title = nama, content = jabatan/role
+
+IMPLEMENTASI LENGKAP
+import React, { useState, useEffect } from "react";
+import {
+  View, Text, ScrollView, ActivityIndicator, StyleSheet
+} from "react-native";
+const BASE = "https://stockbotpro.replit.app";
+// Icon map: IconName → emoji
+const ICON_EMOJI = {
+  TrendingUp: "📈", Zap: "⚡", Shield: "🛡️", Globe: "🌐",
+  Users: "👥", BarChart2: "📊", LineChart: "📉", Cpu: "🖥️",
+  Rocket: "🚀", Star: "⭐", Layers: "🗂️", Info: "ℹ️",
+};
+function parseFeature(item) {
+  const parts = item.title.split("|||");
+  return {
+    iconName: parts.length === 2 ? parts[0] : "TrendingUp",
+    title:    parts.length === 2 ? parts[1] : item.title,
+    desc:     item.content,
+  };
+}
+const getSection = (sections, keyword) =>
+  sections.find(s => s.isActive && s.title.toLowerCase().includes(keyword.toLowerCase()));
+export default function AboutScreen() {
+  const [sections,  setSections]  = useState([]);
+  const [features,  setFeatures]  = useState([]);
+  const [team,      setTeam]      = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  useEffect(() => {
+    Promise.all([
+      fetch(`${BASE}/api/cms/content/about`).then(r => r.json()),
+      fetch(`${BASE}/api/cms/content/about_features`).then(r => r.json()),
+      fetch(`${BASE}/api/cms/content/about_team`).then(r => r.json()),
+    ])
+      .then(([aboutData, featuresData, teamData]) => {
+        setSections(Array.isArray(aboutData)   ? aboutData   : []);
+        setFeatures(
+          Array.isArray(featuresData)
+            ? featuresData.filter(f => f.isActive).map(parseFeature)
+            : []
+        );
+        setTeam(
+          Array.isArray(teamData)
+            ? teamData.filter(t => t.isActive)
+            : []
+        );
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+  if (loading) {
+    return (
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator size="large" color="#00b4ff" />
+      </View>
+    );
+  }
+  const heroDesc   = getSection(sections, "Deskripsi")?.content  ?? "";
+  const mission1   = getSection(sections, "Paragraf 1")?.content ?? "";
+  const mission2   = getSection(sections, "Paragraf 2")?.content ?? "";
+  const disclaimer = getSection(sections, "Disclaimer")?.content ?? "";
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+      {/* ── Hero ── */}
+      <View style={styles.hero}>
+        <View style={styles.heroIconWrap}>
+          <Text style={{ fontSize: 32 }}>📊</Text>
+        </View>
+        <Text style={styles.heroTitle}>About Stockbot Pro</Text>
+        {heroDesc ? (
+          <Text style={styles.heroDesc}>{heroDesc}</Text>
+        ) : null}
+      </View>
+      {/* ── Version badge ── */}
+      <View style={styles.versionCard}>
+        <View>
+          <Text style={styles.versionLabel}>VERSI APLIKASI</Text>
+          <Text style={styles.versionName}>
+            Stockbot Pro{" "}
+            <Text style={{ color: "#facc15" }}>v2.0 Beta</Text>
+          </Text>
+          <Text style={styles.versionSub}>Dirilis: Maret 2026 · IDX/BEI Edition</Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={styles.versionLabel}>POWERED BY</Text>
+          <Text style={[styles.versionName, { fontSize: 12 }]}>
+            Stockbot Data Engine v2.0
+          </Text>
+          <Text style={styles.versionSub}>Multi-Source Integrated Analysis</Text>
+        </View>
+      </View>
+      {/* ── Misi ── */}
+      {(mission1 || mission2) ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Our Mission</Text>
+          <View style={styles.card}>
+            {mission1 ? <Text style={styles.bodyText}>{mission1}</Text> : null}
+            {mission2 ? <Text style={[styles.bodyText, { marginTop: 12 }]}>{mission2}</Text> : null}
+          </View>
+        </View>
+      ) : null}
+      {/* ── Key Features ── */}
+      {features.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Key Features</Text>
+          {features.map((f, i) => (
+            <View key={i} style={styles.featureRow}>
+              <View style={styles.featureIconWrap}>
+                <Text style={{ fontSize: 22 }}>
+                  {ICON_EMOJI[f.iconName] ?? "📌"}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.featureTitle}>{f.title}</Text>
+                <Text style={styles.featureDesc}>{f.desc}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+      {/* ── Our Team ── */}
+      {team.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Our Team</Text>
+          <View style={styles.teamGrid}>
+            {team.map((t, i) => (
+              <View key={i} style={styles.teamCard}>
+                <View style={styles.teamAvatarWrap}>
+                  <Text style={{ fontSize: 18 }}>👤</Text>
+                </View>
+                <Text style={styles.teamName}>{t.title}</Text>
+                <Text style={styles.teamRole}>{t.content}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+      {/* ── Disclaimer ── */}
+      {disclaimer ? (
+        <View style={styles.disclaimerBox}>
+          <Text style={styles.disclaimerText}>⚠️ {disclaimer}</Text>
+        </View>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+STYLES
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#060e1f",
+  },
+  loadingWrap: {
+    flex: 1,
+    backgroundColor: "#060e1f",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Hero
+  hero: {
+    alignItems: "center",
+    padding: 28,
+    paddingBottom: 20,
+  },
+  heroIconWrap: {
+    width: 72, height: 72,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,180,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(0,180,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#e2e8f0",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  heroDesc: {
+    fontSize: 14,
+    color: "#94a3b8",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  // Version
+  versionCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: "#0a1628",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  versionLabel: {
+    color: "#475569",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  versionName: {
+    color: "#00b4ff",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  versionSub: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  // Section
+  section: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#00b4ff",
+    marginBottom: 12,
+  },
+  // Mission card
+  card: {
+    backgroundColor: "#0a1628",
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  bodyText: {
+    color: "#94a3b8",
+    fontSize: 13,
+    lineHeight: 22,
+  },
+  // Features
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    backgroundColor: "#0a1628",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  featureIconWrap: {
+    width: 44, height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,180,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  featureTitle: {
+    color: "#e2e8f0",
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  featureDesc: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  // Team
+  teamGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  teamCard: {
+    flex: 1,
+    minWidth: "28%",
+    backgroundColor: "#0a1628",
+    borderRadius: 16,
+    padding: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  teamAvatarWrap: {
+    width: 44, height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,180,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(0,180,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  teamName: {
+    color: "#e2e8f0",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  teamRole: {
+    color: "#64748b",
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 3,
+  },
+  // Disclaimer
+  disclaimerBox: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: "#1e293b",
+  },
+  disclaimerText: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 19,
+  },
+});
+
+NAVIGASI
+// Di Settings screen — menu item
+{
+  icon: "ℹ️",
+  label: "Tentang Aplikasi",
+  sub: "Versi, fitur, tim",
+  onPress: () => navigation.navigate("About"),
+}
+// Di navigator
+<Stack.Screen
+  name="About"
+  component={AboutScreen}
+  options={{ title: "Tentang Aplikasi", headerBackTitle: "Pengaturan" }}
+/>
+
+CATATAN PENTING
+Semua teks (deskripsi, misi, fitur, tim, disclaimer) bisa diubah admin tanpa update app
+Jika response kosong atau error, tampilkan halaman kosong dengan pesan "Gagal memuat konten"
+Tidak ada auth — semua endpoint publik
+Urutan item mengikuti field sortOrder (sudah diurutkan dari API)
+Hanya tampilkan item dengan isActive: true
