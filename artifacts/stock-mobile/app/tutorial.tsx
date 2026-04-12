@@ -59,7 +59,7 @@ const HOME_GUIDE: HomeGuideItem[] = [
     title: "Header & Status Pasar",
     color: "#00d4ff",
     desc:
-      "Bagian teratas menampilkan sapaan harian dan kondisi pasar saat ini: jumlah saham yang naik (Adv) dan turun (Dec), serta arah IHSG hari ini.\n\nAda juga tiga indikator mini:\n• Akumulasi % — persentase saham yang sedang diakumulasi (sinyal beli bandar)\n• Distribusi % — persentase saham yang sedang didistribusi (sinyal jual bandar)\n• Avg Flow SM — rata-rata Bandar Score dari seluruh saham (skala 0–100). Makin tinggi = semakin banyak aliran masuk dari smart money.",
+      "Bagian teratas menampilkan sapaan harian dan kondisi pasar saat ini: jumlah saham yang naik (Adv) dan turun (Dec), serta arah IHSG hari ini.\n\nAda juga tiga indikator mini:\n• Akumulasi % — persentase saham yang sedang diakumulasi (sinyal beli institusional)\n• Distribusi % — persentase saham yang sedang didistribusi (sinyal jual institusional)\n• Avg Flow SM — rata-rata Flow Score dari seluruh saham (skala 0–100). Makin tinggi = semakin kuat aliran masuk dari smart money.",
     link: "/home",
     linkLabel: "Buka Home",
   },
@@ -68,7 +68,7 @@ const HOME_GUIDE: HomeGuideItem[] = [
     title: "Command Center",
     color: "#f5c518",
     desc:
-      "Empat kartu pintas yang merangkum kondisi market secara real-time:\n\n• 🎯 STOCKPICK — jumlah saham dengan sinyal entry kuat (fase IGNITION). Menampilkan saham terpanas hari ini.\n• ⚡ FLOW — perbandingan saham akumulasi vs distribusi, plus saham dengan Net Buy terbesar.\n• 💎 SMART MONEY — saham dengan Bandar Score tertinggi hari ini.\n• 📡 RADAR — total saham fase ignition dan saham dengan score broker terkuat.\n\nBaris bawah:\n• 🔄 Sector Rotation — berapa sektor leading vs lagging\n• 🌐 Market Intel — kondisi global dan breadth pasar",
+      "Empat kartu pintas yang merangkum kondisi market secara real-time:\n\n• 🎯 STOCKPICK — jumlah saham dengan sinyal entry kuat (fase IGNITION). Menampilkan saham terpanas hari ini.\n• ⚡ FLOW — perbandingan saham akumulasi vs distribusi, plus saham dengan Net Buy terbesar.\n• 💎 SMART MONEY — saham dengan Smart Money Score tertinggi hari ini.\n• 📡 RADAR — total saham fase ignition dan saham dengan score broker terkuat.\n\nBaris bawah:\n• 🔄 Sector Rotation — berapa sektor leading vs lagging\n• 🌐 Market Intel — kondisi global dan breadth pasar",
     link: "/(tabs)/stockpick",
     linkLabel: "Buka Stockpick",
   },
@@ -77,7 +77,7 @@ const HOME_GUIDE: HomeGuideItem[] = [
     title: "Signal Snapshot",
     color: "#b87eff",
     desc:
-      "Panel ini menampilkan 5 saham terpilih per kategori dalam format tab:\n\n• ⭐ Top Akumulasi — saham dengan Bandar Score tertinggi yang sedang diakumulasi\n• 🚀 Entry Peluang — saham fase IGNITION (akumulasi kuat + score ≥65) diurutkan dari net buy terbesar\n• ⚠️ Peringatan — saham yang mulai masuk distribusi, perlu waspada\n• ✅ Strong Trend — saham dengan tren naik stabil dan flow masuk konsisten\n\nTap kartu saham untuk melihat detail teknikal lengkap.",
+      "Panel ini menampilkan 5 saham terpilih per kategori dalam format tab:\n\n• ⭐ Top Akumulasi — saham dengan Smart Money Score tertinggi yang sedang diakumulasi institusional\n• 🚀 Entry Peluang — saham fase IGNITION (akumulasi kuat + score ≥65) diurutkan dari net buy terbesar\n• ⚠️ Peringatan — saham yang mulai masuk distribusi institusional, perlu waspada\n• ✅ Strong Trend — saham dengan tren naik stabil dan aliran institusional konsisten\n\nTap kartu saham untuk melihat detail teknikal lengkap.",
     link: "/(tabs)/screener",
     linkLabel: "Lihat Screener",
   },
@@ -86,7 +86,7 @@ const HOME_GUIDE: HomeGuideItem[] = [
     title: "Phase Distribution",
     color: "#33cc66",
     desc:
-      "Bar horizontal yang menampilkan komposisi fase dari seluruh saham di RADAR:\n\n• Hijau tua — IGNITION (akumulasi kuat, potensi entry)\n• Hijau — EARLY_ACC (awal akumulasi)\n• Biru — STRONG_TREND (tren kuat)\n• Oranye — EXHAUSTION (mulai lemah)\n• Merah — DISTRIBUTION (distribusi/jual bandar)\n• Abu — CHURNING (netral)\n\nDi bawah bar terdapat 3 angka kunci:\n• Avg Flow Score — rata-rata flow score 0–100\n• Akumulasi % — persen saham fase positif\n• Distribusi % — persen saham fase negatif\n\nSemakin dominan warna hijau = kondisi pasar lebih bullish.",
+      "Bar horizontal yang menampilkan komposisi fase dari seluruh saham di RADAR:\n\n• Hijau tua — IGNITION (akumulasi kuat, potensi entry)\n• Hijau — EARLY_ACC (awal akumulasi institusional)\n• Biru — STRONG_TREND (tren kuat)\n• Oranye — EXHAUSTION (mulai melemah)\n• Merah — DISTRIBUTION (distribusi institusional)\n• Abu — CHURNING (netral/sideways)\n\nDi bawah bar terdapat 3 angka kunci:\n• Avg Flow Score — rata-rata Smart Money Score 0–100\n• Akumulasi % — persen saham fase positif\n• Distribusi % — persen saham fase negatif\n\nSemakin dominan warna hijau = kondisi pasar lebih bullish.",
     link: "/market-intel",
     linkLabel: "Lihat Market Intel",
   },
@@ -104,14 +104,14 @@ const HOME_GUIDE: HomeGuideItem[] = [
     title: "Market Risk Score",
     color: "#e05252",
     desc:
-      "Skor risiko pasar 0–10 yang dihitung dari 4 komponen:\n\n1. Market Breadth — seberapa banyak saham yang turun vs naik (market width)\n2. Smart Money Flow — seberapa besar persentase saham dalam distribusi\n3. Arah IHSG — apakah IHSG turun signifikan hari ini (< −1.5%)\n4. Avg Flow Score — jika rata-rata bandar score < 30, ada sinyal kelemahan\n\nInterpretasi:\n• 0–3 → LOW RISK (kondisi aman, bisa entry bertahap)\n• 4–5 → MEDIUM RISK (selektif, pilih saham terkuat)\n• 6–7 → MED-HIGH (kurangi exposure)\n• 8–10 → HIGH RISK (hindari entry baru)\n\nTap untuk melihat breakdown tiap komponen.",
+      "Skor risiko pasar 0–10 yang dihitung dari 4 komponen:\n\n1. Market Breadth — seberapa banyak saham yang turun vs naik (market width)\n2. Institutional Flow — seberapa besar persentase saham dalam fase distribusi\n3. Arah IHSG — apakah IHSG turun signifikan hari ini (< −1.5%)\n4. Avg Flow Score — jika rata-rata Smart Money Score < 30, ada sinyal kelemahan aliran\n\nInterpretasi:\n• 0–3 → LOW RISK (kondisi aman, bisa entry bertahap)\n• 4–5 → MEDIUM RISK (selektif, pilih saham terkuat)\n• 6–7 → MED-HIGH (kurangi exposure)\n• 8–10 → HIGH RISK (hindari entry baru)\n\nTap untuk melihat breakdown tiap komponen.",
   },
   {
     icon: "🚀",
     title: "Top Gainers & Top Losers",
     color: "#f97316",
     desc:
-      "Scroll horizontal berisi saham dengan perubahan harga terbesar hari ini dari database Master Stock IDX.\n\n• Top Gainers — saham naik paling tinggi (urutkan dari % tertinggi)\n• Top Losers — saham turun paling dalam\n\nGunakan ini untuk:\n• Identifikasi saham yang sedang mendapat perhatian pasar\n• Cek apakah kenaikan didukung oleh akumulasi bandar (lihat di Radar/Bandar)\n• Hindari FOMO — kenaikan besar tanpa dukungan flow bandar berisiko reversal",
+      "Scroll horizontal berisi saham dengan perubahan harga terbesar hari ini dari database Master Stock IDX.\n\n• Top Gainers — saham naik paling tinggi (diurutkan dari % tertinggi)\n• Top Losers — saham turun paling dalam\n\nGunakan ini untuk:\n• Identifikasi saham yang sedang mendapat perhatian pasar\n• Cek apakah kenaikan didukung akumulasi institusional (lihat di Radar / Smart Money)\n• Hindari FOMO — kenaikan besar tanpa dukungan aliran institusional berisiko reversal",
     link: "/(tabs)/stockpick",
     linkLabel: "Buka Stockpick",
   },
