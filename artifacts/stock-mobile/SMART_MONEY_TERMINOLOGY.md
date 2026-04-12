@@ -9,10 +9,10 @@ Makin besar volume yang dikuasai kelompok broker, makin kuat sinyal yang ditampi
 ## Tiga Lapisan Smart Money
 
 ### Prime Flow (SM1) — Pelaku Inti
-> **"Bandar utama bergerak"**
+> **"Smart Money entry tahap awal"**
 
 - Representasi: Broker #1 terbesar berdasarkan net volume di saham tersebut
-- Makna: Ini adalah pemain paling dominan — biasanya institusi besar, reksa dana besar, atau bandar saham
+- Makna: Ini adalah pemain paling dominan — biasanya institusi besar atau reksa dana besar
 - Sinyal kuat: Jika Prime Flow = "Big Acc", artinya satu broker dominan sedang akumulasi besar-besaran
 - Warna UI: Ungu (`#a78bfa`)
 

@@ -59,7 +59,7 @@ export const PHASE_CONFIG: Record<SmartMoneyPhase, {
 }> = {
   IGNITION: {
     label: "IGNITION", display: "Akumulasi Diam",
-    desc: "Bandar beli saat retail jual — setup terbaik",
+    desc: "Smart Money entry saat retail jual — setup terbaik",
     color: "#10b981", bg: "#052e16", badge: "ACC",
     badgeColor: "#10b981", priority: 1, icon: "🔥",
   },
@@ -83,7 +83,7 @@ export const PHASE_CONFIG: Record<SmartMoneyPhase, {
   },
   DISTRIBUTION: {
     label: "DISTRIBUTION", display: "Distribusi",
-    desc: "Bandar jual ke retail — hindari masuk",
+    desc: "Smart Money exit ke retail — hindari masuk",
     color: "#f87171", bg: "#2d0a0a", badge: "DIST",
     badgeColor: "#f87171", priority: 5, icon: "🔴",
   },
