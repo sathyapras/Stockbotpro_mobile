@@ -961,7 +961,7 @@ function FinancialsTab({ ticker, quote, broker1d, masterStock, colors }: {
           <InfoCell label="RS vs IHSG" colors={colors}
             value={quote.rs.toFixed(3)} color={quote.rs > 1 ? "#34d399" : "#f87171"} />
           <InfoCell label="RS MA" value={quote.rsMa.toFixed(3)} colors={colors} />
-          <InfoCell label="TA SCORE" value={String(quote.totalScore)} color="#a78bfa" colors={colors} />
+          <InfoCell label="SIGNAL COUNT" value={String(quote.totalScore)} color="#a78bfa" colors={colors} />
         </View>
       </View>
 
