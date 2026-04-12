@@ -150,9 +150,9 @@ export default function AboutUsScreen() {
       {/* ── Hero ── */}
       <View style={styles.hero}>
         <Image
-          source={require("../assets/logo-stockbot.png")}
-          style={{ width: 72, height: 72, borderRadius: 20, marginBottom: 16 }}
-          resizeMode="cover"
+          source={require("../assets/logo-stockbot-banner.png")}
+          style={{ width: 220, height: 48, marginBottom: 16 }}
+          resizeMode="contain"
         />
         {heroDesc ? (
           <Text style={styles.heroDesc}>{heroDesc}</Text>
