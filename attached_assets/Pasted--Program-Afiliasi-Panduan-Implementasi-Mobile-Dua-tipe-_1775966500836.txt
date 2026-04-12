@@ -1,0 +1,589 @@
+# Program Afiliasi — Panduan Implementasi Mobile
+## Dua tipe afiliasi, threshold subscriber, dan progress bar
+
+---
+
+## MODEL BISNIS AFILIASI
+
+| | Tipe 1 — Community Leader | Tipe 2 — One Time |
+|--|--------------------------|-------------------|
+| `commissionType` | `"percentage"` | `"one_time"` |
+| Komisi | **30% recurring** per bulan | **40% sekali** saja |
+| Syarat aktif | **Min 30 subscriber aktif** | Tidak ada |
+| Jika < 30 aktif | Komisi dibekukan, admin review | N/A |
+| Bukti apply | **Wajib** — link/desc group | Tidak wajib |
+| Target afiliasi | Pengelola komunitas 50+ member | Siapa saja |
+| Upgrade | Bisa upgrade ke Type 1 | — |
+
+Diskon untuk referred user: **20%** di kedua tipe.
+
+---
+
+## FLOW SCREEN
+
+```
+Buka Afiliasi
+     │
+     ├── hasProfile: false → Screen Pilih Tipe + Form Apply
+     │
+     └── hasProfile: true
+            ├── status: "pending"  → Dashboard + Banner Menunggu
+            └── status: "active"   → Dashboard Lengkap
+                    ├── [Type 1] Progress bar subscriber + badge frozen/aktif
+                    ├── Kode referral + share
+                    ├── Statistik (komisi, referral, saldo)
+                    ├── Riwayat komisi
+                    └── Request Payout (blocked jika frozen)
+```
+
+---
+
+## ENDPOINT SUMMARY
+
+| Method | URL | Auth | Keterangan |
+|--------|-----|------|-----------|
+| `GET`  | `/api/affiliate/me` | ✅ | Profil + stats + quality |
+| `POST` | `/api/affiliate/apply` | ✅ | Daftar — pilih tipe + bukti group |
+| `POST` | `/api/affiliate/payout-request` | ✅ | Pencairan (blocked jika frozen) |
+| `GET`  | `/api/affiliate/commission-types` | ❌ | Publik |
+
+---
+
+## GET /api/affiliate/me — Response Lengkap
+
+```json
+{
+  "hasProfile": true,
+  "profile": {
+    "id": 12,
+    "code": "BUDI2024",
+    "status": "active",
+    "commissionType": "percentage",
+    "commissionRate": 30,
+    "discountPct": 20,
+    "groupProof": "https://t.me/komunitas_saham_saya",
+    "commissionFrozen": false,
+    "totalEarned": "450000",
+    "pendingBalance": "250000",
+    "paidBalance": "200000"
+  },
+  "referrals": [...],
+  "payouts": [...],
+  "totalReferrals": 12,
+  "quality": {
+    "totalUniqueUsers": 35,
+    "activeUsers": 27,
+    "churnedUsers": 8,
+    "retentionRate": 77,
+    "thresholdRequired": 30,
+    "thresholdMet": false,
+    "commissionFrozen": true,
+    "thisMonthEarnings": 0,
+    "lastMonthEarnings": 120000
+  }
+}
+```
+
+### Field penting quality:
+
+| Field | Keterangan |
+|-------|-----------|
+| `thresholdRequired` | 30 untuk Type 1, null untuk Type 2 |
+| `thresholdMet` | true = komisi berjalan normal |
+| `commissionFrozen` | true = komisi Type 1 dibekukan |
+| `activeUsers` | Jumlah referral yang masih subscribe aktif |
+
+---
+
+## POST /api/affiliate/apply — Body
+
+```json
+{
+  "marketReach":    "Saya mengelola grup Telegram 500+ member fokus saham IDX",
+  "preferredCode":  "BUDI2024",
+  "commissionType": "percentage",
+  "groupProof":     "https://t.me/komunitas_saham_saya"
+}
+```
+
+| Field | Tipe 1 | Tipe 2 |
+|-------|--------|--------|
+| `marketReach` | Wajib | Wajib |
+| `commissionType` | `"percentage"` | `"one_time"` |
+| `groupProof` | **Wajib** | Tidak perlu |
+| `preferredCode` | Opsional | Opsional |
+
+---
+
+## SCREEN: Pilih Tipe Afiliasi
+
+Tampilkan dua kartu sebelum form apply — user pilih salah satu:
+
+```javascript
+function PilihTipeScreen({ onPilih }) {
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#060e1f", padding: 20 }}>
+      <Text style={styles.pageTitle}>Program Afiliasi</Text>
+      <Text style={styles.pageSubtitle}>Pilih tipe yang sesuai dengan profil Anda</Text>
+
+      {/* Tipe 1 */}
+      <Pressable style={[styles.tipeCard, styles.tipeCardHighlight]}
+        onPress={() => onPilih("percentage")}>
+        <View style={styles.tipeHeader}>
+          <Text style={styles.tipeBadge}>👑 COMMUNITY LEADER</Text>
+          <Text style={styles.tipeRate}>30% / bulan</Text>
+        </View>
+        <Text style={styles.tipeDesc}>
+          Untuk pengelola komunitas aktif (Telegram, WA, YouTube, dll) dengan minimal 50 member.
+          Komisi recurring setiap bulan selama member tetap subscribe.
+        </Text>
+        <View style={styles.tipeSyarat}>
+          <Text style={styles.syaratItem}>✅ Min 50 member komunitas saat apply</Text>
+          <Text style={styles.syaratItem}>✅ Wajib lampirkan link/bukti group</Text>
+          <Text style={styles.syaratItem}>✅ Min 30 subscriber aktif agar komisi cair</Text>
+          <Text style={styles.syaratItem}>✅ Aktif edukasi pasar keuangan di komunitas</Text>
+        </View>
+      </Pressable>
+
+      {/* Tipe 2 */}
+      <Pressable style={styles.tipeCard}
+        onPress={() => onPilih("one_time")}>
+        <View style={styles.tipeHeader}>
+          <Text style={styles.tipeBadge}>⚡ ONE TIME</Text>
+          <Text style={styles.tipeRate}>40% sekali</Text>
+        </View>
+        <Text style={styles.tipeDesc}>
+          Komisi 40% dari transaksi pertama setiap referral. Tidak ada syarat minimum subscriber.
+        </Text>
+        <View style={styles.tipeSyarat}>
+          <Text style={styles.syaratItem}>✅ Tidak ada syarat minimum</Text>
+          <Text style={styles.syaratItem}>✅ Komisi lebih besar di transaksi pertama</Text>
+          <Text style={styles.syaratItem}>⚠️ Hanya untuk transaksi pertama per referral</Text>
+        </View>
+      </Pressable>
+    </ScrollView>
+  );
+}
+```
+
+---
+
+## SCREEN: Form Apply
+
+```javascript
+function FormApplyScreen({ tipe, onSuccess }) {
+  const isType1 = tipe === "percentage";
+  const [marketReach,   setMarketReach]   = useState("");
+  const [groupProof,    setGroupProof]    = useState("");
+  const [preferredCode, setPreferredCode] = useState("");
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState("");
+
+  async function handleApply() {
+    if (!marketReach.trim()) { setError("Deskripsi pangsa pasar wajib."); return; }
+    if (isType1 && !groupProof.trim()) { setError("Link/bukti group wajib untuk Community Leader."); return; }
+
+    setLoading(true); setError("");
+    try {
+      const res = await fetchWithAuth("/api/affiliate/apply", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          marketReach:    marketReach.trim(),
+          commissionType: tipe,
+          groupProof:     isType1 ? groupProof.trim() : undefined,
+          preferredCode:  preferredCode.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error ?? "Gagal mendaftar."); return; }
+      onSuccess();
+    } catch { setError("Terjadi kesalahan."); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#060e1f", padding: 20 }}>
+      {/* Badge tipe */}
+      <View style={[styles.tipeBanner,
+        { backgroundColor: isType1 ? "rgba(245,158,11,0.1)" : "rgba(59,130,246,0.1)" }]}>
+        <Text style={{ color: isType1 ? "#f59e0b" : "#3b82f6", fontWeight: "700" }}>
+          {isType1 ? "👑 Community Leader — 30% Recurring" : "⚡ One Time — 40%"}
+        </Text>
+      </View>
+
+      <Text style={styles.label}>Deskripsi Pangsa Pasar *</Text>
+      <TextInput style={styles.textArea} multiline numberOfLines={4}
+        placeholder="Contoh: Saya mengelola grup Telegram saham IDX dengan 500+ member aktif..."
+        placeholderTextColor="#475569" value={marketReach} onChangeText={setMarketReach} />
+
+      {isType1 && (
+        <>
+          <Text style={styles.label}>Link / Bukti Komunitas *</Text>
+          <TextInput style={styles.input}
+            placeholder="https://t.me/nama_group atau link YouTube/WA..."
+            placeholderTextColor="#475569" value={groupProof} onChangeText={setGroupProof} />
+          <Text style={styles.hint}>Link grup Telegram, channel YouTube, atau screenshot komunitas.</Text>
+        </>
+      )}
+
+      <Text style={styles.label}>Kode Afiliasi Pilihan (opsional)</Text>
+      <TextInput style={styles.input} autoCapitalize="characters"
+        placeholder="Contoh: BUDI2024" placeholderTextColor="#475569" maxLength={20}
+        value={preferredCode}
+        onChangeText={t => setPreferredCode(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
+      <Text style={styles.hint}>Huruf kapital & angka. Kosong = otomatis dari username.</Text>
+
+      {error ? <Text style={styles.error}>⚠ {error}</Text> : null}
+
+      <Pressable style={[styles.btnPrimary, loading && styles.btnDisabled]}
+        onPress={handleApply} disabled={loading}>
+        <Text style={styles.btnPrimaryText}>
+          {loading ? "Mengirim..." : "Kirim Aplikasi"}
+        </Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+```
+
+---
+
+## DASHBOARD: Komponen Progress Bar Threshold (Type 1)
+
+Tampilkan di paling atas dashboard untuk afiliasi Type 1.
+
+```javascript
+function ThresholdBar({ activeUsers, threshold = 30, frozen }) {
+  const pct = Math.min((activeUsers / threshold) * 100, 100);
+  const met = activeUsers >= threshold;
+
+  return (
+    <View style={styles.thresholdCard}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+        <Text style={styles.thresholdTitle}>Subscriber Aktif</Text>
+        <View style={[styles.statusBadge,
+          { backgroundColor: met
+            ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)" }]}>
+          <Text style={{ color: met ? "#22c55e" : "#ef4444",
+            fontSize: 11, fontWeight: "700" }}>
+            {met ? "✓ KOMISI AKTIF" : "✗ KOMISI BEKU"}
+          </Text>
+        </View>
+      </View>
+
+      {/* Progress bar */}
+      <View style={styles.progressBg}>
+        <View style={[styles.progressFill, {
+          width: `${pct}%`,
+          backgroundColor: met ? "#22c55e" : "#f59e0b",
+        }]} />
+      </View>
+
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+        <Text style={{ color: "#94a3b8", fontSize: 12 }}>
+          <Text style={{ color: met ? "#22c55e" : "#f59e0b",
+            fontWeight: "800", fontSize: 16 }}>{activeUsers}</Text>
+          {" "}dari{" "}
+          <Text style={{ fontWeight: "700" }}>{threshold}</Text>
+          {" "}subscriber aktif
+        </Text>
+        <Text style={{ color: "#64748b", fontSize: 11 }}>
+          {threshold - activeUsers > 0 ? `Butuh ${threshold - activeUsers} lagi` : "Threshold tercapai"}
+        </Text>
+      </View>
+
+      {frozen && (
+        <View style={styles.frozenBanner}>
+          <Text style={{ color: "#fbbf24", fontSize: 12 }}>
+            ⚠ Komisi dibekukan sementara. Tambah subscriber atau hubungi admin untuk review.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+```
+
+**Style:**
+```javascript
+thresholdCard: {
+  backgroundColor: "#0f1729",
+  borderRadius: 14,
+  padding: 16,
+  marginHorizontal: 16,
+  marginBottom: 14,
+  borderWidth: 1,
+  borderColor: "#1e293b",
+},
+thresholdTitle: {
+  color: "#94a3b8",
+  fontSize: 12,
+  fontWeight: "700",
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+},
+progressBg: {
+  height: 8,
+  backgroundColor: "#1e293b",
+  borderRadius: 4,
+  overflow: "hidden",
+},
+progressFill: {
+  height: "100%",
+  borderRadius: 4,
+},
+frozenBanner: {
+  backgroundColor: "rgba(251,191,36,0.1)",
+  borderRadius: 8,
+  padding: 10,
+  marginTop: 10,
+  borderWidth: 1,
+  borderColor: "rgba(251,191,36,0.25)",
+},
+```
+
+---
+
+## DASHBOARD: Screen Utama Afiliasi Aktif
+
+```javascript
+function DashboardAfiliasiScreen({ data }) {
+  const { profile, quality, referrals, payouts, totalReferrals } = data;
+  const isType1 = profile.commissionType === "percentage";
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#060e1f" }}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Program Afiliasi</Text>
+        <Text style={{ color: "#64748b", fontSize: 12 }}>
+          {isType1 ? "👑 Community Leader" : "⚡ One Time"} · {profile.commissionRate}%
+        </Text>
+      </View>
+
+      {/* Status pending */}
+      {profile.status === "pending" && <PendingBanner />}
+
+      {/* Progress bar threshold — hanya Type 1 */}
+      {isType1 && profile.status === "active" && (
+        <ThresholdBar
+          activeUsers={quality.activeUsers}
+          threshold={quality.thresholdRequired}
+          frozen={quality.commissionFrozen}
+        />
+      )}
+
+      {/* Kode referral */}
+      <ReferralCodeCard code={profile.code} discountPct={profile.discountPct} />
+
+      {/* Stats */}
+      <StatsRow quality={quality} profile={profile} totalReferrals={totalReferrals} />
+
+      {/* Komisi bulan ini */}
+      <EarningsCard quality={quality} frozen={quality.commissionFrozen} />
+
+      {/* Riwayat komisi */}
+      <ReferralHistory referrals={referrals} />
+
+      {/* Payout */}
+      {profile.status === "active" && (
+        <PayoutSection profile={profile} payouts={payouts}
+          frozen={quality.commissionFrozen && isType1} />
+      )}
+    </ScrollView>
+  );
+}
+```
+
+---
+
+## KOMPONEN: PayoutSection
+
+```javascript
+function PayoutSection({ profile, payouts, frozen }) {
+  const [showForm, setShowForm] = useState(false);
+  const pending = parseFloat(profile.pendingBalance ?? "0");
+
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 24 }}>
+      <Text style={styles.sectionTitle}>PENCAIRAN KOMISI</Text>
+
+      {/* Saldo pending */}
+      <View style={styles.balanceCard}>
+        <Text style={{ color: "#64748b", fontSize: 11 }}>SALDO TERSEDIA</Text>
+        <Text style={{ color: "#22c55e", fontWeight: "900", fontSize: 26, marginTop: 4 }}>
+          Rp {pending.toLocaleString("id-ID")}
+        </Text>
+        <Text style={{ color: "#475569", fontSize: 11, marginTop: 4 }}>
+          Min. penarikan Rp 50.000 · Proses 1-3 hari kerja
+        </Text>
+      </View>
+
+      {/* Frozen warning untuk Type 1 */}
+      {frozen && (
+        <View style={styles.frozenBanner}>
+          <Text style={{ color: "#fbbf24", fontSize: 12 }}>
+            ⚠ Pencairan tidak tersedia saat komisi dibekukan. Hubungi admin.
+          </Text>
+        </View>
+      )}
+
+      {/* Tombol request */}
+      {!frozen && pending >= 50000 && (
+        <Pressable style={styles.btnPrimary} onPress={() => setShowForm(true)}>
+          <Text style={styles.btnPrimaryText}>Request Pencairan</Text>
+        </Pressable>
+      )}
+
+      {/* Riwayat payout */}
+      {payouts?.length > 0 && (
+        <View style={{ marginTop: 16 }}>
+          <Text style={styles.sectionTitle}>RIWAYAT PENCAIRAN</Text>
+          {payouts.map((p) => (
+            <View key={p.id} style={styles.payoutRow}>
+              <View>
+                <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>
+                  Rp {parseFloat(p.amount).toLocaleString("id-ID")}
+                </Text>
+                <Text style={{ color: "#64748b", fontSize: 11 }}>
+                  {p.bankName} · {new Date(p.createdAt).toLocaleDateString("id-ID")}
+                </Text>
+              </View>
+              <View style={[styles.payoutBadge,
+                { backgroundColor: p.status === "paid"
+                  ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)" }]}>
+                <Text style={{ color: p.status === "paid" ? "#22c55e" : "#f59e0b",
+                  fontSize: 11, fontWeight: "700" }}>
+                  {p.status === "paid" ? "Cair" : "Proses"}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Modal Form Payout */}
+      <ModalPayout visible={showForm} profile={profile}
+        onClose={() => setShowForm(false)} />
+    </View>
+  );
+}
+
+function ModalPayout({ visible, profile, onClose }) {
+  const [amount,  setAmount]  = useState("");
+  const [bank,    setBank]    = useState("");
+  const [accNum,  setAccNum]  = useState("");
+  const [accName, setAccName] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit() {
+    const amt = Number(amount);
+    if (!amt || !bank || !accNum || !accName) {
+      Alert.alert("Lengkapi semua field"); return;
+    }
+    if (amt < 50000) { Alert.alert("Minimum Rp 50.000"); return; }
+
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth("/api/affiliate/payout-request", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: amt, bankName: bank.trim(),
+          accountNumber: accNum.trim(), accountName: accName.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { Alert.alert("Gagal", json.error); return; }
+      Alert.alert("Berhasil", json.message);
+      onClose();
+    } catch { Alert.alert("Terjadi kesalahan"); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.overlay}>
+        <View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>Request Pencairan</Text>
+          <TextInput style={styles.input} placeholder="Jumlah (Rp)"
+            placeholderTextColor="#475569" keyboardType="numeric"
+            value={amount} onChangeText={setAmount} />
+          <TextInput style={styles.input} placeholder="Nama Bank (BCA, BRI, dll)"
+            placeholderTextColor="#475569" value={bank} onChangeText={setBank} />
+          <TextInput style={styles.input} placeholder="Nomor Rekening"
+            placeholderTextColor="#475569" keyboardType="numeric"
+            value={accNum} onChangeText={setAccNum} />
+          <TextInput style={styles.input} placeholder="Nama Pemilik Rekening"
+            placeholderTextColor="#475569" value={accName} onChangeText={setAccName} />
+          <View style={styles.row2}>
+            <Pressable style={[styles.btn, styles.btnCancel]} onPress={onClose}>
+              <Text style={styles.btnCancelText}>Batal</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, styles.btnSave]} onPress={submit}
+              disabled={loading}>
+              <Text style={styles.btnSaveText}>
+                {loading ? "Mengirim..." : "Konfirmasi"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+```
+
+---
+
+## KOMPONEN: ReferralCodeCard (Share + Copy)
+
+```javascript
+function ReferralCodeCard({ code, discountPct }) {
+  async function shareCode() {
+    await Share.share({
+      message: `Gunakan kode referral saya *${code}* di StockBot Pro dan dapatkan diskon ${discountPct}%!\n\nDownload: https://stockbotpro.replit.app`,
+    });
+  }
+  async function copyCode() {
+    await Clipboard.setStringAsync(code);
+    // tampilkan toast "Kode disalin!"
+  }
+
+  return (
+    <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: "#0f1729",
+      borderRadius: 14, padding: 18, borderWidth: 1, borderColor: "rgba(0,180,255,0.15)" }}>
+      <Text style={{ color: "#64748b", fontSize: 11, marginBottom: 6, textTransform: "uppercase" }}>
+        Kode Referral Kamu
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <Text style={{ color: "#00d4ff", fontWeight: "900", fontSize: 28,
+          letterSpacing: 4, flex: 1 }}>{code}</Text>
+        <Pressable onPress={copyCode} style={{ marginRight: 10 }}>
+          <Text style={{ fontSize: 22 }}>📋</Text>
+        </Pressable>
+        <Pressable onPress={shareCode} style={{ backgroundColor: "#00b4d8",
+          borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }}>
+          <Text style={{ color: "white", fontWeight: "700", fontSize: 13 }}>Share</Text>
+        </Pressable>
+      </View>
+      <Text style={{ color: "#475569", fontSize: 11, marginTop: 8 }}>
+        Referred user dapat diskon {discountPct}% · Kamu dapat komisi setiap transaksi
+      </Text>
+    </View>
+  );
+}
+```
+
+---
+
+## RINGKASAN PERUBAHAN DARI VERSI SEBELUMNYA
+
+| Hal | Sebelum | Sekarang |
+|-----|---------|----------|
+| Tipe komisi | 1 tipe (20%) | 2 tipe: Type 1 (30%) / Type 2 (40%) |
+| Syarat apply Type 1 | Tidak ada | Wajib bukti komunitas |
+| Threshold | Retention 70% | Min 30 subscriber aktif |
+| Freeze komisi | Tidak ada | Otomatis jika < 30 aktif |
+| Form apply | 1 langkah | Pilih tipe dulu → form |
+| Payout jika frozen | Bebas | Diblokir sampai review admin |

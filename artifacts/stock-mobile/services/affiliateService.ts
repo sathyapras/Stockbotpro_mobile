@@ -19,8 +19,8 @@ export async function clearAuthToken(): Promise<void> {
 
 function apiBase(): string {
   const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    if (d) return `https://${d}/api`;
-    return "http://localhost:8080/api";
+  if (d) return `https://${d}/api`;
+  return "http://localhost:8080/api";
 }
 
 async function fetchAuth(path: string, opts?: RequestInit): Promise<Response> {
@@ -40,14 +40,14 @@ export interface AffiliateProfile {
   userId: number;
   code: string;
   status: "pending" | "active";
-  commissionType: string;
+  commissionType: "percentage" | "one_time";
   commissionRate: number;
   discountPct: number;
-  bankName: string;
-  bankAccount: string;
-  bankHolder: string;
+  groupProof?: string;
+  commissionFrozen: boolean;
   totalEarned: string;
-  totalPaid: string;
+  pendingBalance: string;
+  paidBalance: string;
 }
 
 export interface AffiliateReferral {
@@ -62,9 +62,10 @@ export interface AffiliateReferral {
 export interface AffiliatePayout {
   id: number;
   amount: string;
-  status: string;
+  status: "pending" | "paid" | "rejected";
   bankName: string;
-  bankAccount: string;
+  accountNumber: string;
+  accountName: string;
   createdAt: string;
 }
 
@@ -73,8 +74,9 @@ export interface AffiliateQuality {
   activeUsers: number;
   churnedUsers: number;
   retentionRate: number;
-  tierProgress: number;
-  tierThreshold: number;
+  thresholdRequired: number | null;
+  thresholdMet: boolean;
+  commissionFrozen: boolean;
   thisMonthEarnings: number;
   lastMonthEarnings: number;
 }
@@ -99,6 +101,8 @@ export async function fetchAffiliateMe(): Promise<AffiliateMe> {
 
 export async function applyAffiliate(params: {
   marketReach: string;
+  commissionType: "percentage" | "one_time";
+  groupProof?: string;
   preferredCode?: string;
 }): Promise<{ message: string; code: string }> {
   const res = await fetchAuth("/affiliate/apply", {
@@ -113,8 +117,8 @@ export async function applyAffiliate(params: {
 export async function requestPayout(params: {
   amount: number;
   bankName: string;
-  bankAccount: string;
-  bankHolder: string;
+  accountNumber: string;
+  accountName: string;
 }): Promise<{ message: string }> {
   const res = await fetchAuth("/affiliate/payout-request", {
     method: "POST",
