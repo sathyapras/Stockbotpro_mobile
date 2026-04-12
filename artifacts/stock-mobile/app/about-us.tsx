@@ -232,21 +232,6 @@ export default function AboutUsScreen() {
         </View>
       ) : null}
 
-      {/* ── Data Sources ── */}
-      <View style={[styles.disclaimerBox, { marginTop: 12 }]}>
-        <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700",
-          letterSpacing: 1, marginBottom: 8, textTransform: "uppercase" }}>
-          Data Sources
-        </Text>
-        {[
-          "AFL AmiBroker Signal Engine",
-          "IDX (Indonesia Stock Exchange)",
-          "Yahoo Finance (VIX / DXY)",
-          "Broker Flow Analysis",
-        ].map(s => (
-          <Text key={s} style={{ color: "#475569", fontSize: 12, lineHeight: 20 }}>• {s}</Text>
-        ))}
-      </View>
     </ScrollView>
   );
 }
