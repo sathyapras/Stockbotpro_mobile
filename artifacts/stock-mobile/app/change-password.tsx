@@ -77,7 +77,9 @@ export default function ChangePasswordScreen() {
                 </Text>
               </View>
               <Text style={{ color: "#475569", fontSize: 12, marginTop: 14, lineHeight: 18 }}>
-                Setelah klik link di email, kamu bisa set password baru melalui browser.
+                Email akan dikirim dari{" "}
+                <Text style={{ color: "#94a3b8", fontWeight: "600" }}>noreply@stockbot.id</Text>
+                {"\n"}Setelah klik link di email, kamu bisa set password baru melalui browser.
                 Login kembali ke aplikasi setelah password berhasil diubah.
               </Text>
             </View>
@@ -112,16 +114,21 @@ export default function ChangePasswordScreen() {
             </Text>
             <Text style={{ color: "#64748b", fontSize: 13, textAlign: "center",
               lineHeight: 22, marginBottom: 10 }}>
-              Cek inbox{"\n"}
+              Cek inbox
             </Text>
             <Text style={{ color: "#0ea5e9", fontWeight: "700", fontSize: 14,
-              textAlign: "center", marginBottom: 24 }}>
+              textAlign: "center", marginBottom: 6 }}>
               {email}
             </Text>
-            <Text style={{ color: "#64748b", fontSize: 13, textAlign: "center",
-              lineHeight: 22, marginBottom: 36 }}>
-              dan klik link reset password.{"\n"}
-              Setelah selesai, login kembali dengan password baru.
+            <Text style={{ color: "#64748b", fontSize: 12, textAlign: "center",
+              lineHeight: 20, marginBottom: 6 }}>
+              dan klik link reset password.
+            </Text>
+            <Text style={{ color: "#475569", fontSize: 11, textAlign: "center",
+              lineHeight: 18, marginBottom: 36 }}>
+              Email dikirim dari{" "}
+              <Text style={{ color: "#94a3b8", fontWeight: "600" }}>noreply@stockbot.id</Text>
+              {"\n"}Jika tidak ada di inbox, cek folder Spam.
             </Text>
 
             <View style={{ gap: 12, width: "100%" }}>
