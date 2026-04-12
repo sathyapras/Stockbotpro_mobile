@@ -17,20 +17,29 @@ const BASE = "https://stockbotpro.replit.app";
 
 // ─── Design tokens ────────────────────────────────────────────
 
-const AMBER = "hsl(45, 100%, 55%)";
+const AMBER = "#f5c518";
 
+// Hex colors — proper rgba() opacity support
 const STEP_ACCENTS = [
-  "hsl(189, 100%, 50%)", // Cyan
-  "hsl(45, 100%, 55%)",  // Amber
-  "hsl(189, 100%, 50%)", // Cyan
-  "hsl(280, 100%, 70%)", // Purple
-  "hsl(142, 55%, 48%)",  // Green
-  "hsl(120, 60%, 50%)",  // Lime
-  "hsl(350, 70%, 60%)",  // Rose
+  "#00d4ff", // Cyan
+  "#f5c518", // Amber
+  "#00d4ff", // Cyan
+  "#b87eff", // Purple
+  "#33cc66", // Green
+  "#44dd44", // Lime
+  "#e05252", // Rose
 ];
 
 function getAccent(idx: number) {
   return STEP_ACCENTS[idx % STEP_ACCENTS.length];
+}
+
+// Parse hex → rgba string
+function hexRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 // ─── Tips (hardcoded) ─────────────────────────────────────────
@@ -161,8 +170,8 @@ export default function TutorialScreen() {
                 style={[
                   styles.stepCard,
                   {
-                    borderColor: isOpen ? accent + "80" : "rgba(255,255,255,0.08)",
-                    backgroundColor: isOpen ? accent + "12" : "rgba(255,255,255,0.03)",
+                    borderColor:     isOpen ? hexRgba(accent, 0.5) : "rgba(255,255,255,0.08)",
+                    backgroundColor: isOpen ? hexRgba(accent, 0.07) : "rgba(255,255,255,0.03)",
                   },
                 ]}
               >
@@ -176,8 +185,8 @@ export default function TutorialScreen() {
                     style={[
                       styles.stepNumBox,
                       {
-                        backgroundColor: isOpen ? accent + "40" : accent + "18",
-                        borderColor:     isOpen ? accent + "90" : accent + "45",
+                        backgroundColor: isOpen ? hexRgba(accent, 0.25) : hexRgba(accent, 0.12),
+                        borderColor:     isOpen ? hexRgba(accent, 0.6)  : hexRgba(accent, 0.3),
                       },
                     ]}
                   >
@@ -204,7 +213,7 @@ export default function TutorialScreen() {
                     {parsed.link ? (
                       <TouchableOpacity
                         onPress={() => router.push(routeFromLink(parsed.link) as any)}
-                        style={[styles.stepLinkBtn, { borderColor: accent + "60" }]}
+                        style={[styles.stepLinkBtn, { borderColor: hexRgba(accent, 0.4) }]}
                       >
                         <Text style={[styles.stepLinkText, { color: accent }]}>
                           {parsed.linkLabel || "Buka"} →
