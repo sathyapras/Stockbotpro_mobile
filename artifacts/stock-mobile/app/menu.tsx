@@ -18,8 +18,8 @@ import { AppSettings, fetchSettings, whatsappUrl } from "@/services/settingsServ
 // ─── App info ─────────────────────────────────────────────────
 
 const APP_VERSION   = "5.0";
-const APP_NAME      = "StockBot Pro";
-const APP_TAGLINE   = "IDX Analysis";
+const APP_NAME      = "Stockbot Pro";
+const APP_TAGLINE   = "Market Intelligence Platform";
 
 // Ganti dengan URL app store setelah publish
 const PLAYSTORE_URL = "https://play.google.com/store/apps/details?id=com.stockbotpro";
@@ -41,7 +41,7 @@ function handleShare() {
   Share.share({
     title: `${APP_NAME} — ${APP_TAGLINE}`,
     message:
-      `📊 *${APP_NAME}* — Analisis Pasar IDX\n\n` +
+      `📊 *${APP_NAME}* — ${APP_TAGLINE}\n\n` +
       `Smart Money Flow, Radar Market, dan sinyal saham berbasis data institusional.\n\n` +
       `Download: ${PLAYSTORE_URL}`,
     url: PLAYSTORE_URL,
@@ -57,7 +57,7 @@ function handleRateUs() {
       } else {
         Alert.alert(
           "Rate Us",
-          "Terima kasih sudah menggunakan StockBot Pro!\nFitur rating akan tersedia setelah app dipublikasikan di store.",
+          "Terima kasih sudah menggunakan Stockbot Pro!\nFitur rating akan tersedia setelah app dipublikasikan di store.",
           [{ text: "OK" }]
         );
       }
@@ -275,23 +275,20 @@ export default function MenuScreen() {
       {/* ── App version badge ── */}
       <View style={{ alignItems: "center", marginTop: 28, marginBottom: 8, gap: 6 }}>
         <View style={{
-          flexDirection: "row", alignItems: "center", gap: 8,
           backgroundColor: "#1e2433", borderRadius: 20,
-          paddingHorizontal: 16, paddingVertical: 8,
+          paddingHorizontal: 20, paddingVertical: 10,
           borderWidth: 1, borderColor: "#0ea5e920",
+          alignItems: "center",
         }}>
-          <Text style={{ fontSize: 16 }}>📊</Text>
-          <View>
-            <Text style={{ color: "#e2e8f0", fontWeight: "800", fontSize: 13 }}>
-              {APP_NAME} · {APP_TAGLINE}
-            </Text>
-            <Text style={{ color: "#0ea5e9", fontSize: 11, fontWeight: "700", marginTop: 1 }}>
-              Versi {APP_VERSION} — Totally Rebuilt ✨
-            </Text>
-          </View>
+          <Text style={{ color: "#e2e8f0", fontWeight: "800", fontSize: 13 }}>
+            {APP_NAME} · {APP_TAGLINE}
+          </Text>
+          <Text style={{ color: "#0ea5e9", fontSize: 11, fontWeight: "700", marginTop: 3 }}>
+            Versi {APP_VERSION} — Totally Rebuilt ✨
+          </Text>
         </View>
         <Text style={{ color: "#1e293b", fontSize: 10 }}>
-          © 2025 StockBot Pro. All rights reserved.
+          © 2025 Stockbot Pro. All rights reserved.
         </Text>
       </View>
     </ScrollView>
