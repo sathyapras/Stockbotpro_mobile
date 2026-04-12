@@ -262,7 +262,7 @@ const ALL_FEATURES = [
   { icon: "📋", text: "Trading Log — jurnal trade BOW/BOS dengan kalkulasi P&L otomatis" },
   { icon: "🔭", text: "Market Intel — agregasi Broker Flow + Radar dalam satu dashboard" },
   { icon: "🌍", text: "Sentiment Global — pantau indikator makro & mood pasar dunia" },
-  { icon: "🛠️", text: "Stock Tools — kalkulator posisi, risk/reward & konverter lot instan" },
+  { icon: "🛠️", text: "Stock Tools — 18 strategi screener: Momentum, Reversal, Breakout & lebih" },
 ];
 
 const FEATURES: Record<string, string[]> = {
