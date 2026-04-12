@@ -190,7 +190,7 @@ function QuoteRow({ item, prefix }: { item: QuoteItem; prefix?: string }) {
   const styles = useStyles();
   const isUp = (item.changePct ?? 0) >= 0;
   const chgColor = isUp ? "#34d399" : "#f87171";
-  const noData = item.value == null;
+  const noData = item.value == null || item.value === 0;
 
   return (
     <View style={styles.quoteRow}>
@@ -467,9 +467,11 @@ export default function GlobalSentimentScreen() {
 
           {data && (
             <SectionCard title="🛢 Komoditas">
-              {data.commodities.map(item => (
-                <QuoteRow key={item.symbol} item={item} />
-              ))}
+              {data.commodities
+                .filter(item => item.value != null && item.value > 0)
+                .map(item => (
+                  <QuoteRow key={item.symbol} item={item} />
+                ))}
             </SectionCard>
           )}
 

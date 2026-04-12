@@ -110,7 +110,15 @@ GET /api/global-sentiment
 | `name` | string | Nama komoditas |
 | `changePct` | number | Perubahan % hari ini |
 
-Mobile hanya menampilkan komoditas yang `abs(changePct) >= 1.5%` sebagai "komoditas panas".
+Mobile hanya menampilkan komoditas yang `value > 0 AND abs(changePct) >= 1.5%` sebagai "komoditas panas".
+
+> **⚠️ Catatan penting:** Nickel, Tin, dan CPO Palm Oil kadang return `value: 0` dari Yahoo Finance (terutama LME instruments). Selalu filter `value > 0` terlebih dahulu sebelum cek `changePct`, agar item tanpa data tidak ikut ditampilkan.
+>
+> ```typescript
+> const komoditasPanas = (data.commodities ?? [])
+>   .filter(c => c.value != null && c.value > 0 && Math.abs(c.changePct ?? 0) >= 1.5)
+>   .sort((a, b) => Math.abs(b.changePct!) - Math.abs(a.changePct!));
+> ```
 
 Response saat ini sudah menyertakan:
 - `WTI Crude Oil` (CL=F)
