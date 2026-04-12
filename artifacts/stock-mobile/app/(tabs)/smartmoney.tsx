@@ -45,8 +45,8 @@ const TUTORIAL_ITEMS = [
   },
   {
     icon: "🏦",
-    title: "Smart Money 1 & 3",
-    body: "Broker dominan dengan volume terbesar di saham itu. SM1 = broker #1 terbesar, SM3 = top 3 broker. Label seperti 'Big Acc' artinya akumulasi besar.",
+    title: "Prime · Alpha · Echo Flow",
+    body: "Prime Flow (SM1): pelaku inti / bandar utama — broker #1 terbesar.\nAlpha Flow (SM3): pemain aktif / institusi + big players — top 3 broker.\nEcho Flow (SM5): jejak yang diikuti market / crowd effect — top 5 broker.\nLabel seperti 'Big Acc' artinya akumulasi besar.",
   },
   {
     icon: "📏",
@@ -250,17 +250,17 @@ function SmartMoneyCard({ stock, rank }: { stock: SmartMoneyItem; rank: number }
         <View style={{ gap: 1, alignItems: "flex-end" }}>
           {stock.top1Label && stock.top1Label !== "—" && (
             <Text style={{ color: "#475569", fontSize: 10 }}>
-              SM1: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{stock.top1Label}</Text>
+              Prime: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{stock.top1Label}</Text>
             </Text>
           )}
           {stock.top3Label && stock.top3Label !== "—" && (
             <Text style={{ color: "#475569", fontSize: 10 }}>
-              SM3: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{stock.top3Label}</Text>
+              Alpha: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{stock.top3Label}</Text>
             </Text>
           )}
           {stock.top5Label && stock.top5Label !== "—" && (
             <Text style={{ color: "#475569", fontSize: 10 }}>
-              SM5: <Text style={{ color: "#34d399", fontWeight: "700" }}>{stock.top5Label}</Text>
+              Echo: <Text style={{ color: "#34d399", fontWeight: "700" }}>{stock.top5Label}</Text>
             </Text>
           )}
         </View>

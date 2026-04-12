@@ -1196,17 +1196,17 @@ function SmartMoneyTab({ sm, radar, currentPrice, colors }: {
               <View style={{ marginTop: 10, gap: 4 }}>
                 {sm.top1Label ? (
                   <Text style={{ color: colors.foreground, fontSize: 11 }}>
-                    Smart Money 1: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{sm.top1Label}</Text>
+                    Prime Flow: <Text style={{ color: "#a78bfa", fontWeight: "700" }}>{sm.top1Label}</Text>
                   </Text>
                 ) : null}
                 {sm.top3Label ? (
                   <Text style={{ color: colors.foreground, fontSize: 11 }}>
-                    Smart Money 3: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{sm.top3Label}</Text>
+                    Alpha Flow: <Text style={{ color: "#60a5fa", fontWeight: "700" }}>{sm.top3Label}</Text>
                   </Text>
                 ) : null}
                 {sm.top5Label ? (
                   <Text style={{ color: colors.foreground, fontSize: 11 }}>
-                    Smart Money 5: <Text style={{ color: "#34d399", fontWeight: "700" }}>{sm.top5Label}</Text>
+                    Echo Flow: <Text style={{ color: "#34d399", fontWeight: "700" }}>{sm.top5Label}</Text>
                   </Text>
                 ) : null}
                 {sm.latestVwap ? (
