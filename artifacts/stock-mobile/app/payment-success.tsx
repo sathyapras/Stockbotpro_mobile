@@ -63,6 +63,8 @@ export default function PaymentSuccessScreen() {
           { icon: "🤖", text: "RoboCommentary — analisis AI 290+ saham IDX setiap hari" },
           { icon: "📊", text: "Chart + MA50 Distance, ADX & Support/Resistance" },
           { icon: "📋", text: "Trading Log — jurnal P&L otomatis per sinyal" },
+          { icon: "🌍", text: "Sentiment Global — indikator makro & mood pasar dunia" },
+          { icon: "🛠️", text: "Stock Tools — kalkulator posisi & risk/reward instan" },
         ].map((f, i) => (
           <View key={i} style={{ flexDirection: "row", alignItems: "flex-start",
             gap: 10, marginBottom: 8 }}>

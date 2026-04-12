@@ -261,6 +261,8 @@ const ALL_FEATURES = [
   { icon: "🔄", text: "Sector Rotation — pantau sektor Leading vs Lagging setiap sesi" },
   { icon: "📋", text: "Trading Log — jurnal trade BOW/BOS dengan kalkulasi P&L otomatis" },
   { icon: "🔭", text: "Market Intel — agregasi Broker Flow + Radar dalam satu dashboard" },
+  { icon: "🌍", text: "Sentiment Global — pantau indikator makro & mood pasar dunia" },
+  { icon: "🛠️", text: "Stock Tools — kalkulator posisi, risk/reward & konverter lot instan" },
 ];
 
 const FEATURES: Record<string, string[]> = {
