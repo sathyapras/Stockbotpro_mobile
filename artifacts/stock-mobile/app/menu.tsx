@@ -119,7 +119,7 @@ function buildMenuGroups(
       items: [
         {
           icon: "💹",
-          label: "BOS Explorer — Buy on Strength",
+          label: "Jejak Cuan",
           onPress: () => router.push("/bos" as any),
         },
       ],

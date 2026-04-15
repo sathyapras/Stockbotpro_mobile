@@ -566,9 +566,9 @@ export default function BosScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerTitle}>
-          <Text style={[styles.screenTitle, { color: "#34d399" }]}>📈 BOS Explorer</Text>
+          <Text style={[styles.screenTitle, { color: "#34d399" }]}>📈 Jejak Cuan</Text>
           <Text style={[styles.screenSub, { color: colors.mutedForeground }]}>
-            Buy on Strength Signal — AFL AmiBroker
+            Buy on Strength Signal
           </Text>
         </View>
 
