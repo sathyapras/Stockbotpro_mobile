@@ -406,33 +406,108 @@ export default function SectorRotationScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             !hintDismissed ? (
-              <TouchableOpacity
-                onPress={() => setHintDismissed(true)}
+              <View
                 style={{
-                  backgroundColor: "#0b1628", borderRadius: 12, padding: 12,
+                  backgroundColor: "#0b1628", borderRadius: 14,
                   marginBottom: 2, borderWidth: 1, borderColor: "#1e2d45",
+                  overflow: "hidden",
                 }}>
+                {/* Header */}
                 <View style={{
                   flexDirection: "row", justifyContent: "space-between",
-                  alignItems: "flex-start", marginBottom: 8,
+                  alignItems: "center", paddingHorizontal: 14, paddingVertical: 10,
+                  borderBottomWidth: 1, borderBottomColor: "#1e2d45",
                 }}>
-                  <Text style={{
-                    color: "#60a5fa", fontSize: 11, fontWeight: "700", letterSpacing: 1,
-                  }}>ℹ️  CARA BACA</Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>✕</Text>
+                  <Text style={{ color: "#60a5fa", fontSize: 12, fontWeight: "700", letterSpacing: 1 }}>
+                    ℹ️  CARA BACA
+                  </Text>
+                  <TouchableOpacity onPress={() => setHintDismissed(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={{ color: "#475569", fontSize: 16 }}>✕</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={{ gap: 5 }}>
+
+                {/* Section 1: Phase */}
+                <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 5 }}>
+                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
+                    FASE SEKTOR
+                  </Text>
                   {(Object.keys(PHASE_CONFIG) as PhaseKey[]).map(phase => (
-                    <Text key={phase} style={{ color: colors.mutedForeground, fontSize: 11 }}>
-                      {PHASE_CONFIG[phase].emoji}{" "}
-                      <Text style={{ fontWeight: "700", color: PHASE_CONFIG[phase].color }}>
-                        {phase}
+                    <View key={phase} style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
+                      <Text style={{ fontSize: 11 }}>{PHASE_CONFIG[phase].emoji}</Text>
+                      <Text style={{ flex: 1, color: "#94a3b8", fontSize: 11, lineHeight: 16 }}>
+                        <Text style={{ fontWeight: "700", color: PHASE_CONFIG[phase].color }}>
+                          {phase}
+                        </Text>
+                        {" — "}{PHASE_HINTS[phase]}
                       </Text>
-                      {" — "}{PHASE_HINTS[phase]}
-                    </Text>
+                    </View>
                   ))}
                 </View>
-              </TouchableOpacity>
+
+                {/* Divider */}
+                <View style={{ height: 1, backgroundColor: "#1e2d45", marginHorizontal: 14 }} />
+
+                {/* Section 2: SM Score */}
+                <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 4 }}>
+                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
+                    SM SCORE (LINGKARAN KANAN)
+                  </Text>
+                  <Text style={{ color: "#94a3b8", fontSize: 11, lineHeight: 16 }}>
+                    <Text style={{ color: "#a78bfa", fontWeight: "700" }}>0–100</Text>
+                    {" "}— rata-rata Smart Money Score semua saham dalam sektor. Semakin tinggi, semakin kuat akumulasi institusi di sektor tersebut.
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 3 }}>
+                    <Text style={{ color: "#94a3b8", fontSize: 11 }}>
+                      <Text style={{ color: "#34d399", fontWeight: "700" }}>≥70</Text> Kuat
+                    </Text>
+                    <Text style={{ color: "#94a3b8", fontSize: 11 }}>
+                      <Text style={{ color: "#f59e0b", fontWeight: "700" }}>50–69</Text> Moderat
+                    </Text>
+                    <Text style={{ color: "#94a3b8", fontSize: 11 }}>
+                      <Text style={{ color: "#f87171", fontWeight: "700" }}>&lt;50</Text> Lemah
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Divider */}
+                <View style={{ height: 1, backgroundColor: "#1e2d45", marginHorizontal: 14 }} />
+
+                {/* Section 3: RS */}
+                <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 4 }}>
+                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
+                    RS MOMENTUM (BAR HORIZONTAL)
+                  </Text>
+                  <Text style={{ color: "#94a3b8", fontSize: 11, lineHeight: 16 }}>
+                    Perubahan Relative Strength sektor dalam{" "}
+                    <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>2 minggu terakhir</Text>.
+                    Bar memanjang ke kanan (
+                    <Text style={{ color: "#34d399", fontWeight: "700" }}>↑ hijau</Text>
+                    ) = momentum naik. Bar ke kiri (
+                    <Text style={{ color: "#f87171", fontWeight: "700" }}>↓ merah</Text>
+                    ) = momentum melemah.
+                  </Text>
+                </View>
+
+                {/* Divider */}
+                <View style={{ height: 1, backgroundColor: "#1e2d45", marginHorizontal: 14 }} />
+
+                {/* Section 4: Akumulasi + Chip */}
+                <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12, gap: 4 }}>
+                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
+                    ANGKA DI KARTU SAHAM
+                  </Text>
+                  <Text style={{ color: "#94a3b8", fontSize: 11, lineHeight: 16 }}>
+                    <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>% Akumulasi</Text>
+                    {" "}= persentase saham dalam sektor yang sedang dalam fase akumulasi (net buy institusi aktif). Contoh: 59% (10/17) artinya 10 dari 17 saham sedang diakumulasi.
+                  </Text>
+                  <Text style={{ color: "#94a3b8", fontSize: 11, lineHeight: 16, marginTop: 4 }}>
+                    <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>Angka di chip saham</Text>
+                    {" "}= Bandar Score individual saham (0–100). Titik{" "}
+                    <Text style={{ color: "#34d399", fontWeight: "700" }}>● hijau</Text>
+                    {" "}= saham sedang diakumulasi. Tap chip untuk buka detail saham.
+                  </Text>
+                </View>
+              </View>
             ) : null
           }
           ListEmptyComponent={
