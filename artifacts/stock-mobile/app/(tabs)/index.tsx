@@ -434,10 +434,10 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
       detail: stats?.topScore ? `Flow Score ${stats.topScore.bandarScore}/100` : loading ? "Loading…" : "Belum ada data",
     },
     {
-      icon: "📡", label: "RADAR", sub: "Market Intel",
+      icon: "🔍", label: "SCREENER", sub: "Stock Tools",
       color: "#f97316", bg: "#1c0900", border: "#f97316aa",
-      path: "/market-intel",
-      metric: stats ? `${stats.bowCount} Ignition` : "—",
+      path: "/(tabs)/screener",
+      metric: stats ? `${stats.bowCount} Signal` : "—",
       detail: stats?.topEntry ? `↑ ${stats.topEntry.ticker}  Score ${stats.topEntry.bandarScore}` : loading ? "Loading…" : "Belum ada data",
     },
   ];
