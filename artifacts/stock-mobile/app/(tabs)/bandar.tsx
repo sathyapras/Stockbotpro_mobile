@@ -236,7 +236,7 @@ export default function BandarScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
 
   const [indexFilter, setIndexFilter] = useState<IndexFilter>("LQ45");
-  const [filterTab,   setFilterTab]   = useState<FilterTab>("all");
+  const [filterTab,   setFilterTab]   = useState<FilterTab>("acc");
   const [search,      setSearch]      = useState("");
 
   // ── Data ──
