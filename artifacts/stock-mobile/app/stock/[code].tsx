@@ -2098,8 +2098,16 @@ export default function StockDetailScreen() {
   const isHold = plan?.status?.toUpperCase().includes("HOLD") ?? false;
   const planTabLabel = isHold ? "Trading Position" : "Trading Plan";
 
+  // Auto-switch ke Chart kalau tidak ada BOW/BOS plan
+  React.useEffect(() => {
+    if (data && !data.plan && activeTab === "plan") {
+      setActiveTab("chart");
+    }
+  }, [data]);
+
+  // Tab "plan" hanya muncul kalau ada sinyal BOW/BOS aktif
   const tabs: { id: Tab; label: string }[] = [
-    { id: "plan",       label: planTabLabel    },
+    ...(plan ? [{ id: "plan" as Tab, label: planTabLabel }] : []),
     { id: "chart",      label: "Chart"         },
     { id: "financials", label: "TA & FA"       },
     { id: "smartmoney", label: "Smart Money"   },
@@ -2336,13 +2344,6 @@ export default function StockDetailScreen() {
                 isHold
                   ? <HoldModeContent plan={plan} price={quote?.price ?? 0} ticker={ticker} strategies={quote?.strategies ?? []} colors={colors} />
                   : <TradingPlanContent plan={plan} ms={data.masterStock} colors={colors} />
-              )}
-              {activeTab === "plan" && !plan && (
-                <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ color: colors.mutedForeground }}>
-                    Tidak ada trading plan
-                  </Text>
-                </View>
               )}
               {activeTab === "financials" && quote && (
                 <FinancialsTab
