@@ -306,6 +306,102 @@ function OpenSection({
   );
 }
 
+// ─── HoldSnapshotSection ──────────────────────────────────────
+
+function HoldCard({ trade }: { trade: OpenTrade }) {
+  const gl = trade.glPct;
+  const glStr = `${gl > 0 ? "+" : ""}${gl.toFixed(1)}%`;
+  const glCol = gl > 0 ? C.green : gl < 0 ? C.red : "#94a3b8";
+  return (
+    <View style={{
+      flexDirection:    "row",
+      alignItems:       "center",
+      gap:              10,
+      paddingVertical:  10,
+      paddingHorizontal: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: "#0f1729",
+    }}>
+      <View style={[styles.rowIcon, { backgroundColor: "rgba(0,180,255,0.1)" }]}>
+        <Text style={{ fontSize: 12 }}>📌</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={styles.symbol}>{trade.symbol}</Text>
+          <SignalBadge type={trade.signalType} />
+        </View>
+        <Text style={styles.tradeSubText}>
+          Entry {trade.entry.toLocaleString("id-ID")} · {trade.hold || `${trade.holdDays}h`}
+        </Text>
+      </View>
+      <Text style={[styles.pnlText, { color: glCol }]}>{glStr}</Text>
+    </View>
+  );
+}
+
+function HoldSnapshotSection({
+  open, token, onGoLogin,
+}: {
+  open: OpenTrade[]; token: string | null; onGoLogin: () => void;
+}) {
+  const bow2 = open.filter(t => t.signalType === "BOW").slice(0, 2);
+  const bos2 = open.filter(t => t.signalType === "BOS").slice(0, 2);
+  const hasData = bow2.length > 0 || bos2.length > 0;
+
+  return (
+    <View style={[styles.section, { marginBottom: 12 }]}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionIcon}>📌</Text>
+        <Text style={styles.sectionTitle}>Posisi Hold Aktif</Text>
+        {token && hasData && (
+          <Text style={styles.sectionCount}>{bow2.length + bos2.length} posisi</Text>
+        )}
+      </View>
+
+      {!token ? (
+        <View style={styles.authGate}>
+          <Text style={styles.lockIcon}>🔒</Text>
+          <Text style={styles.authTitle}>Login untuk melihat posisi hold</Text>
+          <Pressable style={styles.loginBtn} onPress={onGoLogin}>
+            <Text style={styles.loginBtnText}>Login / Daftar →</Text>
+          </Pressable>
+        </View>
+      ) : !hasData ? (
+        <Text style={styles.emptyText}>Tidak ada posisi hold saat ini</Text>
+      ) : (
+        <>
+          {bow2.length > 0 && (
+            <View>
+              <View style={{
+                paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4,
+                backgroundColor: "rgba(34,197,94,0.06)",
+              }}>
+                <Text style={{ fontSize: 10, fontWeight: "700", color: C.green, letterSpacing: 0.8 }}>
+                  BOW · Buy on Weakness
+                </Text>
+              </View>
+              {bow2.map((t, i) => <HoldCard key={i} trade={t} />)}
+            </View>
+          )}
+          {bos2.length > 0 && (
+            <View>
+              <View style={{
+                paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4,
+                backgroundColor: "rgba(59,130,246,0.06)",
+              }}>
+                <Text style={{ fontSize: 10, fontWeight: "700", color: "#3b82f6", letterSpacing: 0.8 }}>
+                  BOS · Buy on Strength
+                </Text>
+              </View>
+              {bos2.map((t, i) => <HoldCard key={i} trade={t} />)}
+            </View>
+          )}
+        </>
+      )}
+    </View>
+  );
+}
+
 // ─── FooterNote ───────────────────────────────────────────────
 
 function FooterNote({ meta }: { meta: JejakData["meta"] | null }) {
@@ -484,6 +580,13 @@ export default function JejakCuanScreen() {
             filteredClosed.map((t, i) => <ClosedRow key={i} trade={t} />)
           )}
         </View>
+
+        {/* Hold snapshot: 2 BOW + 2 BOS */}
+        <HoldSnapshotSection
+          open={openData}
+          token={token}
+          onGoLogin={() => router.push("/login" as any)}
+        />
 
         {/* Global empty state */}
         {!loading && data && data.closed.length === 0 && openData.length === 0 && (

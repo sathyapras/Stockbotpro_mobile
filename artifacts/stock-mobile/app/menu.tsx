@@ -113,19 +113,7 @@ function buildMenuGroups(
       ],
     },
 
-    // ── [2] Stock Tools ───────────────────────────────────────
-    {
-      section: "STOCK TOOLS",
-      items: [
-        {
-          icon: "💹",
-          label: "Jejak Cuan",
-          onPress: () => router.push("/bos" as any),
-        },
-      ],
-    },
-
-    // ── [3] Komunitas ─────────────────────────────────────────
+    // ── [2] Komunitas ─────────────────────────────────────────
     {
       section: "KOMUNITAS",
       items: [
