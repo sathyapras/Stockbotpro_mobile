@@ -397,10 +397,24 @@ function TradingPlanContent({ plan, ms, colors }: {
   );
 }
 
+// ─── Parse pipe-separated strategy chips from commentary ──────
+
+function parseStrategyChips(raw: string): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split("|")
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && s.length < 40);
+}
+
 // ─── Tab 1b: Hold Mode / Trading Position ────────────────────
 
-function HoldModeContent({ plan, price, colors }: {
-  plan: TradingPlan; price: number; colors: ReturnType<typeof useColors>;
+function HoldModeContent({ plan, price, ticker, strategies, colors }: {
+  plan: TradingPlan;
+  price: number;
+  ticker: string;
+  strategies: string[];
+  colors: ReturnType<typeof useColors>;
 }) {
   const pl = plan.type === "BOW" ? plan.holdPl : plan.glPct;
   const plColor = pl > 0 ? "#34d399" : pl < 0 ? "#f87171" : "#94a3b8";
@@ -409,6 +423,23 @@ function HoldModeContent({ plan, price, colors }: {
     ? ((plan.tp1 - price) / price * 100)
     : null;
   const daysHeld = plan.holdDays;
+
+  const { data: roboData } = useQuery<{ ticker: string; date: string; commentary: string }>({
+    queryKey: ["robocommentary", ticker],
+    queryFn: async () => {
+      const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const res = await fetch(`https://${d}/api/robocommentary/${encodeURIComponent(ticker)}`);
+      if (!res.ok) throw new Error("not found");
+      return res.json();
+    },
+    staleTime: 15 * 60 * 1000,
+    retry: 1,
+  });
+
+  // Merge: prefer quote strategies array, fallback to parsing plan.commentary
+  const chipList: string[] = strategies.length > 0
+    ? strategies
+    : parseStrategyChips(plan.commentary);
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}
@@ -504,8 +535,35 @@ function HoldModeContent({ plan, price, colors }: {
         </Text>
       </View>
 
-      {/* Commentary */}
-      <RoboCommentary commentary={plan.commentary} colors={colors} />
+      {/* Strategi Aktif — pill buttons */}
+      {chipList.length > 0 && (
+        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+          backgroundColor: colors.card, padding: 12 }}>
+          <SectionTitle title="STRATEGI AKTIF" colors={colors} />
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+            {chipList.map((s, i) => (
+              <View key={i} style={{
+                borderRadius: 8, borderWidth: 1,
+                backgroundColor: "#60a5fa18", borderColor: "#60a5fa50",
+                paddingHorizontal: 10, paddingVertical: 5,
+              }}>
+                <Text style={{ color: "#60a5fa", fontSize: 12, fontWeight: "700" }}>{s}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Robo Commentary — from API, not plan.commentary */}
+      {roboData?.commentary ? (
+        <View>
+          <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700",
+            letterSpacing: 0.5, marginBottom: 4 }}>
+            ROBO COMMENTARY · {roboData.date}
+          </Text>
+          <RoboCommentary commentary={roboData.commentary} colors={colors} showTitle={false} />
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -2267,7 +2325,7 @@ export default function StockDetailScreen() {
             <View style={{ flex: 1 }}>
               {activeTab === "plan" && plan && (
                 isHold
-                  ? <HoldModeContent plan={plan} price={quote?.price ?? 0} colors={colors} />
+                  ? <HoldModeContent plan={plan} price={quote?.price ?? 0} ticker={ticker} strategies={quote?.strategies ?? []} colors={colors} />
                   : <TradingPlanContent plan={plan} ms={data.masterStock} colors={colors} />
               )}
               {activeTab === "plan" && !plan && (
