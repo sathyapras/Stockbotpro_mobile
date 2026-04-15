@@ -113,7 +113,19 @@ function buildMenuGroups(
       ],
     },
 
-    // ── [2] Komunitas ─────────────────────────────────────────
+    // ── [2] Stock Tools ───────────────────────────────────────
+    {
+      section: "STOCK TOOLS",
+      items: [
+        {
+          icon: "💹",
+          label: "BOS Explorer — Buy on Strength",
+          onPress: () => router.push("/bos" as any),
+        },
+      ],
+    },
+
+    // ── [3] Komunitas ─────────────────────────────────────────
     {
       section: "KOMUNITAS",
       items: [

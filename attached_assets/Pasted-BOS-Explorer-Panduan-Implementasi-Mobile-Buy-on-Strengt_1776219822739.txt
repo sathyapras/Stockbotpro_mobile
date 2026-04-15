@@ -1,0 +1,480 @@
+BOS Explorer — Panduan Implementasi Mobile
+Buy on Strength Signal Screen
+Layar posisi terbuka & sinyal momentum naik dari AFL BuyOnStrength Explorer
+
+GAMBARAN UMUM
+Buy on Strength (BOS) adalah layar yang menampilkan portofolio sinyal aktif dari AFL BuyOnStrength Explorer — saham yang sedang dalam posisi terbuka (HOLD), baru mendapat sinyal beli (BUY), atau baru keluar posisi (SELL). Data diupload harian oleh admin via CSV.
+
+Bedanya dengan Stockpick biasa:
+
+Stockpick	BOS Explorer
+Data	Real-time API + screener	CSV upload harian oleh admin
+Konten	Kandidat entry	Posisi nyata yang sudah/sedang diambil
+Tab	Single list	3 tab: BUY / HOLD / SELL
+Field	Harga, signal, strength	Entry, SL, TP, G/L, Hold days, SL_Phase
+Sumber data: Upload CSV dari AmiBroker AFL Explorer oleh admin → disimpan di server → diambil via API.
+
+ENDPOINT
+GET https://stockbotpro.replit.app/api/bos
+Authorization: Bearer <JWT_TOKEN>
+
+Response sukses (200):
+
+{
+  "data": [
+    {
+      "symbol": "ADRO",
+      "date": "14-04-26",
+      "signal": "HOLD",
+      "trend": "Weak Bullish +",
+      "close": 2450,
+      "entry": 2460,
+      "stopLoss": 2340,
+      "slPct": 4.9,
+      "tp1": 2580,
+      "tp2": 2660,
+      "sellPrice": 0,
+      "glPct": -0.4,
+      "hold": "1 hari",
+      "highest": 2490,
+      "valB": 197.59,
+      "support": 2430,
+      "resistance": 2480,
+      "shortTrend": "Weak Bullish +",
+      "vwap": 2490,
+      "vwapTrend": "NAIK 3 bar",
+      "vwapPct": -1.7,
+      "vwapFilter": "[VWAP OK]",
+      "secTrend": "Energy BEAR",
+      "slPhase": "P1: Fixed SL 5% | SL=2340",
+      "exitReason": "",
+      "rr": 1.5,
+      "commentary": "VWAP naik namun harga masih di bawah..."
+    }
+  ],
+  "meta": {
+    "rows": 17,
+    "fileName": "BuyOnStrenght_Signal_14042026.csv",
+    "uploadedAt": "2026-04-14T08:30:00Z",
+    "approvedCount": 0
+  }
+}
+
+Response jika belum ada data (404):
+
+{ "error": "No BOS data uploaded yet" }
+
+FIELD LENGKAP
+Identifikasi
+Field	Tipe	Contoh	Keterangan
+symbol	string	"ADRO"	Kode saham IDX
+date	string	"14-04-26"	Tanggal sinyal dari AFL
+signal	string	"HOLD"	Lihat tabel klasifikasi di bawah
+trend	string	"Weak Bullish +"	Trend dari AFL
+close	number	2450	Harga penutupan terakhir (Rp)
+Entry & Risk Management
+Field	Tipe	Contoh	Keterangan
+entry	number	2460	Harga beli yang direkomendasikan
+stopLoss	number	2340	Level stop loss
+slPct	number	4.9	Jarak SL dari entry dalam %
+tp1	number	2580	Target profit 1
+tp2	number	2660	Target profit 2
+sellPrice	number	0	Harga jual aktual (0 = masih open)
+rr	number	1.5	Risk:Reward ratio (dihitung otomatis)
+Catatan slPct negatif: Jika slPct < 0, artinya StopLoss sudah di atas Entry — trailing stop sudah bergerak naik mengunci profit. Ini bukan error, ini kondisi positif.
+
+Contoh: slPct = -5.4, entry = 840, stopLoss = 885 → SL sudah di atas entry, posisi profit terlindungi.
+
+Performa Posisi
+Field	Tipe	Contoh	Keterangan
+glPct	number	-0.4	G/L saat ini dalam % (negatif = rugi)
+hold	string	"1 hari"	Berapa lama posisi sudah dibuka
+highest	number	2490	Harga tertinggi sejak entry
+VWAP
+Field	Tipe	Contoh	Keterangan
+vwap	number	2490	VWAP(5) — rata-rata 5 bar
+vwapTrend	string	"NAIK 3 bar"	Arah VWAP
+vwapPct	number	-1.7	% harga vs VWAP (negatif = di bawah VWAP)
+vwapFilter	string	"[VWAP OK]"	Status filter VWAP
+Nilai vwapTrend:
+
+"NAIK 3 bar" / "NAIK 2 bar" / "NAIK 1 bar" — VWAP naik
+"TURUN" — VWAP turun
+"FLAT" — VWAP sideways
+Nilai vwapFilter:
+
+"[VWAP OK]" ✅ — momentum VWAP mendukung
+"[VWAP FILTER: belum naik]" ⚠️ — VWAP belum naik, hati-hati
+"[VWAP BLOKIR: turun + harga di bawah]" 🚫 — blokir sinyal
+Fase Stop Loss (Baru)
+Field	Tipe	Contoh	Keterangan
+slPhase	string	"P1: Fixed SL 5% | SL=2340"	Fase manajemen risiko saat ini
+exitReason	string	"TrailStop/FixedSL" atau ""	Alasan exit (kosong = masih open)
+Nilai slPhase yang mungkin:
+
+Nilai	Arti	Aksi untuk user
+"P1: Fixed SL 5% | SL=XXXX"	Fase 1 — SL tetap di bawah entry	Pasang SL di level yang tertera
+"P2: TGT1 HIT Trail 3% ON"	Target 1 tercapai, trailing 3% aktif	Jual 50% posisi, aktifkan trailing stop
+"P2: Trail 3% | TS=XXXX"	Trailing stop sedang berjalan	SL sudah naik ke level TS yang tertera
+"P2: TGT2 HIT Locked TS=XXXX"	Target 2 tercapai, profit dikunci	Trailing stop terkunci di harga tertinggi
+Nilai exitReason:
+
+"" (kosong) — posisi masih open, belum ada alasan exit
+"TrailStop/FixedSL" — posisi ditutup karena trailing stop atau fixed SL tersentuh
+Konteks Pasar
+Field	Tipe	Contoh	Keterangan
+support	number	2430	Level support terdekat
+resistance	number	2480	Level resistance terdekat
+shortTrend	string	"Weak Bullish +"	Trend jangka pendek
+secTrend	string	"Energy BEAR"	Kondisi sektor
+valB	number	197.59	Volume transaksi dalam Miliar Rp
+commentary	string	"VWAP naik..."	Analisa naratif dari AFL
+KLASIFIKASI SIGNAL
+Engine AFL menghasilkan beberapa varian teks signal. Mobile harus memetakannya ke 3 tab:
+
+→ Tab BUY
+Signal yang mengandung "BUY" (case-insensitive):
+
+const isBuy = signal.toUpperCase().includes("BUY");
+// Contoh: "** BUY **", "Signal BUY", "BUY ON STRENGTH"
+
+→ Tab HOLD
+Signal yang mengandung "HOLD":
+
+const isHold = signal.toUpperCase().includes("HOLD");
+// Contoh: "HOLD", "Signal HOLD"
+
+→ Tab SELL
+Signal yang mengandung "SELL" atau "SOLD":
+
+const isSell = signal.toUpperCase().includes("SELL") ||
+               signal.toUpperCase().includes("SOLD");
+// Contoh: "SELL", "Signal SELL", "SOLD"
+
+STRUKTUR LAYAR
+Tab Bar (3 Tab)
+┌──────────────────────────────────┐
+│  📈 BOS Explorer                  │
+│  Data: 14 Apr 2026 · 17 posisi   │
+├──────────────────────────────────┤
+│  [BUY (N)] [HOLD (N)] [SELL (N)] │  ← sub-tab
+├──────────────────────────────────┤
+│  ┌────────────────────────────┐  │
+│  │  CARD SAHAM                │  │
+│  └────────────────────────────┘  │
+│  ┌────────────────────────────┐  │
+│  │  CARD SAHAM                │  │
+│  └────────────────────────────┘  │
+└──────────────────────────────────┘
+
+Tampilkan badge jumlah per tab:
+
+const buyCount  = data.filter(r => r.signal.toUpperCase().includes("BUY")).length;
+const holdCount = data.filter(r => r.signal.toUpperCase().includes("HOLD")).length;
+const sellCount = data.filter(
+  r => r.signal.toUpperCase().includes("SELL") || r.signal.toUpperCase().includes("SOLD")
+).length;
+
+CARD PER TAB
+Tab BUY — Sinyal Beli Baru
+┌──────────────────────────────────────────┐
+│ 🟢 BUY ON STRENGTH          [Trend badge]│
+│ BBNI                        Rp 4.390     │
+│ Entry: 4.370  SL: 4.170  TP1: 4.590     │
+│ R:R 1:1.5 · SL 4.8% · Vol 916B          │
+│ [slPhase pill]                           │
+│ VWAP: NAIK 2 bar · [VWAP OK]            │
+│ SecTrend: NOT MAPPED                     │
+│ ─────────────────────────────────────── │
+│ Commentary (2 baris truncated, tap buka) │
+└──────────────────────────────────────────┘
+
+Field yang ditampilkan di tab BUY:
+
+Elemen	Field	Format
+Kode saham	symbol	Bold besar
+Harga sekarang	close	Rp X.XXX
+Trend	trend	Badge warna
+Harga entry	entry	Entry: Rp X.XXX
+Stop loss	stopLoss	SL: Rp X.XXX
+Target 1	tp1	TP1: Rp X.XXX
+Target 2	tp2	TP2: Rp X.XXX (optional)
+Risk:Reward	rr	R:R 1:X.X
+Jarak SL	slPct	SL X.X%
+Fase SL	slPhase	Pill/badge (lihat bawah)
+Volume	valB	Vol XXX B
+VWAP	vwapTrend + vwapFilter	VWAP: NAIK X bar · [VWAP OK]
+Sektor	secTrend	Teks kecil
+Narasi	commentary	2 baris, tap untuk expand
+Tab HOLD — Posisi Sedang Berjalan
+┌──────────────────────────────────────────┐
+│ 🟡 HOLD POSITION            [Trend badge]│
+│ ADRO                        Rp 2.450    │
+│ Entry: 2.460  Highest: 2.490            │
+│ G/L: -0.4% · 1 hari                    │
+│ SL: 2.340 [P1: Fixed SL 5%]            │
+│ TP1: 2.580 · TP2: 2.660               │
+│ VWAP: NAIK 3 bar · [VWAP OK]           │
+│ SecTrend: Energy BEAR                   │
+└──────────────────────────────────────────┘
+
+Field yang ditampilkan di tab HOLD:
+
+Elemen	Field	Format
+Kode saham	symbol	Bold besar
+Harga sekarang	close	Rp X.XXX
+Harga entry	entry	Entry: Rp X.XXX
+Harga tertinggi	highest	Highest: Rp X.XXX
+G/L	glPct	G/L: +X.X% hijau / -X.X% merah
+Durasi hold	hold	X hari
+Stop loss + fase	stopLoss + slPhase	SL: X.XXX [Fase]
+Target 1 & 2	tp1, tp2	TP1: X.XXX · TP2: X.XXX
+VWAP	vwapTrend + vwapFilter	VWAP: NAIK X bar · [VWAP OK]
+Sektor	secTrend	Teks kecil, warna merah jika BEAR
+Narasi	commentary	2 baris, tap untuk expand
+Highlight khusus HOLD:
+
+Jika slPhase mengandung "TGT1 HIT" atau "TGT2 HIT":
+
+┌──────────────────────────────────────────┐
+│ 🎯 TARGET TERCAPAI!                      │
+│ Jual 50% posisi · Trail Stop aktif       │
+└──────────────────────────────────────────┘
+
+Tampilkan banner/callout ini di atas card saat target sudah hit.
+
+Tab SELL — Posisi Sudah Ditutup
+┌──────────────────────────────────────────┐
+│ 🔴 CLOSED · TrailStop/FixedSL           │
+│ BRMS                        Rp 860      │
+│ Entry: 840 → Sold: 885                  │
+│ G/L: +2.4% · 4 hari                    │
+│ TP1: 880 · TP2: 905 (sudah tercapai)   │
+│ P2: TGT2 HIT Locked TS=885             │
+│ [EXIT] Phase 1: Fixed SL 5% tersentuh  │
+└──────────────────────────────────────────┘
+
+Field yang ditampilkan di tab SELL:
+
+Elemen	Field	Format
+Kode saham	symbol	Bold besar
+Harga saat exit	sellPrice	Sold @ Rp X.XXX
+Arah: Entry → Sold	entry + sellPrice	Rp X.XXX → Rp X.XXX
+G/L final	glPct	+X.X% hijau / -X.X% merah
+Durasi hold	hold	X hari
+Alasan exit	exitReason	Badge / label
+Fase SL	slPhase	Teks info
+Target hit?	perbandingan close/sellPrice vs tp1/tp2	Label "TP1 Tercapai" / "TP2 Tercapai"
+Narasi	commentary	2 baris, tap untuk expand
+WARNA & STATUS BADGE
+Badge Trend
+Nilai trend	Warna	Label Singkat
+"Strong Bullish +++"	🟢 Hijau tua	Strong Bull
+"Weak Bullish +"	🟡 Hijau muda	Weak Bull
+"Weak Bearish -"	🟠 Oranye	Weak Bear
+"Strong Bearish ---"	🔴 Merah	Strong Bear
+Lainnya	Abu-abu	—
+Badge SL_Phase
+Kondisi	Warna	Label
+Mengandung "P1"	Abu-abu	P1: Fixed SL
+Mengandung "TGT1 HIT"	Biru	🎯 TP1 Hit · Trail ON
+Mengandung "Trail"	Cyan	🔒 Trail Active
+Mengandung "TGT2 HIT"	Ungu	🏆 TP2 Hit · Locked
+function getSLPhaseBadge(slPhase: string) {
+  if (!slPhase) return null;
+  const p = slPhase.toUpperCase();
+  if (p.includes("TGT2 HIT")) return { label: "🏆 TP2 Hit · Locked", color: "purple" };
+  if (p.includes("TGT1 HIT")) return { label: "🎯 TP1 Hit · Trail ON", color: "blue" };
+  if (p.includes("TRAIL"))    return { label: "🔒 Trail Active", color: "cyan" };
+  if (p.includes("P1"))       return { label: "P1: Fixed SL", color: "gray" };
+  return { label: slPhase, color: "gray" };
+}
+
+Warna G/L
+const glColor = glPct > 0 ? "#22c55e"   // hijau
+              : glPct < 0 ? "#ef4444"   // merah
+              : "#94a3b8";              // abu
+
+Badge SecTrend
+const isBearSector = secTrend.toUpperCase().includes("BEAR");
+// Jika BEAR: teks merah + icon ⚠️
+// Jika NOT MAPPED: abu-abu
+// Jika BULL: hijau
+
+Badge VWAP Filter
+function getVwapStatus(vwapFilter: string) {
+  const v = vwapFilter.toUpperCase();
+  if (v.includes("BLOKIR")) return { icon: "🚫", color: "red",    label: "VWAP BLOKIR" };
+  if (v.includes("FILTER")) return { icon: "⚠️", color: "orange", label: "VWAP FILTER" };
+  if (v.includes("OK"))     return { icon: "✅", color: "green",  label: "VWAP OK" };
+  return { icon: "—", color: "gray", label: vwapFilter };
+}
+
+SORTING DEFAULT
+Tab BUY: urutkan dari G/L tertinggi ke terendah (saham paling profit duluan)
+
+data.filter(isBuy).sort((a, b) => (b.glPct ?? 0) - (a.glPct ?? 0))
+
+Tab HOLD: urutkan dari G/L tertinggi ke terendah
+
+data.filter(isHold).sort((a, b) => (b.glPct ?? 0) - (a.glPct ?? 0))
+
+Tab SELL: urutkan dari yang paling baru exit (jika ada timestamp) atau dari G/L tertinggi
+
+data.filter(isSell).sort((a, b) => (b.glPct ?? 0) - (a.glPct ?? 0))
+
+DETAIL SCREEN (Bottom Sheet / Full Screen)
+Saat user tap sebuah card, tampilkan detail lengkap dalam bottom sheet atau halaman baru:
+
+┌──────────────────────────────────────────┐
+│ BRMS                                     │
+│ Weak Bearish · Energy BEAR               │
+│ ──────────────────────────────────────── │
+│ POSISI                                   │
+│  Entry          Rp 840                   │
+│  Stop Loss      Rp 885  (SL naik ↑)      │
+│  Target 1       Rp 880  ✅ Tercapai      │
+│  Target 2       Rp 905  ✅ Tercapai      │
+│  Sell Price     Rp 885                   │
+│  R:R            1 : —                    │
+│ ──────────────────────────────────────── │
+│ FASE SL                                  │
+│  [🏆 TP2 Hit · Locked TS=885]            │
+│  Exit: TrailStop/FixedSL                 │
+│ ──────────────────────────────────────── │
+│ PERFORMA                                 │
+│  G/L            +2.4%                    │
+│  Hold           4 hari                   │
+│  Highest        Rp 910                   │
+│  Vol Transaksi  Rp 529 B                 │
+│ ──────────────────────────────────────── │
+│ VWAP & TEKNIKAL                          │
+│  VWAP(5)        Rp 770                   │
+│  Trend VWAP     NAIK 3 bar               │
+│  Jarak vs VWAP  +11.9%                   │
+│  Filter         [VWAP OK] ✅             │
+│  Support        Rp 825                   │
+│  Resistance     Rp 900                   │
+│ ──────────────────────────────────────── │
+│ ANALISA AFL                              │
+│  [EXIT] Phase 1: Fixed SL 5% tersentuh. │
+│  Sold at SL=885. Target Price 1 dan 2   │
+│  telah tercapai.                         │
+└──────────────────────────────────────────┘
+
+LOGIKA TAMPIL "SL SUDAH NAIK"
+Jika slPct < 0, artinya trailing stop sudah bergerak di atas entry — tampilkan indikator positif:
+
+const isTrailingAboveEntry = row.slPct < 0;
+// Di card:
+if (isTrailingAboveEntry) {
+  // Tampilkan "SL naik ↑ Rp X.XXX" dengan teks hijau
+  // Bukan merah — ini adalah kondisi profit protection
+}
+
+Contoh tampilan:
+
+SL: Rp 885  ↑ di atas entry (profit protected)   ← hijau
+
+vs kondisi normal:
+
+SL: Rp 2.340  (4.9% dari entry)                  ← abu-abu/merah
+
+LOGIKA "TARGET SUDAH TERCAPAI"
+function getTargetStatus(row: BosRow) {
+  const phase = (row.slPhase ?? "").toUpperCase();
+  const tp2Hit = phase.includes("TGT2 HIT");
+  const tp1Hit = phase.includes("TGT1 HIT") || tp2Hit;
+  return {
+    tp1Hit,
+    tp2Hit,
+    trailActive: phase.includes("TRAIL"),
+    lockedAt: tp2Hit
+      ? row.slPhase.match(/TS=(\d+)/)?.[1] ?? null
+      : null,
+  };
+}
+
+Gunakan ini untuk menampilkan badge ✅ di samping TP1/TP2.
+
+EMPTY STATE
+Belum ada data upload:
+┌──────────────────────────────────────────┐
+│        📊                                │
+│   Data BOS Belum Tersedia                │
+│   Admin belum mengupload sinyal hari ini │
+│   Coba lagi besok pagi setelah          │
+│   market open (09:00 WIB)               │
+└──────────────────────────────────────────┘
+
+Tab kosong (misal tidak ada BUY hari ini):
+┌──────────────────────────────────────────┐
+│        ✅                                │
+│   Tidak Ada Sinyal BUY Hari Ini          │
+│   Semua posisi sedang dalam status HOLD  │
+└──────────────────────────────────────────┘
+
+HEADER INFO BAR
+Di atas tab, tampilkan info upload terakhir:
+
+// Dari meta.uploadedAt dan meta.fileName
+const uploadDate = new Date(meta.uploadedAt).toLocaleDateString("id-ID", {
+  day: "numeric", month: "long", year: "numeric"
+});
+// Tampilkan:
+// "Data: 14 April 2026 · 17 posisi"
+
+CONTOH DATA TIAP TAB (dari CSV 14 Apr 2026)
+Tab BUY
+Tidak ada sinyal BUY di CSV ini — semua sudah masuk HOLD atau SELL.
+
+Tab HOLD (15 posisi)
+ADRO  · G/L -0.4%  · 1 hari   · P1 Fixed SL
+BJBR  · G/L +3.7%  · 41 hari  · P1 Fixed SL
+BJTM  · G/L +0.9%  · 4 hari   · P1 Fixed SL
+BWPT  · G/L +3.1%  · 1 hari   · 🎯 TP1 Hit · Trail ON
+DMMX  · G/L +4.6%  · 1 hari   · 🎯 TP1 Hit · Trail ON
+JMAS  · G/L +8.3%  · 4 hari   · 🔒 Trail Active
+KBLI  · G/L -0.6%  · 3 hari   · P1 Fixed SL
+MLPL  · G/L +6.8%  · 2 hari   · 🎯 TP1 Hit · Trail ON
+PACK  · G/L +23.3% · 2 hari   · 🏆 TP2 Hit · Locked
+POWR  · G/L +1.4%  · 13 hari  · P1 Fixed SL
+ROTI  · G/L 0.0%   · 4 hari   · P1 Fixed SL
+SMSM  · G/L +0.6%  · 42 hari  · P1 Fixed SL
+SPTO  · G/L +2.3%  · 53 hari  · P1 Fixed SL
+TAPG  · G/L +2.7%  · 2 hari   · P1 Fixed SL
+UNTR  · G/L +1.2%  · 2 hari   · P1 Fixed SL
+
+Tab SELL (2 posisi)
+BRMS  · G/L +2.4%  · 4 hari   · 🏆 TP2 Hit · TrailStop exit
+CBRE  · G/L +10.0% · 4 hari   · 🏆 TP2 Hit · TrailStop exit
+
+NAVIGASI
+BOS Explorer bisa diakses dari:
+
+Menu / Hamburger
+    └── StockTools
+            └── Buy on Strength → BOS Explorer Screen
+
+Atau dari tab Tools jika ada shortcut langsung.
+
+CHECKLIST IMPLEMENTASI
+Backend (✅ Sudah live)
+ GET /api/bos — return data + meta
+ POST /api/bos — upload data (admin only)
+ DELETE /api/bos — hapus data (admin only)
+ Field slPhase dan exitReason sudah tersedia di response
+ Normalisasi AFL JSON dan CSV format di backend
+Mobile (TODO)
+ Screen BosExplorer dengan 3 sub-tab (BUY / HOLD / SELL)
+ Fetch GET /api/bos dengan Bearer token
+ Handle 404 → empty state "belum ada data"
+ Card component dengan field sesuai tiap tab
+ Badge SL_Phase dengan warna sesuai fase
+ Badge secTrend merah jika BEAR
+ Indikator "SL naik ↑" jika slPct < 0
+ Banner "🎯 Target Tercapai" jika slPhase contains TGT1 HIT / TGT2 HIT
+ Detail bottom sheet dengan semua field
+ Header info bar: tanggal upload + jumlah posisi
+ Sort per tab: G/L tertinggi di atas
+ Register di navigasi (Menu → StockTools → Buy on Stre

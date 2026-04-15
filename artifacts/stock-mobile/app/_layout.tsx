@@ -112,6 +112,9 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
       <Stack.Screen name="edit-profile"     options={{ headerShown: false }} />
       <Stack.Screen name="change-password"    options={{ headerShown: false }} />
       <Stack.Screen name="forgot-password"    options={{ headerShown: false }} />
+      <Stack.Screen name="bos"               options={{ headerShown: false }} />
+      <Stack.Screen name="buka-rekening"     options={{ headerShown: false }} />
+      <Stack.Screen name="sector-rotation"   options={{ headerShown: false }} />
     </Stack>
   );
 }
