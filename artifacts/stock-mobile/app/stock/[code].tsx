@@ -2098,16 +2098,18 @@ export default function StockDetailScreen() {
   const isHold = plan?.status?.toUpperCase().includes("HOLD") ?? false;
   const planTabLabel = isHold ? "Trading Position" : "Trading Plan";
 
-  // Auto-switch ke Chart kalau tidak ada BOW/BOS plan
+  const hasBowBosPlan = plan?.type === "BOW" || plan?.type === "BOS";
+
+  // Auto-switch ke Chart kalau plan bukan BOW/BOS
   React.useEffect(() => {
-    if (data && !data.plan && activeTab === "plan") {
+    if (data && !hasBowBosPlan && activeTab === "plan") {
       setActiveTab("chart");
     }
   }, [data]);
 
-  // Tab "plan" hanya muncul kalau ada sinyal BOW/BOS aktif
+  // Tab "plan" hanya muncul kalau ada sinyal BOW atau BOS aktif (bukan COMPUTED)
   const tabs: { id: Tab; label: string }[] = [
-    ...(plan ? [{ id: "plan" as Tab, label: planTabLabel }] : []),
+    ...(hasBowBosPlan ? [{ id: "plan" as Tab, label: planTabLabel }] : []),
     { id: "chart",      label: "Chart"         },
     { id: "financials", label: "TA & FA"       },
     { id: "smartmoney", label: "Smart Money"   },
