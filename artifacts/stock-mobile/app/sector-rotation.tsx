@@ -4,7 +4,9 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -296,6 +298,133 @@ function SectorCard({ sector, rank }: { sector: SectorData; rank: number }) {
   );
 }
 
+// ─── Cara Baca Modal ──────────────────────────────────────────
+
+function CaraBacaModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const colors = useColors();
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={onClose}>
+      <Pressable
+        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" }}
+        onPress={onClose}>
+        <Pressable onPress={e => e.stopPropagation()}>
+          <View style={{
+            backgroundColor: "#0b1628", borderTopLeftRadius: 20, borderTopRightRadius: 20,
+            borderTopWidth: 1, borderColor: "#1e2d45", paddingBottom: 32,
+          }}>
+            {/* Handle bar */}
+            <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 4 }}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: "#334155" }} />
+            </View>
+
+            {/* Title row */}
+            <View style={{
+              flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+              paddingHorizontal: 18, paddingVertical: 12,
+              borderBottomWidth: 1, borderBottomColor: "#1e2d45",
+            }}>
+              <Text style={{ color: "#60a5fa", fontSize: 13, fontWeight: "700", letterSpacing: 1 }}>
+                ℹ️  CARA BACA
+              </Text>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={{ color: "#475569", fontSize: 20 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 14, gap: 0 }}>
+
+              {/* Fase Sektor */}
+              <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 }}>
+                FASE SEKTOR
+              </Text>
+              <View style={{ gap: 6, marginBottom: 16 }}>
+                {(Object.keys(PHASE_CONFIG) as PhaseKey[]).map(phase => (
+                  <View key={phase} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                    <Text style={{ fontSize: 13 }}>{PHASE_CONFIG[phase].emoji}</Text>
+                    <Text style={{ flex: 1, color: "#94a3b8", fontSize: 12, lineHeight: 17 }}>
+                      <Text style={{ fontWeight: "700", color: PHASE_CONFIG[phase].color }}>
+                        {phase}
+                      </Text>
+                      {" — "}{PHASE_HINTS[phase]}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={{ height: 1, backgroundColor: "#1e2d45", marginBottom: 16 }} />
+
+              {/* SM Score */}
+              <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 }}>
+                SM SCORE · LINGKARAN KANAN
+              </Text>
+              <Text style={{ color: "#94a3b8", fontSize: 12, lineHeight: 17, marginBottom: 8 }}>
+                Rata-rata{" "}
+                <Text style={{ color: "#a78bfa", fontWeight: "700" }}>Smart Money Score (0–100)</Text>
+                {" "}seluruh saham dalam sektor. Semakin tinggi, semakin kuat akumulasi institusi.
+              </Text>
+              <View style={{ flexDirection: "row", gap: 14, marginBottom: 16 }}>
+                {[
+                  { range: "≥ 70", label: "Kuat", color: "#34d399" },
+                  { range: "50–69", label: "Moderat", color: "#f59e0b" },
+                  { range: "< 50", label: "Lemah", color: "#f87171" },
+                ].map(item => (
+                  <View key={item.range} style={{
+                    flex: 1, backgroundColor: "#0f1729", borderRadius: 8, padding: 8,
+                    alignItems: "center", borderWidth: 1, borderColor: item.color + "40",
+                  }}>
+                    <Text style={{ color: item.color, fontWeight: "800", fontSize: 14 }}>{item.range}</Text>
+                    <Text style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={{ height: 1, backgroundColor: "#1e2d45", marginBottom: 16 }} />
+
+              {/* RS Momentum */}
+              <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 }}>
+                RS MOMENTUM · BAR HORIZONTAL
+              </Text>
+              <Text style={{ color: "#94a3b8", fontSize: 12, lineHeight: 17, marginBottom: 16 }}>
+                Perubahan Relative Strength sektor dalam{" "}
+                <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>2 minggu terakhir</Text>.
+                Bar{" "}
+                <Text style={{ color: "#34d399", fontWeight: "700" }}>↑ hijau ke kanan</Text>
+                {" "}= momentum naik. Bar{" "}
+                <Text style={{ color: "#f87171", fontWeight: "700" }}>↓ merah ke kiri</Text>
+                {" "}= momentum melemah.
+              </Text>
+
+              <View style={{ height: 1, backgroundColor: "#1e2d45", marginBottom: 16 }} />
+
+              {/* Angka di chip */}
+              <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 8 }}>
+                ANGKA DI CHIP SAHAM
+              </Text>
+              <Text style={{ color: "#94a3b8", fontSize: 12, lineHeight: 17, marginBottom: 6 }}>
+                <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>% Akumulasi (n/total)</Text>
+                {" "}— persentase saham dalam sektor yang sedang dalam fase akumulasi (net buy institusi aktif).
+              </Text>
+              <Text style={{ color: "#94a3b8", fontSize: 12, lineHeight: 17, marginBottom: 4 }}>
+                <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>Angka di chip</Text>
+                {" "}= Bandar Score individual saham (0–100).{" "}
+                <Text style={{ color: "#34d399", fontWeight: "700" }}>● Titik hijau</Text>
+                {" "}= saham sedang diakumulasi. Tap chip untuk buka detail saham.
+              </Text>
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────
 
 export default function SectorRotationScreen() {
@@ -303,9 +432,9 @@ export default function SectorRotationScreen() {
   const colors = useColors();
   const topPad = Platform.OS === "web" ? 67 : insets.top + 8;
 
-  const [sortBy,       setSortBy]       = useState<SortMode>("sm");
-  const [filterPhase,  setFilterPhase]  = useState<PhaseKey | null>(null);
-  const [hintDismissed, setHintDismissed] = useState(false);
+  const [sortBy,      setSortBy]      = useState<SortMode>("sm");
+  const [filterPhase, setFilterPhase] = useState<PhaseKey | null>(null);
+  const [showCaraBaca, setShowCaraBaca] = useState(false);
 
   const { data: stocks = [], isLoading: loadingStocks } = useQuery({
     queryKey: ["master-stock"],
@@ -363,18 +492,29 @@ export default function SectorRotationScreen() {
             </Text>
           )}
         </View>
-        <TouchableOpacity
-          onPress={() => setSortBy(s => s === "sm" ? "phase" : "sm")}
-          style={{
-            flexDirection: "row", alignItems: "center", gap: 4,
-            backgroundColor: colors.card, borderRadius: 8,
-            paddingHorizontal: 10, paddingVertical: 5,
-            borderWidth: 1, borderColor: "#1e293b",
-          }}>
-          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-            {sortBy === "sm" ? "SM Score ▼" : "Phase ▼"}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+          <TouchableOpacity
+            onPress={() => setShowCaraBaca(true)}
+            style={{
+              width: 32, height: 32, borderRadius: 16,
+              backgroundColor: colors.card, borderWidth: 1, borderColor: "#1e293b",
+              alignItems: "center", justifyContent: "center",
+            }}>
+            <Text style={{ color: "#60a5fa", fontSize: 15 }}>ℹ</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setSortBy(s => s === "sm" ? "phase" : "sm")}
+            style={{
+              flexDirection: "row", alignItems: "center", gap: 4,
+              backgroundColor: colors.card, borderRadius: 8,
+              paddingHorizontal: 10, paddingVertical: 5,
+              borderWidth: 1, borderColor: "#1e293b",
+            }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+              {sortBy === "sm" ? "SM Score ▼" : "Phase ▼"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Summary Strip (phase donuts) ── */}
@@ -404,112 +544,6 @@ export default function SectorRotationScreen() {
           )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 90, gap: 10, paddingTop: 12 }}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            !hintDismissed ? (
-              <View
-                style={{
-                  backgroundColor: "#0b1628", borderRadius: 14,
-                  marginBottom: 2, borderWidth: 1, borderColor: "#1e2d45",
-                  overflow: "hidden",
-                }}>
-                {/* Header */}
-                <View style={{
-                  flexDirection: "row", justifyContent: "space-between",
-                  alignItems: "center", paddingHorizontal: 14, paddingVertical: 10,
-                  borderBottomWidth: 1, borderBottomColor: "#1e2d45",
-                }}>
-                  <Text style={{ color: "#60a5fa", fontSize: 12, fontWeight: "700", letterSpacing: 1 }}>
-                    ℹ️  CARA BACA
-                  </Text>
-                  <TouchableOpacity onPress={() => setHintDismissed(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={{ color: "#475569", fontSize: 16 }}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Section 1: Phase */}
-                <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 5 }}>
-                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
-                    FASE SEKTOR
-                  </Text>
-                  {(Object.keys(PHASE_CONFIG) as PhaseKey[]).map(phase => (
-                    <View key={phase} style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
-                      <Text style={{ fontSize: 11 }}>{PHASE_CONFIG[phase].emoji}</Text>
-                      <Text style={{ flex: 1, color: "#94a3b8", fontSize: 11, lineHeight: 16 }}>
-                        <Text style={{ fontWeight: "700", color: PHASE_CONFIG[phase].color }}>
-                          {phase}
-                        </Text>
-                        {" — "}{PHASE_HINTS[phase]}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Divider */}
-                <View style={{ height: 1, backgroundColor: "#1e2d45", marginHorizontal: 14 }} />
-
-                {/* Section 2: SM Score */}
-                <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 4 }}>
-                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
-                    SM SCORE (LINGKARAN KANAN)
-                  </Text>
-                  <Text style={{ color: "#94a3b8", fontSize: 11, lineHeight: 16 }}>
-                    <Text style={{ color: "#a78bfa", fontWeight: "700" }}>0–100</Text>
-                    {" "}— rata-rata Smart Money Score semua saham dalam sektor. Semakin tinggi, semakin kuat akumulasi institusi di sektor tersebut.
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: 10, marginTop: 3 }}>
-                    <Text style={{ color: "#94a3b8", fontSize: 11 }}>
-                      <Text style={{ color: "#34d399", fontWeight: "700" }}>≥70</Text> Kuat
-                    </Text>
-                    <Text style={{ color: "#94a3b8", fontSize: 11 }}>
-                      <Text style={{ color: "#f59e0b", fontWeight: "700" }}>50–69</Text> Moderat
-                    </Text>
-                    <Text style={{ color: "#94a3b8", fontSize: 11 }}>
-                      <Text style={{ color: "#f87171", fontWeight: "700" }}>&lt;50</Text> Lemah
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Divider */}
-                <View style={{ height: 1, backgroundColor: "#1e2d45", marginHorizontal: 14 }} />
-
-                {/* Section 3: RS */}
-                <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 4 }}>
-                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
-                    RS MOMENTUM (BAR HORIZONTAL)
-                  </Text>
-                  <Text style={{ color: "#94a3b8", fontSize: 11, lineHeight: 16 }}>
-                    Perubahan Relative Strength sektor dalam{" "}
-                    <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>2 minggu terakhir</Text>.
-                    Bar memanjang ke kanan (
-                    <Text style={{ color: "#34d399", fontWeight: "700" }}>↑ hijau</Text>
-                    ) = momentum naik. Bar ke kiri (
-                    <Text style={{ color: "#f87171", fontWeight: "700" }}>↓ merah</Text>
-                    ) = momentum melemah.
-                  </Text>
-                </View>
-
-                {/* Divider */}
-                <View style={{ height: 1, backgroundColor: "#1e2d45", marginHorizontal: 14 }} />
-
-                {/* Section 4: Akumulasi + Chip */}
-                <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12, gap: 4 }}>
-                  <Text style={{ color: "#94a3b8", fontSize: 10, fontWeight: "700", letterSpacing: 0.8, marginBottom: 2 }}>
-                    ANGKA DI KARTU SAHAM
-                  </Text>
-                  <Text style={{ color: "#94a3b8", fontSize: 11, lineHeight: 16 }}>
-                    <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>% Akumulasi</Text>
-                    {" "}= persentase saham dalam sektor yang sedang dalam fase akumulasi (net buy institusi aktif). Contoh: 59% (10/17) artinya 10 dari 17 saham sedang diakumulasi.
-                  </Text>
-                  <Text style={{ color: "#94a3b8", fontSize: 11, lineHeight: 16, marginTop: 4 }}>
-                    <Text style={{ color: "#e2e8f0", fontWeight: "600" }}>Angka di chip saham</Text>
-                    {" "}= Bandar Score individual saham (0–100). Titik{" "}
-                    <Text style={{ color: "#34d399", fontWeight: "700" }}>● hijau</Text>
-                    {" "}= saham sedang diakumulasi. Tap chip untuk buka detail saham.
-                  </Text>
-                </View>
-              </View>
-            ) : null
-          }
           ListEmptyComponent={
             <View style={{ alignItems: "center", paddingTop: 60, gap: 10 }}>
               <Text style={{ fontSize: 32 }}>🔄</Text>
@@ -522,6 +556,9 @@ export default function SectorRotationScreen() {
           }
         />
       )}
+
+      {/* ── Cara Baca Modal ── */}
+      <CaraBacaModal visible={showCaraBaca} onClose={() => setShowCaraBaca(false)} />
     </View>
   );
 }
