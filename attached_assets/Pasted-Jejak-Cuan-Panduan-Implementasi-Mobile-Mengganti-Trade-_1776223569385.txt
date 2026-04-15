@@ -1,0 +1,924 @@
+Jejak Cuan — Panduan Implementasi Mobile
+Mengganti Trade Log Screen menjadi Jejak Cuan
+Screen ini menggantikan tampilan lama "Trade Log" (jurnal trade personal per device)
+menjadi Jejak Cuan — rekam jejak publik sinyal BOW & BOS dari admin, bukan catatan pribadi user.
+
+PERBEDAAN UTAMA: Trade Log vs Jejak Cuan
+Trade Log (lama)	Jejak Cuan (baru)
+Sumber data	Input manual oleh user per device	Sinyal resmi BOW & BOS dari admin
+Akses	Private (per deviceId)	Closed: publik · Open: login required
+Tombol "+ Tambah"	Ada — user mencatat sendiri	Hapus — data otomatis dari server
+P&L	Hitung dari entry/exit user	Langsung dari field glPct server
+Endpoint	/api/trading-log	/api/jejak-cuan
+Filter	SEMUA / OPEN / CLOSED	SEMUA / BOS / BOW
+ARSITEKTUR SCREEN
+JejakCuanScreen
+├── Header                — judul + subtitle + refresh button
+├── FilterTabs            — SEMUA / BOS / BOW  
+├── StatsBar              — Win Rate · Total Trade · Avg P&L · Avg Hold
+├── MonthlyChart          — bar chart P&L bulanan (opsional, pakai Victory Native)
+├── OpenSection           — posisi sedang berjalan (auth gate)
+│   ├── AuthGate          — tampil Lock + tombol Login jika belum login
+│   └── FlatList<OpenRow> — list posisi open (hanya untuk user login)
+├── ClosedSection         — riwayat posisi closed (publik)
+│   └── FlatList<ClosedRow>
+├── FooterNote            — keterangan + timestamp update
+└── EmptyState            — saat belum ada data sama sekali
+
+ENDPOINT API
+1. Data Publik (Stats + Monthly + Closed)
+GET https://stockbotpro.replit.app/api/jejak-cuan
+
+Tidak perlu Authorization header. Akses publik.
+
+Response:
+
+{
+  "ok": true,
+  "stats": {
+    "combined": {
+      "total": 42,
+      "wins": 28,
+      "losses": 14,
+      "winRate": 66.7,
+      "avgPnl": 4.2,
+      "totalPnl": 176.4,
+      "avgHoldDays": 8
+    },
+    "bos": { "total": 20, "wins": 14, "losses": 6, "winRate": 70, "avgPnl": 5.1, "totalPnl": 102, "avgHoldDays": 6 },
+    "bow": { "total": 22, "wins": 14, "losses": 8, "winRate": 63.6, "avgPnl": 3.4, "totalPnl": 74.4, "avgHoldDays": 10 }
+  },
+  "monthly": [
+    { "month": "2026-03", "label": "Mar '26", "pnl": 18.4, "winRate": 72, "total": 11, "wins": 8 }
+  ],
+  "closed": [
+    {
+      "symbol": "BBRI",
+      "date": "2026-04-10",
+      "signalType": "BOW",
+      "glPct": 8.3,
+      "holdDays": 12,
+      "entry": 4800,
+      "exitPrice": 5200,
+      "exitReason": "TP1 Hit",
+      "trend": "Strong Bullish",
+      "win": true
+    }
+  ],
+  "meta": {
+    "bosUploadedAt": "2026-04-15T03:00:00.000Z",
+    "bowUploadedAt": "2026-04-15T03:00:00.000Z"
+  }
+}
+
+2. Data Open Positions (Butuh Login)
+GET https://stockbotpro.replit.app/api/jejak-cuan/open
+Authorization: Bearer <JWT_TOKEN>
+
+Jika tidak ada token → server reply 401 Unauthorized.
+
+Response sukses:
+
+{
+  "ok": true,
+  "total": 7,
+  "open": [
+    {
+      "symbol": "ADRO",
+      "date": "2026-04-08",
+      "signalType": "BOS",
+      "signal": "HOLD",
+      "glPct": 3.2,
+      "holdDays": 7,
+      "entry": 2460,
+      "close": 2539,
+      "stopLoss": 2310,
+      "tp1": 2580,
+      "tp2": 2660,
+      "hold": "7 hari",
+      "slPhase": "TGT1 HIT Trail ON",
+      "trend": "Strong Bullish +"
+    }
+  ]
+}
+
+TIPE DATA
+type SignalFilter = "SEMUA" | "BOS" | "BOW";
+interface Stats {
+  total: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  avgPnl: number;
+  totalPnl: number;
+  avgHoldDays: number;
+}
+interface MonthlyItem {
+  month: string;      // "2026-03"
+  label: string;      // "Mar '26"
+  pnl: number;        // total P&L bulan tsb (%)
+  winRate: number;
+  total: number;
+  wins: number;
+}
+interface ClosedTrade {
+  symbol: string;
+  date: string;
+  signalType: "BOS" | "BOW";
+  glPct: number;
+  holdDays: number;
+  entry: number;
+  exitPrice: number;
+  exitReason: string;
+  trend: string;
+  win: boolean;
+}
+interface OpenTrade {
+  symbol: string;
+  date: string;
+  signalType: "BOS" | "BOW";
+  signal: string;     // "HOLD" | "BUY"
+  glPct: number;
+  holdDays: number;
+  entry: number;
+  close: number;
+  stopLoss: number;
+  tp1: number;
+  tp2: number;
+  hold: string;       // "7 hari"
+  slPhase: string;    // "TGT1 HIT Trail ON"
+  trend: string;
+}
+interface JejakData {
+  stats: { combined: Stats; bos: Stats; bow: Stats };
+  monthly: MonthlyItem[];
+  closed: ClosedTrade[];
+  meta: { bosUploadedAt: string | null; bowUploadedAt: string | null };
+}
+
+STATE SCREEN
+const BASE = "https://stockbotpro.replit.app/api";
+// — Auth token (dari login screen, disimpan di SecureStore)
+const [token,      setToken]      = useState<string | null>(null);
+const [user,       setUser]       = useState<any>(null);
+// — Data publik
+const [data,       setData]       = useState<JejakData | null>(null);
+const [loading,    setLoading]    = useState(true);
+const [error,      setError]      = useState<string | null>(null);
+// — Data open (hanya jika login)
+const [openData,   setOpenData]   = useState<OpenTrade[]>([]);
+const [openLoading,setOpenLoading]= useState(false);
+// — Filter tab
+const [filter,     setFilter]     = useState<SignalFilter>("SEMUA");
+// — Stats tampil (derived dari filter)
+const stats = filter === "BOS" ? data?.stats.bos
+            : filter === "BOW" ? data?.stats.bow
+            : data?.stats.combined ?? null;
+const filteredClosed = (data?.closed ?? []).filter(t =>
+  filter === "SEMUA" || t.signalType === filter
+);
+const filteredOpen = openData.filter(t =>
+  filter === "SEMUA" || t.signalType === filter
+);
+
+LOAD DATA SAAT MOUNT
+useEffect(() => {
+  loadToken();
+  fetchPublic();
+}, []);
+async function loadToken() {
+  const t = await SecureStore.getItemAsync("stockbot-auth-token");
+  setToken(t);
+  if (t) fetchOpen(t);
+}
+async function fetchPublic() {
+  setLoading(true);
+  setError(null);
+  try {
+    const res  = await fetch(`${BASE}/jejak-cuan`);
+    const json = await res.json();
+    if (json.ok) setData(json);
+    else throw new Error(json.error ?? "Gagal memuat");
+  } catch (e: any) {
+    setError(e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+async function fetchOpen(t: string) {
+  setOpenLoading(true);
+  try {
+    const res  = await fetch(`${BASE}/jejak-cuan/open`, {
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    if (res.status === 401) { setOpenData([]); return; }
+    const json = await res.json();
+    if (json.ok) setOpenData(json.open ?? []);
+  } catch {
+    setOpenData([]);
+  } finally {
+    setOpenLoading(false);
+  }
+}
+function handleRefresh() {
+  fetchPublic();
+  if (token) fetchOpen(token);
+}
+
+HEADER SCREEN
+Hapus tombol "+ Tambah" yang ada di Trade Log lama. Ganti dengan tombol refresh.
+
+function ScreenHeader({ onRefresh, loading }) {
+  return (
+    <View style={styles.header}>
+      <View>
+        <Text style={styles.headerTitle}>Jejak Cuan</Text>
+        <Text style={styles.headerSub}>Rekam jejak sinyal BOW & BOS</Text>
+      </View>
+      <Pressable style={styles.refreshBtn} onPress={onRefresh} disabled={loading}>
+        <Text style={[styles.refreshIcon, loading && { opacity: 0.4 }]}>🔄</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+header: {
+  flexDirection:  "row",
+  alignItems:     "center",
+  justifyContent: "space-between",
+  paddingHorizontal: 16,
+  paddingTop:  16,
+  paddingBottom: 8,
+},
+headerTitle: {
+  fontSize:   22,
+  fontWeight: "800",
+  color:      "#f1f5f9",
+  letterSpacing: 0.2,
+},
+headerSub: {
+  fontSize: 12,
+  color:    "#475569",
+  marginTop: 2,
+},
+refreshBtn: {
+  width:  36,
+  height: 36,
+  borderRadius:    18,
+  backgroundColor: "#0f1729",
+  alignItems:      "center",
+  justifyContent:  "center",
+  borderWidth: 1,
+  borderColor: "#1e293b",
+},
+refreshIcon: {
+  fontSize: 16,
+},
+
+FILTER TABS (SEMUA / BOS / BOW)
+const TABS: SignalFilter[] = ["SEMUA", "BOS", "BOW"];
+function FilterTabs({ active, onChange }) {
+  return (
+    <View style={styles.tabRow}>
+      {TABS.map((tab) => (
+        <Pressable
+          key={tab}
+          style={[styles.tab, active === tab && styles.tabActive]}
+          onPress={() => onChange(tab)}
+        >
+          <Text style={[styles.tabText, active === tab && styles.tabTextActive]}>
+            {tab}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+tabRow: {
+  flexDirection:   "row",
+  gap:             8,
+  paddingHorizontal: 16,
+  marginBottom:    12,
+},
+tab: {
+  flex:            1,
+  paddingVertical: 8,
+  borderRadius:    20,
+  alignItems:      "center",
+  backgroundColor: "#0f1729",
+  borderWidth:     1,
+  borderColor:     "#1e293b",
+},
+tabActive: {
+  backgroundColor: "rgba(0,180,255,0.15)",
+  borderColor:     "#00b4d8",
+},
+tabText: {
+  fontSize:   12,
+  fontWeight: "600",
+  color:      "#64748b",
+},
+tabTextActive: {
+  color: "#00d4ff",
+},
+
+STATS BAR (4 KOTAK)
+Tampil di bawah filter tabs. Stats berubah sesuai filter tab aktif (SEMUA/BOS/BOW).
+
+function StatsBar({ stats }: { stats: Stats | null }) {
+  const pnl = stats?.avgPnl ?? 0;
+  const wr  = stats?.winRate ?? 0;
+  return (
+    <View style={styles.summaryBar}>
+      <StatBox
+        label="Win Rate"
+        value={`${wr}%`}
+        color={wr >= 50 ? "#22c55e" : "#ef4444"}
+      />
+      <StatBox
+        label="Total Closed"
+        value={String(stats?.total ?? 0)}
+      />
+      <StatBox
+        label="Avg P&L"
+        value={`${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}%`}
+        color={pnl >= 0 ? "#22c55e" : "#ef4444"}
+      />
+      <StatBox
+        label="Avg Hold"
+        value={stats?.avgHoldDays ? `${stats.avgHoldDays}h` : "—"}
+      />
+    </View>
+  );
+}
+function StatBox({ label, value, color = "#e2e8f0" }) {
+  return (
+    <View style={styles.statBox}>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+summaryBar: {
+  flexDirection:   "row",
+  backgroundColor: "#0f1729",
+  borderRadius:    12,
+  marginHorizontal: 16,
+  marginBottom:    12,
+  padding:         12,
+  gap:             4,
+  borderWidth:     1,
+  borderColor:     "rgba(0,180,255,0.1)",
+},
+statBox: {
+  flex:       1,
+  alignItems: "center",
+  gap:        2,
+},
+statValue: {
+  fontSize:   15,
+  fontWeight: "700",
+  color:      "#e2e8f0",
+},
+statLabel: {
+  fontSize:        9,
+  color:           "#64748b",
+  textTransform:   "uppercase",
+  letterSpacing:   0.5,
+},
+
+MONTHLY CHART (Bar Chart)
+Gunakan react-native-chart-kit atau victory-native. Jika belum ada package chart, bisa skip bagian ini dan tampilkan ringkasan angka saja.
+
+Opsi A — Pakai react-native-chart-kit:
+
+import { BarChart } from "react-native-chart-kit";
+import { Dimensions } from "react-native";
+const W = Dimensions.get("window").width - 32;
+function MonthlyChart({ monthly }: { monthly: MonthlyItem[] }) {
+  if (monthly.length === 0) return null;
+  const chartData = {
+    labels:   monthly.map((m) => m.label),
+    datasets: [{ data: monthly.map((m) => m.pnl) }],
+  };
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>📊 Performa Bulanan (%)</Text>
+      <BarChart
+        data={chartData}
+        width={W}
+        height={160}
+        yAxisSuffix="%"
+        yAxisLabel=""
+        chartConfig={{
+          backgroundGradientFrom: "#0b1628",
+          backgroundGradientTo:   "#0b1628",
+          decimalPlaces:          1,
+          color: (opacity = 1) => `rgba(0, 212, 255, ${opacity})`,
+          labelColor: () => "#475569",
+          barPercentage: 0.6,
+        }}
+        style={{ borderRadius: 8 }}
+        fromZero
+      />
+    </View>
+  );
+}
+
+Opsi B — Jika tidak ada chart package (minimal view):
+
+function MonthlyMini({ monthly }: { monthly: MonthlyItem[] }) {
+  if (monthly.length === 0) return null;
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>📊 Performa Bulanan</Text>
+      {monthly.slice(-4).map((m) => (
+        <View key={m.month} style={styles.monthRow}>
+          <Text style={styles.monthLabel}>{m.label}</Text>
+          <View style={styles.monthBarWrap}>
+            <View style={[
+              styles.monthBar,
+              {
+                width:           `${Math.min(Math.abs(m.pnl) * 3, 100)}%`,
+                backgroundColor: m.pnl >= 0 ? "#22c55e" : "#ef4444",
+              }
+            ]} />
+          </View>
+          <Text style={[
+            styles.monthPnl,
+            { color: m.pnl >= 0 ? "#22c55e" : "#ef4444" }
+          ]}>
+            {m.pnl >= 0 ? "+" : ""}{m.pnl.toFixed(1)}%
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+chartCard: {
+  backgroundColor: "#0b1628",
+  borderRadius:    14,
+  marginHorizontal: 16,
+  marginBottom:    12,
+  padding:         14,
+  borderWidth:     1,
+  borderColor:     "#1e293b",
+},
+chartTitle: {
+  fontSize:     13,
+  fontWeight:   "700",
+  color:        "#94a3b8",
+  marginBottom: 10,
+},
+monthRow: {
+  flexDirection:  "row",
+  alignItems:     "center",
+  gap:            8,
+  marginBottom:   6,
+},
+monthLabel: {
+  width:    52,
+  fontSize: 11,
+  color:    "#64748b",
+},
+monthBarWrap: {
+  flex:            1,
+  height:          6,
+  backgroundColor: "#1e293b",
+  borderRadius:    3,
+  overflow:        "hidden",
+},
+monthBar: {
+  height:       6,
+  borderRadius: 3,
+},
+monthPnl: {
+  width:      52,
+  fontSize:   11,
+  fontWeight: "700",
+  textAlign:  "right",
+},
+
+SEKSI: POSISI SEDANG BERJALAN (dengan Auth Gate)
+function OpenSection({ open, loading, token, onGoLogin }) {
+  return (
+    <View style={styles.section}>
+      {/* ── Header seksi ── */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionIcon}>⚡</Text>
+        <Text style={styles.sectionTitle}>Posisi Sedang Berjalan</Text>
+        {token && (
+          <Text style={styles.sectionCount}>{open.length} posisi</Text>
+        )}
+      </View>
+      {/* ── Konten: Auth Gate atau list ── */}
+      {!token ? (
+        // Belum login → tampilkan Lock screen
+        <View style={styles.authGate}>
+          <Text style={styles.lockIcon}>🔒</Text>
+          <Text style={styles.authTitle}>Login untuk melihat posisi terbuka</Text>
+          <Text style={styles.authDesc}>
+            Data posisi aktif hanya tersedia untuk member yang sudah register
+          </Text>
+          <Pressable style={styles.loginBtn} onPress={onGoLogin}>
+            <Text style={styles.loginBtnText}>Login / Daftar →</Text>
+          </Pressable>
+        </View>
+      ) : loading ? (
+        <ActivityIndicator color="#00d4ff" style={{ marginVertical: 16 }} />
+      ) : open.length === 0 ? (
+        <Text style={styles.emptyText}>Tidak ada posisi terbuka saat ini</Text>
+      ) : (
+        open.map((t, i) => <OpenRow key={i} trade={t} />)
+      )}
+    </View>
+  );
+}
+
+Arahkan ke Login screen:
+
+import { useNavigation } from "@react-navigation/native";
+const navigation = useNavigation();
+// Di render:
+<OpenSection
+  open={filteredOpen}
+  loading={openLoading}
+  token={token}
+  onGoLogin={() => navigation.navigate("Login")}
+/>
+
+KOMPONEN: OpenRow
+function OpenRow({ trade }: { trade: OpenTrade }) {
+  const gl         = trade.glPct;
+  const isPhaseHit = trade.slPhase?.toUpperCase().includes("TGT");
+  return (
+    <View style={styles.tradeRow}>
+      {/* Left icon */}
+      <View style={[styles.rowIcon, { backgroundColor: "rgba(245,158,11,0.15)" }]}>
+        <Text style={{ fontSize: 13 }}>⚡</Text>
+      </View>
+      {/* Info tengah */}
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <Text style={styles.symbol}>{trade.symbol}</Text>
+          <SignalBadge type={trade.signalType} />
+          {isPhaseHit && (
+            <View style={styles.phaseHitBadge}>
+              <Text style={styles.phaseHitText}>🎯 Target Hit</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.tradeSubText}>
+          Entry {trade.entry.toLocaleString("id-ID")} · {trade.hold || `${trade.holdDays} hari`}
+        </Text>
+      </View>
+      {/* P&L kanan */}
+      <Text style={[styles.pnlText, { color: gl > 0 ? "#22c55e" : gl < 0 ? "#ef4444" : "#94a3b8" }]}>
+        {gl > 0 ? "+" : ""}{gl.toFixed(1)}%
+      </Text>
+    </View>
+  );
+}
+
+KOMPONEN: ClosedRow
+function ClosedRow({ trade }: { trade: ClosedTrade }) {
+  const gl = trade.glPct;
+  return (
+    <View style={styles.tradeRow}>
+      {/* Left icon — centang hijau atau silang merah */}
+      <View style={[
+        styles.rowIcon,
+        { backgroundColor: trade.win ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)" }
+      ]}>
+        <Text style={{ fontSize: 13 }}>{trade.win ? "✓" : "✗"}</Text>
+      </View>
+      {/* Info tengah */}
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={styles.symbol}>{trade.symbol}</Text>
+          <SignalBadge type={trade.signalType} />
+        </View>
+        <Text style={styles.tradeSubText}>
+          {trade.date}
+          {trade.holdDays > 0 ? ` · ${trade.holdDays} hari` : ""}
+          {trade.exitReason ? ` · ${trade.exitReason}` : ""}
+        </Text>
+      </View>
+      {/* P&L kanan */}
+      <Text style={[styles.pnlText, { color: gl > 0 ? "#22c55e" : gl < 0 ? "#ef4444" : "#94a3b8" }]}>
+        {gl > 0 ? "+" : ""}{gl.toFixed(1)}%
+      </Text>
+    </View>
+  );
+}
+
+KOMPONEN: SignalBadge (BOW/BOS)
+function SignalBadge({ type }: { type: "BOW" | "BOS" }) {
+  const isBow = type === "BOW";
+  return (
+    <View style={{
+      backgroundColor: isBow ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
+      paddingHorizontal: 6,
+      paddingVertical:   2,
+      borderRadius:      5,
+    }}>
+      <Text style={{
+        fontSize:   10,
+        fontWeight: "700",
+        color:      isBow ? "#22c55e" : "#3b82f6",
+      }}>
+        {type}
+      </Text>
+    </View>
+  );
+}
+
+STYLE BERSAMA (shared)
+section: {
+  backgroundColor: "#0b1628",
+  borderRadius:    14,
+  marginHorizontal: 16,
+  marginBottom:    12,
+  borderWidth:     1,
+  borderColor:     "#1e293b",
+  overflow:        "hidden",
+},
+sectionHeader: {
+  flexDirection:  "row",
+  alignItems:     "center",
+  gap:            8,
+  padding:        12,
+  borderBottomWidth: 1,
+  borderBottomColor: "#1e293b",
+},
+sectionIcon: {
+  fontSize: 14,
+},
+sectionTitle: {
+  flex:       1,
+  fontSize:   13,
+  fontWeight: "700",
+  color:      "#e2e8f0",
+},
+sectionCount: {
+  fontSize: 11,
+  color:    "#475569",
+},
+tradeRow: {
+  flexDirection:  "row",
+  alignItems:     "center",
+  gap:            10,
+  paddingVertical:   10,
+  paddingHorizontal: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: "#0f1729",
+},
+rowIcon: {
+  width:         28,
+  height:        28,
+  borderRadius:  14,
+  alignItems:    "center",
+  justifyContent:"center",
+},
+symbol: {
+  fontSize:      14,
+  fontWeight:    "800",
+  color:         "#f1f5f9",
+  letterSpacing: 0.3,
+},
+tradeSubText: {
+  fontSize:  11,
+  color:     "#475569",
+  marginTop: 1,
+},
+pnlText: {
+  fontSize:      14,
+  fontWeight:    "800",
+  textAlign:     "right",
+  minWidth:      52,
+},
+// — Auth Gate
+authGate: {
+  alignItems:  "center",
+  padding:     24,
+  gap:         8,
+},
+lockIcon: {
+  fontSize:     28,
+  marginBottom: 4,
+},
+authTitle: {
+  fontSize:   14,
+  fontWeight: "700",
+  color:      "#e2e8f0",
+  textAlign:  "center",
+},
+authDesc: {
+  fontSize:  12,
+  color:     "#475569",
+  textAlign: "center",
+},
+loginBtn: {
+  marginTop:        8,
+  backgroundColor:  "rgba(0,180,255,0.2)",
+  borderWidth:      1,
+  borderColor:      "#00b4d8",
+  borderRadius:     10,
+  paddingHorizontal: 20,
+  paddingVertical:  10,
+},
+loginBtnText: {
+  color:      "#00d4ff",
+  fontWeight: "700",
+  fontSize:   13,
+},
+emptyText: {
+  textAlign:  "center",
+  color:      "#475569",
+  fontSize:   13,
+  paddingVertical: 16,
+},
+
+EMPTY STATE GLOBAL
+Tampil hanya jika data.closed.length === 0 DAN openData.length === 0.
+
+function EmptyState() {
+  return (
+    <View style={styles.emptyGlobal}>
+      <Text style={styles.emptyGlobalIcon}>📊</Text>
+      <Text style={styles.emptyGlobalTitle}>Data belum tersedia</Text>
+      <Text style={styles.emptyGlobalDesc}>
+        Admin belum mengupload sinyal yang memiliki posisi closed.
+      </Text>
+    </View>
+  );
+}
+
+emptyGlobal: {
+  alignItems:  "center",
+  paddingVertical: 48,
+  gap: 8,
+},
+emptyGlobalIcon: {
+  fontSize: 36,
+  opacity:  0.4,
+},
+emptyGlobalTitle: {
+  fontSize:   15,
+  fontWeight: "700",
+  color:      "#64748b",
+},
+emptyGlobalDesc: {
+  fontSize:  12,
+  color:     "#475569",
+  textAlign: "center",
+  paddingHorizontal: 32,
+},
+
+FOOTER NOTE
+Tampil di bawah semua konten.
+
+function FooterNote({ meta }: { meta: JejakData["meta"] | null }) {
+  const bosDate = meta?.bosUploadedAt
+    ? new Date(meta.bosUploadedAt).toLocaleDateString("id-ID", {
+        day: "numeric", month: "long", year: "numeric",
+      })
+    : null;
+  return (
+    <View style={styles.footer}>
+      <Text style={styles.footerTitle}>📌 Tentang Jejak Cuan</Text>
+      <Text style={styles.footerText}>
+        Data diambil otomatis dari sinyal BOS & BOW yang diupload admin setiap hari.
+        Semua trade adalah sinyal nyata berdasarkan analisis teknikal — bukan backtest.
+      </Text>
+      <Text style={styles.footerText}>
+        Win = posisi ditutup dengan G/L {">"} 0%. Performa tidak menjamin hasil di masa depan.
+      </Text>
+      {bosDate && (
+        <Text style={styles.footerSub}>BOS update: {bosDate}</Text>
+      )}
+    </View>
+  );
+}
+
+footer: {
+  marginHorizontal: 16,
+  marginBottom:     32,
+  backgroundColor:  "#0a1220",
+  borderRadius:     12,
+  padding:          14,
+  gap:              6,
+},
+footerTitle: {
+  fontSize:     12,
+  fontWeight:   "700",
+  color:        "#94a3b8",
+  marginBottom: 4,
+},
+footerText: {
+  fontSize:   11,
+  color:      "#475569",
+  lineHeight: 16,
+},
+footerSub: {
+  fontSize: 10,
+  color:    "#334155",
+  marginTop: 4,
+},
+
+LOADING STATE
+if (loading) {
+  return (
+    <View style={{ flex: 1, backgroundColor: "#060e1f", justifyContent: "center", alignItems: "center" }}>
+      <ActivityIndicator color="#00d4ff" size="large" />
+      <Text style={{ color: "#475569", marginTop: 12, fontSize: 13 }}>Memuat data...</Text>
+    </View>
+  );
+}
+
+ERROR STATE
+if (error) {
+  return (
+    <View style={{ flex: 1, backgroundColor: "#060e1f", justifyContent: "center", alignItems: "center", padding: 32 }}>
+      <Text style={{ fontSize: 28, marginBottom: 12 }}>⚠️</Text>
+      <Text style={{ color: "#ef4444", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>
+        Gagal memuat data
+      </Text>
+      <Text style={{ color: "#475569", fontSize: 12, textAlign: "center", marginBottom: 16 }}>
+        {error}
+      </Text>
+      <Pressable style={styles.loginBtn} onPress={handleRefresh}>
+        <Text style={styles.loginBtnText}>Coba Lagi</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+STRUKTUR RENDER LENGKAP
+return (
+  <View style={{ flex: 1, backgroundColor: "#060e1f" }}>
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <ScreenHeader onRefresh={handleRefresh} loading={loading} />
+      <FilterTabs active={filter} onChange={setFilter} />
+      <StatsBar stats={stats} />
+      <MonthlyMini monthly={data?.monthly ?? []} />
+      <OpenSection
+        open={filteredOpen}
+        loading={openLoading}
+        token={token}
+        onGoLogin={() => navigation.navigate("Login")}
+      />
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionIcon}>✓</Text>
+          <Text style={styles.sectionTitle}>Riwayat Posisi Closed</Text>
+          <Text style={styles.sectionCount}>{filteredClosed.length} trade</Text>
+        </View>
+        {filteredClosed.length === 0 ? (
+          <Text style={styles.emptyText}>Belum ada trade yang closed</Text>
+        ) : (
+          filteredClosed.map((t, i) => <ClosedRow key={i} trade={t} />)
+        )}
+      </View>
+      {!loading && data && data.closed.length === 0 && openData.length === 0 && (
+        <EmptyState />
+      )}
+      <FooterNote meta={data?.meta ?? null} />
+    </ScrollView>
+  </View>
+);
+
+CHECKLIST IMPLEMENTASI
+ Ganti nama screen di navigator: "TradeLog" → "JejakCuan" (atau pertahankan key lama agar tidak break nav)
+ Ganti label bottom tab: "Trade Log" → "Jejak Cuan" dengan icon trophy / chart
+ Hapus tombol "+ Tambah" dari header
+ Hapus ModalTambah dan ModalTutup (tidak dibutuhkan)
+ Hapus device ID logic — tidak dipakai di Jejak Cuan
+ Tambahkan auth token read dari SecureStore
+ Panggil dua endpoint terpisah (publik + auth)
+ Stats bar berubah saat ganti filter tab SEMUA/BOS/BOW
+ Auth gate di seksi Posisi Open → tombol arahkan ke Login screen
+ Pull-to-refresh dengan RefreshControl pada ScrollView
+Pull-to-Refresh (opsional tapi recommended):
+<ScrollView
+  refreshControl={
+    <RefreshControl
+      refreshing={loading}
+      onRefresh={handleRefresh}
+      tintColor="#00d4ff"
+    />
+  }
+>
+
+ICON BOTTOM TAB
+Ganti icon tab dari clipboard/list menjadi trophy atau chart:
+
+// Jika pakai @expo/vector-icons / Ionicons
+<Ionicons name="trophy-outline" size={22} color={focused ? "#00d4ff" : "#64748b"} />
+// Atau Feather
+<Feather name="award" size={22} color={focused ? "#00d4ff" : "#64748b"} />
+
+Label tab: "Jejak Cuan" (bisa disingkat "Jejak" jika terlalu panjang di bar bawah)

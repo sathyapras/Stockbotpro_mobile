@@ -25,8 +25,8 @@ function NativeTabLayout() {
         <Label>Stockpick</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="trading-log">
-        <Icon sf={{ default: "chart.line.uptrend.xyaxis", selected: "chart.line.uptrend.xyaxis.circle.fill" }} />
-        <Label>Trade Log</Label>
+        <Icon sf={{ default: "trophy", selected: "trophy.fill" }} />
+        <Label>Jejak Cuan</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="screener">
         <Icon sf={{ default: "line.3.horizontal.decrease.circle", selected: "line.3.horizontal.decrease.circle.fill" }} />
@@ -129,12 +129,12 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="trading-log"
         options={{
-          title: "Trade Log",
+          title: "Jejak Cuan",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="chart.line.uptrend.xyaxis" tintColor={color} size={24} />
+              <SymbolView name="trophy" tintColor={color} size={24} />
             ) : (
-              <Feather name="book-open" size={22} color={color} />
+              <Feather name="award" size={22} color={color} />
             ),
         }}
       />
