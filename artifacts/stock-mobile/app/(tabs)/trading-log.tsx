@@ -414,11 +414,9 @@ function FooterNote({ meta }: { meta: JejakData["meta"] | null }) {
     <View style={styles.footer}>
       <Text style={styles.footerTitle}>📌 Tentang Jejak Cuan</Text>
       <Text style={styles.footerText}>
-        Data diambil otomatis dari sinyal BOS & BOW yang diupload admin setiap hari.
-        Semua trade adalah sinyal nyata berdasarkan analisis teknikal — bukan backtest.
-      </Text>
-      <Text style={styles.footerText}>
-        Win = posisi ditutup dengan G/L {">"} 0%. Performa tidak menjamin hasil di masa depan.
+        Setiap data dalam portofolio ini merupakan kurasi presisi dari sinyal BOS & BOW harian.
+        Kami menyajikan realitas pasar, bukan sekadar proyeksi backtest. Ini adalah manifestasi
+        strategi riil yang lahir dari ketajaman analisis teknikal di medan tempur yang sesungguhnya.
       </Text>
       {bosDate && <Text style={styles.footerSub}>BOS update: {bosDate}</Text>}
     </View>
