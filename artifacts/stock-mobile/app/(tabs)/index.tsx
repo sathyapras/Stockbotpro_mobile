@@ -372,7 +372,7 @@ function CommandMiniCard({ card }: { card: CCCard }) {
       style={{
         flex: 1, borderRadius: 14, padding: 13,
         backgroundColor: colors.card,
-        borderWidth: 1, borderColor: colors.border,
+        borderWidth: 1, borderColor: card.color + "30",
       }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
         <Text style={{ fontSize: 16 }}>{card.icon}</Text>
@@ -475,7 +475,7 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
             style={{
               flex: 1, borderRadius: 14, padding: 13,
               backgroundColor: colors.card,
-              borderWidth: 1, borderColor: colors.border,
+              borderWidth: 1, borderColor: "#fb923c30",
             }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
               <Text style={{ fontSize: 15 }}>🔄</Text>
@@ -516,7 +516,7 @@ function CommandCenter({ radar, loading, sectors }: { radar: RadarMarket[]; load
             style={{
               flex: 1, borderRadius: 14, padding: 13,
               backgroundColor: colors.card,
-              borderWidth: 1, borderColor: colors.border,
+              borderWidth: 1, borderColor: "#06b6d430",
             }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
               <Text style={{ fontSize: 15 }}>🔭</Text>
