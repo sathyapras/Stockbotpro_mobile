@@ -119,8 +119,8 @@ function buildHakaHakiFlow(stocks: RadarMarket[]) {
   return {
     nbs5d: total5d,   nbs5dStr:  formatT(total5d),
     nbs10d: total10d, nbs10dStr: formatT(total10d),
-    label5d:  total5d  >= 0 ? "Haka dominan (Akumulasi)" : "Haki dominan (Distribusi)",
-    label10d: total10d >= 0 ? "Haka dominan (Akumulasi)" : "Haki dominan (Distribusi)",
+    label5d:  total5d  >= 0 ? "Aggressor Buy (Akumulasi)" : "Aggressor Sell (Distribusi)",
+    label10d: total10d >= 0 ? "Aggressor Buy (Akumulasi)" : "Aggressor Sell (Distribusi)",
     color5d:  total5d  >= 0 ? "#34d399" : "#f87171",
     color10d: total10d >= 0 ? "#34d399" : "#f87171",
   };
@@ -199,7 +199,7 @@ function FlowStateCard({ stocks }: { stocks: RadarMarket[] }) {
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>👥 Flow State</Text>
       </View>
-      <Text style={styles.cardSubtitle}>Primary Truth — HakaHaki Power</Text>
+      <Text style={styles.cardSubtitle}>Primary Truth — Aggressor Power</Text>
       {flows.map(f => (
         <View key={f.key} style={[styles.row, { gap: 8, marginBottom: 8 }]}>
           <Text style={[styles.flowLabel, { color: f.color }]}>{f.label}</Text>
@@ -309,16 +309,16 @@ function HakaHakiFlowCard({ stocks }: { stocks: RadarMarket[] }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>🎯 Haka/Haki Flow</Text>
-        <Text style={styles.cardSub}>Offer vs Bid 5D & 10D</Text>
+        <Text style={styles.cardTitle}>🎯 Aggressor Flow</Text>
+        <Text style={styles.cardSub}>Buy/Sell Aggression</Text>
       </View>
       <Text style={styles.cardSubtitle}>
-        Haka (Hajar Kanan) = beli di Offer · Haki (Hajar Kiri) = jual di Bid
+        Aksi beli atau jual yang agresif dengan langsung menyapu antrean
       </Text>
       <View style={{ flexDirection: "row", gap: 12 }}>
         {[
-          { label: "Net Haka/Haki 5D",  value: flow.nbs5dStr,  sub: flow.label5d,  color: flow.color5d  },
-          { label: "Net Haka/Haki 10D", value: flow.nbs10dStr, sub: flow.label10d, color: flow.color10d },
+          { label: "Net Aggressor 5D",  value: flow.nbs5dStr,  sub: flow.label5d,  color: flow.color5d  },
+          { label: "Net Aggressor 10D", value: flow.nbs10dStr, sub: flow.label10d, color: flow.color10d },
         ].map(item => (
           <View key={item.label} style={[styles.flowBox]}>
             <Text style={styles.flowBoxLabel}>{item.label}</Text>
@@ -452,7 +452,7 @@ function SignalSynthesisCard({
           </Text>
         </View>
       </View>
-      <Text style={styles.cardSubtitle}>Broker Net Flow × Haka/Haki — Combined Intelligence</Text>
+      <Text style={styles.cardSubtitle}>Broker Net Flow × Aggressor Flow — Combined Intelligence</Text>
 
       {/* Scenario verdict box */}
       <View style={[styles.verdictBox, { backgroundColor: syn.bg, borderColor: syn.border }]}>
@@ -468,7 +468,7 @@ function SignalSynthesisCard({
           <Text style={[styles.signalPillValue, { color: syn.brokerColor }]}>{syn.brokerLabel}</Text>
         </View>
         <View style={[styles.signalPill, { borderColor: syn.hakaColor + "55", backgroundColor: syn.hakaColor + "11" }]}>
-          <Text style={styles.signalPillLabel}>🎯 Haka/Haki 5D</Text>
+          <Text style={styles.signalPillLabel}>🎯 Aggressor 5D</Text>
           <Text style={[styles.signalPillValue, { color: syn.hakaColor }]}>{syn.hakaLabel}</Text>
         </View>
       </View>
