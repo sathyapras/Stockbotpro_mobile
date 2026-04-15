@@ -105,16 +105,17 @@ function parseCommentary(raw: string): { badge: string | null; body: string } | 
 }
 
 /** Robo Commentary block — parses and renders nicely */
-function RoboCommentary({ commentary, colors, showTitle = true }: {
+function RoboCommentary({ commentary, colors, showTitle = true, title = "ROBO COMMENTARY" }: {
   commentary: string;
   colors: ReturnType<typeof useColors>;
   showTitle?: boolean;
+  title?: string;
 }) {
   const parsed = parseCommentary(commentary);
   if (!parsed) return null;
   return (
     <>
-      {showTitle && <SectionTitle title="ROBO COMMENTARY" colors={colors} />}
+      {showTitle && <SectionTitle title={title} colors={colors} />}
       <View style={{ borderRadius: 12, borderWidth: 1, borderColor: colors.border,
         backgroundColor: colors.card, padding: 12, gap: 8 }}>
         {parsed.badge && (
@@ -392,7 +393,7 @@ function TradingPlanContent({ plan, ms, colors }: {
       </View>
 
       {/* Commentary */}
-      <RoboCommentary commentary={plan.commentary} colors={colors} />
+      <RoboCommentary commentary={plan.commentary} colors={colors} title="TRADING COMMENTARY" />
     </ScrollView>
   );
 }
@@ -560,7 +561,7 @@ function HoldModeContent({ plan, price, ticker, strategies, colors }: {
       {/* Commentary — BOW/BOS: dari data AFL sendiri | lainnya: dari Robo Commentary API */}
       {isBowBos ? (
         plan.commentary ? (
-          <RoboCommentary commentary={plan.commentary} colors={colors} />
+          <RoboCommentary commentary={plan.commentary} colors={colors} title="TRADING COMMENTARY" />
         ) : null
       ) : (
         roboData?.commentary ? (
