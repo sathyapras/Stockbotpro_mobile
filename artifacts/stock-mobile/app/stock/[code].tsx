@@ -424,6 +424,8 @@ function HoldModeContent({ plan, price, ticker, strategies, colors }: {
     : null;
   const daysHeld = plan.holdDays;
 
+  const isBowBos = plan.type === "BOW" || plan.type === "BOS";
+
   const { data: roboData } = useQuery<{ ticker: string; date: string; commentary: string }>({
     queryKey: ["robocommentary", ticker],
     queryFn: async () => {
@@ -434,6 +436,7 @@ function HoldModeContent({ plan, price, ticker, strategies, colors }: {
     },
     staleTime: 15 * 60 * 1000,
     retry: 1,
+    enabled: !isBowBos,
   });
 
   // Merge: prefer quote strategies array, fallback to parsing plan.commentary
@@ -554,16 +557,22 @@ function HoldModeContent({ plan, price, ticker, strategies, colors }: {
         </View>
       )}
 
-      {/* Robo Commentary — from API, not plan.commentary */}
-      {roboData?.commentary ? (
-        <View>
-          <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700",
-            letterSpacing: 0.5, marginBottom: 4 }}>
-            ROBO COMMENTARY · {roboData.date}
-          </Text>
-          <RoboCommentary commentary={roboData.commentary} colors={colors} showTitle={false} />
-        </View>
-      ) : null}
+      {/* Commentary — BOW/BOS: dari data AFL sendiri | lainnya: dari Robo Commentary API */}
+      {isBowBos ? (
+        plan.commentary ? (
+          <RoboCommentary commentary={plan.commentary} colors={colors} />
+        ) : null
+      ) : (
+        roboData?.commentary ? (
+          <View>
+            <Text style={{ color: colors.mutedForeground, fontSize: 9, fontWeight: "700",
+              letterSpacing: 0.5, marginBottom: 4 }}>
+              ROBO COMMENTARY · {roboData.date}
+            </Text>
+            <RoboCommentary commentary={roboData.commentary} colors={colors} showTitle={false} />
+          </View>
+        ) : null
+      )}
     </ScrollView>
   );
 }
