@@ -74,8 +74,8 @@ export function buildSectorStats(
   // Group master stocks by sector
   const sectorMap = new Map<string, MasterStock[]>();
   for (const s of stocks) {
-    const sec = s.sector?.trim() || "Lainnya";
-    if (!sec || sec === "-" || sec === "") continue;
+    const sec = s.sector?.trim() || "";
+    if (!sec || sec === "-" || sec.toLowerCase() === "undefined" || sec.toLowerCase() === "null") continue;
     const arr = sectorMap.get(sec) ?? [];
     arr.push(s);
     sectorMap.set(sec, arr);

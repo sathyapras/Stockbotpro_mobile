@@ -100,7 +100,7 @@ function parseMasterStock(raw: any): MasterStock[] {
     .map((r: any): MasterStock => ({
       symbol:        r.symbol        ?? r.Ticker     ?? r.ticker     ?? "",
       name:          r.name          ?? r.Name       ?? r.CompName   ?? r.symbol ?? r.Ticker ?? "",
-      sector:        r.sector        ?? r.Sector     ?? "",
+      sector:        (r.sector && r.sector !== "undefined" && r.sector !== "null" ? r.sector : null) ?? (r.Sector && r.Sector !== "undefined" ? r.Sector : null) ?? "",
       industry:      r.industry      ?? r.Industry   ?? "",
       indexCategory: r.indexCategory ?? r.IndexCat   ?? r.IndexCategory ?? r.Index ?? "",
       date:          r.date          ?? r.Date       ?? "",
