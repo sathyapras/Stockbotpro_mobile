@@ -37,7 +37,17 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#0ea5e9",
+          "sounds": ["./assets/sounds/startup.wav"],
+          "androidMode": "default",
+          "androidCollapsedTitle": "Stockbot Pro"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

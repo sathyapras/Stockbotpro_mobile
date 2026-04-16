@@ -27,6 +27,10 @@ import { fetchSettings } from "@/services/settingsService";
 import { fetchSmartMoneyFlow } from "@/services/smartMoneyService";
 import { fetchAllPicks } from "@/services/stockpickService";
 import { fetchScreener } from "@/services/stockToolsService";
+import {
+  registerForPushNotifications,
+  addNotificationListeners,
+} from "@/services/pushNotificationService";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -143,8 +147,25 @@ export default function RootLayout() {
     if (fontsReady) {
       SplashScreen.hideAsync();
       prefetchAll();
+      // Register for push notifications (non-blocking, silent fail)
+      registerForPushNotifications();
     }
   }, [fontsReady]);
+
+  // Listen for incoming notifications & user taps
+  useEffect(() => {
+    const remove = addNotificationListeners(
+      (notification) => {
+        // Foreground notification received — log only
+        console.log("[Push] received:", notification.request.content.title);
+      },
+      (response) => {
+        // User tapped a notification — could navigate based on data
+        console.log("[Push] tapped:", response.notification.request.content.data);
+      },
+    );
+    return remove;
+  }, []);
 
   if (!fontsReady) return null;
 

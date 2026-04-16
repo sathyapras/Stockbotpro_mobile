@@ -77,7 +77,7 @@ function forward(req: Request, res: Response, upstreamPath: string) {
 
 // ─── Middleware: forward matching prefixes ────────────────────
 
-const PREFIXES = ["/affiliate", "/payments", "/auth"];
+const PREFIXES = ["/affiliate", "/payments", "/auth", "/notifications"];
 
 router.use((req: Request, res: Response, next: NextFunction) => {
   const path = req.path;
