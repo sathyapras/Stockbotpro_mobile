@@ -43,12 +43,13 @@ export default function SubscribeScreen() {
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [error,           setError]           = useState("");
 
-  // Load plans
-  const { data: plans = [], isLoading: loadingPlans } = useQuery<Plan[]>({
+  // Load plans — only show "pro"
+  const { data: allPlans = [], isLoading: loadingPlans } = useQuery<Plan[]>({
     queryKey: ["plans"],
     queryFn: fetchPlans,
     staleTime: 60 * 60 * 1000,
   });
+  const plans = allPlans.filter(p => p.planName === "pro");
 
   // Auto-select first plan once loaded
   useEffect(() => {
