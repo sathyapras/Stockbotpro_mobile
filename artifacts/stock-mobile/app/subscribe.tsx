@@ -259,9 +259,9 @@ const ALL_FEATURES = [
   { icon: "🤖", text: "RoboCommentary — analisis naratif AI untuk 290+ saham IDX setiap hari" },
   { icon: "📊", text: "Chart Teknikal — candlestick, MA50 Distance, ADX, Support & Resistance" },
   { icon: "🔄", text: "Sector Rotation — pantau sektor Leading vs Lagging setiap sesi" },
-  { icon: "📋", text: "Trading Log — jurnal trade BOW/BOS dengan kalkulasi P&L otomatis" },
+  { icon: "📋", text: "Jejak Cuan — jurnal trade BOW/BOS dengan kalkulasi P&L otomatis" },
   { icon: "🔭", text: "Market Intel — agregasi Broker Flow + Radar dalam satu dashboard" },
-  { icon: "🌍", text: "Sentiment Global — pantau indikator makro & mood pasar dunia" },
+  { icon: "🌍", text: "Sentimen Global — pantau indikator makro & mood pasar dunia" },
   { icon: "🛠️", text: "Stock Tools — 18 strategi screener: Momentum, Reversal, Breakout & lebih" },
 ];
 
