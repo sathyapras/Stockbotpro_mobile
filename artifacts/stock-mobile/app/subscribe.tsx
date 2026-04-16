@@ -74,8 +74,11 @@ export default function SubscribeScreen() {
     if (!token) {
       Alert.alert(
         "Login Diperlukan",
-        "Kamu perlu memasukkan API token akun StockBot Pro sebelum berlangganan. Buka menu → Program Afiliasi untuk input token.",
-        [{ text: "OK" }]
+        "Kamu perlu login ke akun Stockbot Pro terlebih dahulu sebelum berlangganan.",
+        [
+          { text: "Batal", style: "cancel" },
+          { text: "Login", onPress: () => router.push("/login" as any) },
+        ]
       );
       return;
     }

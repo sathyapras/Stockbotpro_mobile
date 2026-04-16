@@ -62,8 +62,10 @@ export default function PaymentSuccessScreen() {
           { icon: "📡", text: "Radar Market — fase Ignition, Accumulation & Distribution" },
           { icon: "🤖", text: "RoboCommentary — analisis AI 290+ saham IDX setiap hari" },
           { icon: "📊", text: "Chart + MA50 Distance, ADX & Support/Resistance" },
-          { icon: "📋", text: "Trading Log — jurnal P&L otomatis per sinyal" },
-          { icon: "🌍", text: "Sentiment Global — indikator makro & mood pasar dunia" },
+          { icon: "🔄", text: "Sector Rotation — pantau sektor Leading vs Lagging setiap sesi" },
+          { icon: "📋", text: "Jejak Cuan — jurnal trade BOW/BOS dengan kalkulasi P&L otomatis" },
+          { icon: "🔭", text: "Market Intel — agregasi Broker Flow + Radar dalam satu dashboard" },
+          { icon: "🌍", text: "Sentimen Global — pantau indikator makro & mood pasar dunia" },
           { icon: "🛠️", text: "Stock Tools — 18 strategi screener: Momentum, Reversal & Breakout" },
         ].map((f, i) => (
           <View key={i} style={{ flexDirection: "row", alignItems: "flex-start",
