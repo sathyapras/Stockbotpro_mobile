@@ -1,22 +1,31 @@
 {
   "expo": {
-    "name": "Stock Insight Mobile",
+    "name": "Stockbot Pro",
     "slug": "stock-mobile",
-    "version": "1.0.0",
+    "version": "5.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stock-mobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0B14"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.stockbotpro.mobile",
+      "buildNumber": "1"
     },
-    "android": {},
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0A0B14"
+      },
+      "package": "com.stockbotpro.mobile",
+      "versionCode": 1
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
