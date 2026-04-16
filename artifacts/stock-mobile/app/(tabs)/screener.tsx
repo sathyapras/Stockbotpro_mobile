@@ -184,7 +184,7 @@ export default function ScreenerScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <TouchableOpacity
               style={[styles.refreshBtn, { borderColor: colors.border }]}
-              onPress={() => router.push("/tutorial" as any)}
+              onPress={() => router.push("/stock-tools-guide" as any)}
             >
               <Text style={{ color: colors.mutedForeground, fontSize: 16 }}>ℹ️</Text>
             </TouchableOpacity>
