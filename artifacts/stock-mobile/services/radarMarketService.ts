@@ -240,12 +240,10 @@ let radarCache: RadarMarket[] | null = null;
 let radarCachedAt = 0;
 const RADAR_TTL = 60 * 60 * 1000;
 
+import { PROXY_BASE } from "../config/api";
+
 function radarProxyUrl(): string {
-  if (Platform.OS === "web") {
-    const { PROXY_BASE } = require("../config/api");
-    return `${PROXY_BASE}/RADAR_MARKET`;
-  }
-  return "http://103.190.28.248/stockbotprodata/RADAR_MARKET";
+  return `${PROXY_BASE}/RADAR_MARKET`;
 }
 
 export async function fetchRadarMarket(): Promise<RadarMarket[]> {

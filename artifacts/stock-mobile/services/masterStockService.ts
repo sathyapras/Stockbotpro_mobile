@@ -1,14 +1,10 @@
-import { Platform } from "react-native";
 import { type Stock } from "./stockData";
+import { PROXY_BASE } from "../config/api";
 
 // ─── Proxy URL helper ─────────────────────────────────────────
 
 function proxyUrl(name: string): string {
-  if (Platform.OS === "web") {
-    const { PROXY_BASE } = require("../config/api");
-    return `${PROXY_BASE}/${name}`;
-  }
-  return `http://103.190.28.248/stockbotprodata/${name}`;
+  return `${PROXY_BASE}/${name}`;
 }
 
 // ─── Master Stock type ────────────────────────────────────────

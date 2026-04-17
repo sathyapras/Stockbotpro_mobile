@@ -8,18 +8,10 @@ import { RadarMarket, fetchRadarBySymbol } from "./radarMarketService";
 import { ScreenerRaw } from "./stockToolsService";
 import { BOWRaw, BOSRaw } from "./stockpickService";
 
+import { PROXY_BASE as _PROXY_BASE } from "../config/api";
+
 function proxyUrl(name: string) {
-  if (Platform.OS === "web") {
-    const { PROXY_BASE } = require("../config/api");
-    return `${PROXY_BASE}/${name}`;
-  }
-  const DIRECT: Record<string, string> = {
-    broksum_data_1d: "http://103.190.28.45/broksum_data_1d.json",
-    BuyOnStrenght_Signal: "http://103.190.28.248/stockbotprodata/BuyOnStrenght_Signal",
-    BuyOnWeakness_Signal: "http://103.190.28.248/stockbotprodata/BuyOnWeakness_Signal",
-    STOCKTOOLS_SCREENER: "http://103.190.28.248/stockbotprodata/STOCKTOOLS_SCREENER",
-  };
-  return DIRECT[name];
+  return `${_PROXY_BASE}/${name}`;
 }
 
 async function fetchJson<T>(name: string): Promise<T> {

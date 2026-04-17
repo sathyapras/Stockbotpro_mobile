@@ -1,17 +1,9 @@
 import { Platform } from "react-native";
 
-// On web (HTTPS), fetch via the API proxy to avoid mixed-content blocking.
-// On native iOS/Android, fetch directly from HTTP (no restriction).
+import { PROXY_BASE } from "../config/api";
+
 function getDataUrl(name: "broksum_data_1d" | "broksum_data_history15d"): string {
-  if (Platform.OS === "web") {
-    const { PROXY_BASE } = require("../config/api");
-    return `${PROXY_BASE}/${name}`;
-  }
-  const DIRECT: Record<string, string> = {
-    broksum_data_1d:         "http://103.190.28.45/broksum_data_1d.json",
-    broksum_data_history15d: "http://103.190.28.45/broksum_data_history15d.json",
-  };
-  return DIRECT[name];
+  return `${PROXY_BASE}/${name}`;
 }
 
 export interface BrokerRow {

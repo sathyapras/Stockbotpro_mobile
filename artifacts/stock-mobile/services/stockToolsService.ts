@@ -1,11 +1,7 @@
-import { Platform } from "react-native";
+import { PROXY_BASE } from "../config/api";
 
 function proxyUrl(name: string): string {
-  if (Platform.OS === "web") {
-    const { PROXY_BASE } = require("../config/api");
-    return `${PROXY_BASE}/${name}`;
-  }
-  return `http://103.190.28.248/stockbotprodata/${name}`;
+  return `${PROXY_BASE}/${name}`;
 }
 
 // ─── Raw AFL row ─────────────────────────────────────────────

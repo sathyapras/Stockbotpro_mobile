@@ -1,15 +1,7 @@
-import { Platform } from "react-native";
+import { PROXY_BASE } from "../config/api";
 
 function proxyUrl(name: string): string {
-  if (Platform.OS === "web") {
-    const { PROXY_BASE } = require("../config/api");
-    return `${PROXY_BASE}/${name}`;
-  }
-  const DIRECT: Record<string, string> = {
-    BuyOnStrenght_Signal: "http://103.190.28.248/stockbotprodata/BuyOnStrenght_Signal",
-    BuyOnWeakness_Signal: "http://103.190.28.248/stockbotprodata/BuyOnWeakness_Signal",
-  };
-  return DIRECT[name];
+  return `${PROXY_BASE}/${name}`;
 }
 
 // ─── Raw types from AFL server ─────────────────────────────────
