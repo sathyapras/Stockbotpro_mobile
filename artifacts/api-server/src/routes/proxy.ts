@@ -71,8 +71,9 @@ router.get("/proxy/:name", async (req: Request, res: Response) => {
 
   if (entry && now - entry.cachedAt < ttl) {
     res.setHeader("Content-Type", "application/json");
-    res.setHeader("Cache-Control", "public, max-age=900");
+    res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Cache", "HIT");
+    res.removeHeader("ETag");
     res.json(entry.data);
     return;
   }
@@ -81,8 +82,9 @@ router.get("/proxy/:name", async (req: Request, res: Response) => {
     const data = await fetchUpstream(cfg);
     cache.set(name, { data, cachedAt: now });
     res.setHeader("Content-Type", "application/json");
-    res.setHeader("Cache-Control", "public, max-age=900");
+    res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Cache", "MISS");
+    res.removeHeader("ETag");
     res.json(data);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
