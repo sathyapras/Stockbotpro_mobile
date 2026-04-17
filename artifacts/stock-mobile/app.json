@@ -54,9 +54,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "eas": {
-        "projectId": "GANTI_DENGAN_PROJECT_ID_DARI_EAS"
-      }
+      "eas": {}
     }
   }
 }
