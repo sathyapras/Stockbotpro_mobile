@@ -8,12 +8,10 @@ export interface RoboCommentaryItem {
 
 export type RoboCommentaryMap = Record<string, RoboCommentaryItem>;
 
+import { PROXY_BASE } from "../config/api";
+
 function roboCommentaryUrl(): string {
-  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-  if (Platform.OS === "web") {
-    return `https://${domain}/api/proxy/RoboCommentary`;
-  }
-  return `https://${domain}/api/proxy/RoboCommentary`;
+  return `${PROXY_BASE}/RoboCommentary`;
 }
 
 export async function fetchRoboCommentary(): Promise<RoboCommentaryMap> {

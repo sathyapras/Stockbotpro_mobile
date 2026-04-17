@@ -10,10 +10,10 @@ export async function clearAuthToken(): Promise<void> {
   return AsyncStorage.removeItem(TOKEN_KEY);
 }
 
+import { API_BASE } from "../config/api";
+
 function apiBase(): string {
-  const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    if (d) return `https://${d}/api`;
-    return "http://localhost:8080/api";
+  return API_BASE;
 }
 
 async function fetchAuth(path: string, opts?: RequestInit): Promise<Response> {

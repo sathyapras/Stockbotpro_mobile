@@ -22,13 +22,10 @@ export const PERIODS: { key: PeriodKey; label: string; days: number }[] = [
 
 // ─── API URL ───────────────────────────────────────────────────
 
+import { API_BASE } from "../config/api";
+
 function apiBaseUrl(): string {
-  if (Platform.OS === "web") {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${d}/api`;
-  }
-  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost";
-  return `https://${domain}/api`;
+  return API_BASE;
 }
 
 // ─── Fetch (all data, filter client-side) ──────────────────────

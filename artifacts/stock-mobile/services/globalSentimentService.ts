@@ -2,10 +2,10 @@ import { Platform } from "react-native";
 
 // ─── API base URL ─────────────────────────────────────────────
 
+import { API_BASE } from "../config/api";
+
 function apiBaseUrl(): string {
-  const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-  if (d) return `https://${d}/api`;
-  return "http://localhost:8080/api";
+  return API_BASE;
 }
 
 // ─── Types ────────────────────────────────────────────────────

@@ -2,8 +2,8 @@ import { Platform } from "react-native";
 
 function proxyUrl(name: string): string {
   if (Platform.OS === "web") {
-    const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${domain}/api/proxy/${name}`;
+    const { PROXY_BASE } = require("../config/api");
+    return `${PROXY_BASE}/${name}`;
   }
   return `http://103.190.28.248/stockbotprodata/${name}`;
 }

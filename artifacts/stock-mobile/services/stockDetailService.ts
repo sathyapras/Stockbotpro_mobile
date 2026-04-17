@@ -10,8 +10,8 @@ import { BOWRaw, BOSRaw } from "./stockpickService";
 
 function proxyUrl(name: string) {
   if (Platform.OS === "web") {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${d}/api/proxy/${name}`;
+    const { PROXY_BASE } = require("../config/api");
+    return `${PROXY_BASE}/${name}`;
   }
   const DIRECT: Record<string, string> = {
     broksum_data_1d: "http://103.190.28.45/broksum_data_1d.json",
@@ -30,14 +30,10 @@ async function fetchJson<T>(name: string): Promise<T> {
 
 // ─── Smart Money via server API (per-ticker, efficient) ────────
 
+import { API_BASE } from "../config/api";
+
 function getSmartMoneyUrl(ticker: string): string {
-  if (Platform.OS === "web") {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${d}/api/broker-summary/smart-money?ticker=${ticker}`;
-  }
-  // Native: call API server directly
-  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost";
-  return `https://${domain}/api/broker-summary/smart-money?ticker=${ticker}`;
+  return `${API_BASE}/broker-summary/smart-money?ticker=${ticker}`;
 }
 
 async function fetchSmartMoneyForTicker(ticker: string): Promise<SmartMoneyResult | null> {

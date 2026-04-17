@@ -5,8 +5,8 @@ import { type Stock } from "./stockData";
 
 function proxyUrl(name: string): string {
   if (Platform.OS === "web") {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${d}/api/proxy/${name}`;
+    const { PROXY_BASE } = require("../config/api");
+    return `${PROXY_BASE}/${name}`;
   }
   return `http://103.190.28.248/stockbotprodata/${name}`;
 }

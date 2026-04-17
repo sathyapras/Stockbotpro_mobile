@@ -16,10 +16,10 @@ export interface BrokerFlowAggregate {
   brokerBuyDominance: number;
 }
 
+import { API_BASE } from "../config/api";
+
 function getApiBase(): string {
-  const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-  if (d) return `https://${d}/api`;
-  return "http://localhost:8080/api";
+  return API_BASE;
 }
 
 export async function fetchBrokerFlowAggregate(): Promise<BrokerFlowAggregate> {

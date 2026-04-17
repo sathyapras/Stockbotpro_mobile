@@ -242,8 +242,8 @@ const RADAR_TTL = 60 * 60 * 1000;
 
 function radarProxyUrl(): string {
   if (Platform.OS === "web") {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return `https://${d}/api/proxy/RADAR_MARKET`;
+    const { PROXY_BASE } = require("../config/api");
+    return `${PROXY_BASE}/RADAR_MARKET`;
   }
   return "http://103.190.28.248/stockbotprodata/RADAR_MARKET";
 }
