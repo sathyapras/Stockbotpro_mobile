@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { LoginGate } from "@/components/LoginGate";
 import {
   GRADE_COLOR,
   STATUS_CONFIG,
@@ -302,7 +303,7 @@ function StatusFilter({
 
 // ─── Main screen ─────────────────────────────────────────────
 
-export default function StockpickScreen() {
+function StockpickScreenContent() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top + 8;
@@ -522,3 +523,7 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, textAlign: "center" },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 8 },
 });
+
+export default function StockpickScreen() {
+  return <LoginGate feature="Stockpick"><StockpickScreenContent /></LoginGate>;
+}

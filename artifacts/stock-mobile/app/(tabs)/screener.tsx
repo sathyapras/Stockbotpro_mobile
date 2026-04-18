@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { LoginGate } from "@/components/LoginGate";
 import { MenuButton } from "@/components/MenuButton";
 import { SkeletonListScreen } from "@/components/SkeletonBox";
 import {
@@ -129,7 +130,7 @@ function CategorySection({
 
 // ─── Main screen ─────────────────────────────────────────────
 
-export default function ScreenerScreen() {
+function ScreenerScreenContent() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -337,3 +338,7 @@ const styles = StyleSheet.create({
   toolDesc: { fontSize: 10, lineHeight: 14 },
   arrowIcon: { fontSize: 20, fontWeight: "900", marginTop: 4, alignSelf: "flex-end" },
 });
+
+export default function ScreenerScreen() {
+  return <LoginGate feature="Stock Tools"><ScreenerScreenContent /></LoginGate>;
+}

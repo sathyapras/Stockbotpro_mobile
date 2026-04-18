@@ -1,7 +1,27 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import { Platform } from "react-native";
 
+const SOUND_PREF_KEY = "@stockbot_sound_enabled";
+
 let _sound: Audio.Sound | null = null;
+
+// ── Sound preference (AsyncStorage) ──────────────────────────
+
+export async function isSoundEnabled(): Promise<boolean> {
+  try {
+    const val = await AsyncStorage.getItem(SOUND_PREF_KEY);
+    return val === null ? true : val === "true";
+  } catch {
+    return true;
+  }
+}
+
+export async function setSoundEnabled(enabled: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SOUND_PREF_KEY, enabled ? "true" : "false");
+  } catch {}
+}
 
 // ── Web Audio synthesis ───────────────────────────────────────
 
@@ -9,7 +29,7 @@ function playWebSound() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const master = ctx.createGain();
-    master.gain.setValueAtTime(0.18, ctx.currentTime);
+    master.gain.setValueAtTime(0.07, ctx.currentTime);
     master.connect(ctx.destination);
 
     const notes = [
@@ -59,7 +79,7 @@ async function playNativeSound() {
     const { sound } = await Audio.Sound.createAsync(
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       require("../assets/sounds/startup.wav"),
-      { shouldPlay: true, volume: 0.6 }
+      { shouldPlay: true, volume: 0.25 }
     );
     _sound = sound;
 
@@ -77,6 +97,9 @@ async function playNativeSound() {
 // ── Public API ───────────────────────────────────────────────
 
 export async function playStartupSound() {
+  const enabled = await isSoundEnabled();
+  if (!enabled) return;
+
   if (Platform.OS === "web") {
     playWebSound();
   } else {

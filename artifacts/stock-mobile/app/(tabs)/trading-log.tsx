@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoginGate } from "@/components/LoginGate";
 
 // ─── Constants ────────────────────────────────────────────────
 
@@ -439,7 +440,7 @@ function EmptyState() {
 
 // ─── Main Screen ──────────────────────────────────────────────
 
-export default function JejakCuanScreen() {
+function JejakCuanScreenContent() {
   const router = useRouter();
 
   const [token,       setToken]       = useState<string | null>(null);
@@ -776,3 +777,7 @@ const styles = StyleSheet.create({
   errorTitle:  { color: "#ef4444", fontSize: 14, fontWeight: "700", marginBottom: 4, textAlign: "center" },
   errorDesc:   { color: "#475569", fontSize: 12, textAlign: "center", marginBottom: 12 },
 });
+
+export default function JejakCuanScreen() {
+  return <LoginGate feature="Jejak Cuan"><JejakCuanScreenContent /></LoginGate>;
+}

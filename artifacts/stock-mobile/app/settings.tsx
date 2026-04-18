@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Platform,
   ScrollView,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -17,6 +18,7 @@ import { useColors } from "@/hooks/useColors";
 import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 import { useVerification } from "@/context/VerificationContext";
 import { fetchMe, clearAuthToken, type UserProfile } from "@/services/userService";
+import { isSoundEnabled, setSoundEnabled } from "@/services/soundService";
 
 // ─── Plan config ──────────────────────────────────────────────
 
@@ -202,6 +204,17 @@ export default function SettingsScreen() {
   const { preference, setPreference, effectiveScheme } = useTheme();
   const { needsVerification, dismiss: dismissVerification } = useVerification();
 
+  const [soundOn, setSoundOn] = useState(true);
+
+  useEffect(() => {
+    isSoundEnabled().then(setSoundOn);
+  }, []);
+
+  async function handleSoundToggle(val: boolean) {
+    setSoundOn(val);
+    await setSoundEnabled(val);
+  }
+
   const { data: user, isLoading, isError, error } = useQuery<UserProfile>({
     queryKey: ["me"],
     queryFn: fetchMe,
@@ -279,6 +292,29 @@ export default function SettingsScreen() {
             <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
               marginBottom: 8, letterSpacing: 1 }}>TAMPILAN</Text>
             <ThemeToggle colors={colors} preference={preference} setPreference={setPreference} effectiveScheme={effectiveScheme} />
+          </View>
+
+          {/* Sound toggle — always visible */}
+          <View style={{ marginTop: 16, width: "100%" }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
+              marginBottom: 8, letterSpacing: 1 }}>SUARA</Text>
+            <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 16,
+              flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
+                  🔊 Suara Pembuka
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 3 }}>
+                  Sound saat aplikasi pertama dibuka
+                </Text>
+              </View>
+              <Switch
+                value={soundOn}
+                onValueChange={handleSoundToggle}
+                trackColor={{ false: colors.muted, true: "#0ea5e944" }}
+                thumbColor={soundOn ? "#0ea5e9" : colors.mutedForeground}
+              />
+            </View>
           </View>
         </ScrollView>
       )}
@@ -362,6 +398,28 @@ export default function SettingsScreen() {
             marginHorizontal: 16, marginBottom: 8, letterSpacing: 1 }}>TAMPILAN</Text>
           <View style={{ marginHorizontal: 16, marginBottom: 14 }}>
             <ThemeToggle colors={colors} preference={preference} setPreference={setPreference} effectiveScheme={effectiveScheme} />
+          </View>
+
+          {/* Section: Suara */}
+          <Text style={{ color: colors.mutedForeground, fontSize: 11, fontWeight: "700",
+            marginHorizontal: 16, marginBottom: 8, letterSpacing: 1 }}>SUARA</Text>
+          <View style={{ backgroundColor: colors.card, borderRadius: 14,
+            marginHorizontal: 16, marginBottom: 14, padding: 16,
+            flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
+                🔊 Suara Pembuka
+              </Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 3 }}>
+                Sound saat aplikasi pertama dibuka
+              </Text>
+            </View>
+            <Switch
+              value={soundOn}
+              onValueChange={handleSoundToggle}
+              trackColor={{ false: colors.muted, true: "#0ea5e944" }}
+              thumbColor={soundOn ? "#0ea5e9" : colors.mutedForeground}
+            />
           </View>
 
           {/* Section: Bantuan */}

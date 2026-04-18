@@ -24,7 +24,7 @@
         "backgroundColor": "#0A0B14"
       },
       "package": "com.stockbotpro.mobile",
-      "versionCode": 3,
+      "versionCode": 4,
       "usesCleartextTraffic": true
     },
     "web": {

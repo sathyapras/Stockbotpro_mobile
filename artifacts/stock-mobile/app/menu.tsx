@@ -25,8 +25,8 @@ const APP_TAGLINE   = "Market Intelligence Platform";
 const PLAYSTORE_URL = "https://play.google.com/store/apps/details?id=com.stockbotpro";
 const APPSTORE_URL  = "https://apps.apple.com/app/stockbot-pro/id0000000000";
 
-const PRIVACY_URL   = "https://stockbotpro.replit.app/privacy";
-const TERMS_URL     = "https://stockbotpro.replit.app/terms";
+const PRIVACY_URL   = "https://stockbot.id/privacy-policy";
+const TERMS_URL     = "https://stockbot.id/terms-of-service";
 
 // ─── Helpers ──────────────────────────────────────────────────
 

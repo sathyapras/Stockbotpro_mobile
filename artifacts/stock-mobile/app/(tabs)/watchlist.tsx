@@ -23,6 +23,7 @@ import { MAX_WATCHLIST, useWatchlist } from "@/context/WatchlistContext";
 import { MenuButton } from "@/components/MenuButton";
 import { SkeletonListScreen } from "@/components/SkeletonBox";
 import { useColors } from "@/hooks/useColors";
+import { LoginGate } from "@/components/LoginGate";
 import {
   MasterStock,
   buildStockMap,
@@ -326,7 +327,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 
 // ─── Main Screen ──────────────────────────────────────────────
 
-export default function WatchlistScreen() {
+function WatchlistScreenContent() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist();
@@ -630,3 +631,7 @@ const styles = StyleSheet.create({
   },
   emptyAddText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 });
+
+export default function WatchlistScreen() {
+  return <LoginGate feature="Watchlist"><WatchlistScreenContent /></LoginGate>;
+}
